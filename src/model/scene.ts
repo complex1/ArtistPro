@@ -538,9 +538,15 @@ export function moveLayer(
   return true
 }
 
-export function cloneNode(node: EditorNode, offset = false): EditorNode {
+export function cloneNode(
+  node: EditorNode,
+  offset = false,
+  idMap?: Map<string, string>,
+): EditorNode {
   const copy = structuredClone(node)
+  const previousId = copy.id
   copy.id = nanoid()
+  idMap?.set(previousId, copy.id)
   if (offset) {
     copy.transform.position = {
       x: copy.transform.position.x + 18,
@@ -549,7 +555,7 @@ export function cloneNode(node: EditorNode, offset = false): EditorNode {
     copy.name = `${copy.name} copy`
   }
   if (copy.type === 'group') {
-    copy.children = copy.children.map((child) => cloneNode(child))
+    copy.children = copy.children.map((child) => cloneNode(child, false, idMap))
   } else if (copy.type === 'path') {
     copy.points = copy.points.map((point) => ({ ...point, id: nanoid() }))
   }

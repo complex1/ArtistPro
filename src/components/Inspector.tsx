@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { Copy, Group, Link, Lock, Trash2, Ungroup, Unlink, Unlock } from 'lucide-react'
 import {
@@ -6,9 +7,21 @@ import {
   guideFamilyCount,
   withGuideColor,
 } from '../model/grid'
+import {
+  evaluateNodeAtTime,
+  evaluateTransform,
+  isArmed,
+  propertyLabel,
+} from '../model/animation'
 import { pivotAnchor } from '../model/scene'
 import { retargetPivot } from '../model/transform'
-import type { GridSettings, ImageNode, PivotPreset, Vec2 } from '../model/types'
+import type {
+  AnimatableProperty,
+  GridSettings,
+  ImageNode,
+  PivotPreset,
+  Vec2,
+} from '../model/types'
 import {
   canGroup,
   canUngroup,
@@ -107,6 +120,10 @@ export function Inspector() {
   const nodes = document.children
   const selectedIds = useEditorStore((state) => state.selectedIds)
   const updateNode = useEditorStore((state) => state.updateNode)
+  const editTransform = useEditorStore((state) => state.editTransform)
+  const mode = useEditorStore((state) => state.mode)
+  const playhead = useEditorStore((state) => state.playhead)
+  const togglePropertyArm = useEditorStore((state) => state.togglePropertyArm)
   const updateArtboard = useEditorStore((state) => state.updateArtboard)
   const setDocumentName = useEditorStore((state) => state.setDocumentName)
   const setViewport = useEditorStore((state) => state.setViewport)
@@ -119,6 +136,18 @@ export function Inspector() {
   const grid = document.artboard.grid
   const grouping = canGroup(nodes, selectedIds)
   const ungrouping = canUngroup(nodes, selectedIds)
+
+  if (mode === 'preview') {
+    return (
+      <aside className="inspector">
+        <CollapsibleSection title="Preview">
+          <p className="section-note">
+            Playing the clip. Switch back to Animate to edit keys.
+          </p>
+        </CollapsibleSection>
+      </aside>
+    )
+  }
 
   if (selectedIds.length > 1) {
     return (
@@ -303,20 +332,33 @@ export function Inspector() {
   }
 
   const { transform } = node
+  const view =
+    mode === 'animate'
+      ? evaluateNodeAtTime(node, document.animation, playhead)
+      : node
+  const display =
+    mode === 'animate'
+      ? evaluateTransform(
+          transform,
+          document.animation,
+          node.id,
+          playhead,
+        )
+      : transform
 
   const patchTransform = (patch: Partial<typeof transform>) =>
-    updateNode(node.id, { transform: { ...transform, ...patch } })
+    editTransform(node.id, { ...display, ...patch })
 
   const setVector = (key: 'position' | 'skew', axis: 'x' | 'y', value: number) =>
-    patchTransform({ [key]: { ...transform[key], [axis]: value } })
+    patchTransform({ [key]: { ...display[key], [axis]: value } })
 
   const setScale = (axis: 'x' | 'y', value: number) => {
     if (!scaleLinked) {
-      patchTransform({ scale: { ...transform.scale, [axis]: value } })
+      patchTransform({ scale: { ...display.scale, [axis]: value } })
       return
     }
     const other = axis === 'x' ? 'y' : 'x'
-    const ratio = transform.scale[axis] === 0 ? 1 : transform.scale[other] / transform.scale[axis]
+    const ratio = display.scale[axis] === 0 ? 1 : display.scale[other] / display.scale[axis]
     patchTransform({
       scale: { [axis]: value, [other]: Number((value * ratio).toFixed(3)) } as Vec2,
     })
@@ -333,6 +375,16 @@ export function Inspector() {
       pivotPreset,
       transform: retargetPivot(transform, pivotAnchor(node, pivotPreset)),
     })
+
+  const keyframe = (property: AnimatableProperty) =>
+    mode === 'animate' ? (
+      <KeyframeButton
+        nodeId={node.id}
+        property={property}
+        armed={isArmed(document.animation, node.id, property)}
+        onToggle={togglePropertyArm}
+      />
+    ) : undefined
 
   return (
     <aside key={node.id} className="inspector">
@@ -351,9 +403,25 @@ export function Inspector() {
       </CollapsibleSection>
 
       <CollapsibleSection title="Transform">
+        {mode === 'animate' && (
+          <p className="section-note">
+            Diamonds arm a property. Armed edits write a key at the playhead;
+            disarmed edits change the Draw rest pose.
+          </p>
+        )}
         <PropertyRow label="Position">
-          <ScrubField label="X" value={transform.position.x} onValue={(v) => setVector('position', 'x', v)} />
-          <ScrubField label="Y" value={transform.position.y} onValue={(v) => setVector('position', 'y', v)} />
+          <ScrubField
+            label="X"
+            value={display.position.x}
+            leading={keyframe('position.x')}
+            onValue={(v) => setVector('position', 'x', v)}
+          />
+          <ScrubField
+            label="Y"
+            value={display.position.y}
+            leading={keyframe('position.y')}
+            onValue={(v) => setVector('position', 'y', v)}
+          />
         </PropertyRow>
 
         <PropertyRow
@@ -367,20 +435,37 @@ export function Inspector() {
             />
           }
         >
-          <ScrubField label="X" value={transform.scale.x} step={0.01} onValue={(v) => setScale('x', v)} />
-          <ScrubField label="Y" value={transform.scale.y} step={0.01} onValue={(v) => setScale('y', v)} />
+          <ScrubField
+            label="X"
+            value={display.scale.x}
+            step={0.01}
+            leading={keyframe('scale.x')}
+            onValue={(v) => setScale('x', v)}
+          />
+          <ScrubField
+            label="Y"
+            value={display.scale.y}
+            step={0.01}
+            leading={keyframe('scale.y')}
+            onValue={(v) => setScale('y', v)}
+          />
         </PropertyRow>
 
         <div className="rotation-row">
-          <AngleDial value={transform.rotation} onValue={(rotation) => patchTransform({ rotation })} />
+          <AngleDial value={display.rotation} onValue={(rotation) => patchTransform({ rotation })} />
           <div className="rotation-fields">
-            <ScrubField label="Rotate" value={transform.rotation} onValue={(rotation) => patchTransform({ rotation })} />
+            <ScrubField
+              label="Rotate"
+              value={display.rotation}
+              leading={keyframe('rotation')}
+              onValue={(rotation) => patchTransform({ rotation })}
+            />
             <div className="rotation-presets">
               {[-90, -45, 45, 90].map((step) => (
                 <button
                   type="button"
                   key={step}
-                  onClick={() => patchTransform({ rotation: transform.rotation + step })}
+                  onClick={() => patchTransform({ rotation: display.rotation + step })}
                 >
                   {step > 0 ? `+${step}` : step}°
                 </button>
@@ -390,20 +475,32 @@ export function Inspector() {
         </div>
 
         <PropertyRow label="Skew">
-          <ScrubField label="X" value={transform.skew.x} onValue={(v) => setVector('skew', 'x', v)} />
-          <ScrubField label="Y" value={transform.skew.y} onValue={(v) => setVector('skew', 'y', v)} />
+          <ScrubField
+            label="X"
+            value={display.skew.x}
+            leading={keyframe('skew.x')}
+            onValue={(v) => setVector('skew', 'x', v)}
+          />
+          <ScrubField
+            label="Y"
+            value={display.skew.y}
+            leading={keyframe('skew.y')}
+            onValue={(v) => setVector('skew', 'y', v)}
+          />
         </PropertyRow>
 
         <PropertyRow label="Opacity">
           <SliderField
             label="Opacity"
-            value={transform.opacity}
+            value={display.opacity}
+            leading={keyframe('opacity')}
             onValue={(opacity) => patchTransform({ opacity })}
-            display={`${Math.round(transform.opacity * 100)}%`}
+            display={`${Math.round(display.opacity * 100)}%`}
           />
         </PropertyRow>
       </CollapsibleSection>
 
+      {mode !== 'animate' && (
       <CollapsibleSection title="Pivot">
         <div className="pivot-row">
           <PivotPicker
@@ -417,147 +514,208 @@ export function Inspector() {
         </div>
         <p className="section-note">Artwork stays put while the pivot moves.</p>
       </CollapsibleSection>
+      )}
 
-      {node.type !== 'group' && (
+      {node.type !== 'group' && !(mode === 'animate' && node.type === 'path') && (
         <CollapsibleSection title="Geometry">
-          {node.type === 'rect' ? (
+          {view.type === 'rect' ? (
             <>
               <PropertyRow label="Size">
-                <ScrubField label="W" value={node.width} min={1} onValue={(width) => updateNode(node.id, { width })} />
-                <ScrubField label="H" value={node.height} min={1} onValue={(height) => updateNode(node.id, { height })} />
+                <ScrubField
+                  label="W"
+                  value={view.width}
+                  min={1}
+                  leading={keyframe('width')}
+                  onValue={(width) => updateNode(node.id, { width })}
+                />
+                <ScrubField
+                  label="H"
+                  value={view.height}
+                  min={1}
+                  leading={keyframe('height')}
+                  onValue={(height) => updateNode(node.id, { height })}
+                />
               </PropertyRow>
               <PropertyRow label="Corner">
                 <SliderField
                   label="Corner radius"
-                  value={node.rx}
+                  value={view.rx}
                   min={0}
-                  max={Math.min(node.width, node.height) / 2}
+                  max={Math.min(view.width, view.height) / 2}
                   step={1}
+                  leading={keyframe('rx')}
                   onValue={(rx) => updateNode(node.id, { rx, ry: rx })}
-                  display={`${Math.round(node.rx)}px`}
+                  display={`${Math.round(view.rx)}px`}
                 />
               </PropertyRow>
             </>
-          ) : node.type === 'ellipse' ? (
+          ) : view.type === 'ellipse' ? (
             <PropertyRow label="Radius">
-              <ScrubField label="X" value={node.rx} min={1} onValue={(rx) => updateNode(node.id, { rx })} />
-              <ScrubField label="Y" value={node.ry} min={1} onValue={(ry) => updateNode(node.id, { ry })} />
+              <ScrubField
+                label="X"
+                value={view.rx}
+                min={1}
+                leading={keyframe('rx')}
+                onValue={(rx) => updateNode(node.id, { rx })}
+              />
+              <ScrubField
+                label="Y"
+                value={view.ry}
+                min={1}
+                leading={keyframe('ry')}
+                onValue={(ry) => updateNode(node.id, { ry })}
+              />
             </PropertyRow>
-          ) : node.type === 'path' ? (
+          ) : view.type === 'path' ? (
+            mode !== 'animate' && (
+              <>
+                <PropertyRow label="Points">
+                  <span className="geometry-value">{view.points.length}</span>
+                </PropertyRow>
+                <PropertyRow label="Path">
+                  <Button onClick={() => updateNode(node.id, { closed: !view.closed })}>
+                    {view.closed ? 'Closed' : 'Open'}
+                  </Button>
+                </PropertyRow>
+              </>
+            )
+          ) : view.type === 'pencil' ? (
             <>
-              <PropertyRow label="Points">
-                <span className="geometry-value">{node.points.length}</span>
-              </PropertyRow>
-              <PropertyRow label="Path">
-                <Button onClick={() => updateNode(node.id, { closed: !node.closed })}>
-                  {node.closed ? 'Closed' : 'Open'}
-                </Button>
-              </PropertyRow>
-            </>
-          ) : node.type === 'pencil' ? (
-            <>
-              <PropertyRow label="Samples">
-                <span className="geometry-value">{node.samples.length}</span>
-              </PropertyRow>
+              {mode !== 'animate' && (
+                <PropertyRow label="Samples">
+                  <span className="geometry-value">{view.samples.length}</span>
+                </PropertyRow>
+              )}
               <PropertyRow label="Brush">
-                <span className="geometry-value">
-                  {Math.round(node.settings.size)}px
-                </span>
+                <ScrubField
+                  label="PX"
+                  value={view.settings.size}
+                  min={1}
+                  leading={keyframe('pencil.size')}
+                  onValue={(size) =>
+                    updateNode(node.id, {
+                      settings: { ...node.type === 'pencil' ? node.settings : view.settings, size },
+                    })
+                  }
+                />
+              </PropertyRow>
+              <PropertyRow label="Color">
+                <ColorField
+                  label="Brush color"
+                  value={view.settings.color}
+                  leading={keyframe('pencil.color')}
+                  onValue={(color) =>
+                    updateNode(node.id, {
+                      settings: { ...node.type === 'pencil' ? node.settings : view.settings, color },
+                    })
+                  }
+                />
               </PropertyRow>
             </>
-          ) : node.type === 'image' ? (
+          ) : view.type === 'image' ? (
             <PropertyRow label="Size">
               <ScrubField
                 label="W"
-                value={node.width}
+                value={view.width}
                 min={1}
+                leading={keyframe('width')}
                 onValue={(width) =>
                   updateNode(node.id, {
                     width,
-                    height: width * (node.height / node.width),
+                    height: width * (view.height / view.width),
                   })
                 }
               />
               <ScrubField
                 label="H"
-                value={node.height}
+                value={view.height}
                 min={1}
+                leading={keyframe('height')}
                 onValue={(height) =>
                   updateNode(node.id, {
                     height,
-                    width: height * (node.width / node.height),
+                    width: height * (view.width / view.height),
                   })
                 }
               />
             </PropertyRow>
-          ) : (
+          ) : view.type === 'text' ? (
             <>
-              <PropertyRow label="Content">
-                <TextField
-                  label="Text content"
-                  value={node.text}
-                  onValue={(text) =>
-                    updateNode(node.id, {
-                      text,
-                      width: naturalTextWidth(text, node),
-                    })
-                  }
-                />
-              </PropertyRow>
+              {mode !== 'animate' && (
+                <PropertyRow label="Content">
+                  <TextField
+                    label="Text content"
+                    value={view.text}
+                    onValue={(text) =>
+                      updateNode(node.id, {
+                        text,
+                        width: naturalTextWidth(text, view),
+                      })
+                    }
+                  />
+                </PropertyRow>
+              )}
               <PropertyRow label="Width">
                 <ScrubField
                   label="W"
-                  value={node.width}
+                  value={view.width}
                   min={1}
+                  leading={keyframe('width')}
                   onValue={(width) => updateNode(node.id, { width })}
                 />
               </PropertyRow>
             </>
-          )}
+          ) : null}
         </CollapsibleSection>
       )}
 
-      {node.type === 'text' && (
+      {view.type === 'text' && (
         <CollapsibleSection title="Typography">
-          <PropertyRow label="Font">
-            <Select
-              aria-label="Font family"
-              value={node.fontFamily}
-              onChange={(event) => {
-                const fontFamily = event.target.value
-                updateNode(node.id, {
-                  fontFamily,
-                  width: naturalTextWidth(node.text, { ...node, fontFamily }),
-                })
-              }}
-            >
-              {['Inter', 'Arial', 'Georgia', 'Times New Roman', 'Courier New'].map(
-                (font) => <option key={font}>{font}</option>,
-              )}
-            </Select>
-          </PropertyRow>
+          {mode !== 'animate' && (
+            <PropertyRow label="Font">
+              <Select
+                aria-label="Font family"
+                value={view.fontFamily}
+                onChange={(event) => {
+                  const fontFamily = event.target.value
+                  updateNode(node.id, {
+                    fontFamily,
+                    width: naturalTextWidth(view.text, { ...view, fontFamily }),
+                  })
+                }}
+              >
+                {['Inter', 'Arial', 'Georgia', 'Times New Roman', 'Courier New'].map(
+                  (font) => <option key={font}>{font}</option>,
+                )}
+              </Select>
+            </PropertyRow>
+          )}
           <PropertyRow label="Size">
             <ScrubField
               label="PX"
-              value={node.fontSize}
+              value={view.fontSize}
               min={1}
+              leading={keyframe('fontSize')}
               onValue={(fontSize) =>
                 updateNode(node.id, {
                   fontSize,
-                  width: naturalTextWidth(node.text, { ...node, fontSize }),
+                  width: naturalTextWidth(view.text, { ...view, fontSize }),
                 })
               }
             />
           </PropertyRow>
-          <PropertyRow label="Weight">
+          <PropertyRow
+            label="Weight"
+            action={keyframe('fontWeight')}
+          >
             <Select
               aria-label="Font weight"
-              value={node.fontWeight}
+              value={view.fontWeight}
               onChange={(event) => {
                 const fontWeight = Number(event.target.value)
                 updateNode(node.id, {
                   fontWeight,
-                  width: naturalTextWidth(node.text, { ...node, fontWeight }),
+                  width: naturalTextWidth(view.text, { ...view, fontWeight }),
                 })
               }}
             >
@@ -571,61 +729,79 @@ export function Inspector() {
           <PropertyRow label="Spacing">
             <ScrubField
               label="PX"
-              value={node.letterSpacing}
+              value={view.letterSpacing}
               min={-20}
               max={100}
+              leading={keyframe('letterSpacing')}
               onValue={(letterSpacing) =>
                 updateNode(node.id, {
                   letterSpacing,
-                  width: naturalTextWidth(node.text, {
-                    ...node,
+                  width: naturalTextWidth(view.text, {
+                    ...view,
                     letterSpacing,
                   }),
                 })
               }
             />
           </PropertyRow>
-          <PropertyRow label="Align">
-            <Select
-              aria-label="Text alignment"
-              value={node.textAlign}
-              onChange={(event) =>
-                updateNode(node.id, {
-                  textAlign: event.target.value as typeof node.textAlign,
-                })
-              }
-            >
-              <option value="left">Left</option>
-              <option value="center">Center</option>
-              <option value="right">Right</option>
-            </Select>
-          </PropertyRow>
+          {mode !== 'animate' && (
+            <PropertyRow label="Align">
+              <Select
+                aria-label="Text alignment"
+                value={view.textAlign}
+                onChange={(event) =>
+                  updateNode(node.id, {
+                    textAlign: event.target.value as typeof view.textAlign,
+                  })
+                }
+              >
+                <option value="left">Left</option>
+                <option value="center">Center</option>
+                <option value="right">Right</option>
+              </Select>
+            </PropertyRow>
+          )}
         </CollapsibleSection>
       )}
 
-      {node.type === 'image' && (
-        <ImageProperties node={node} onUpdate={(update) => updateNode(node.id, update)} />
+      {view.type === 'image' && (
+        <ImageProperties
+          node={view}
+          onUpdate={(update) => updateNode(node.id, update)}
+          keyframe={keyframe}
+        />
       )}
 
-      {node.type !== 'group' && node.type !== 'pencil' && node.type !== 'image' && (
+      {view.type !== 'group' && view.type !== 'pencil' && view.type !== 'image' && (
         <CollapsibleSection title="Appearance">
-          {node.type !== 'path' && (
+          {view.type !== 'path' && (
             <PropertyRow label="Fill">
-              <ColorField label="Fill" value={node.fill} onValue={(fill) => updateNode(node.id, { fill })} />
+              <ColorField
+                label="Fill"
+                value={view.fill}
+                leading={keyframe('fill')}
+                onValue={(fill) => updateNode(node.id, { fill })}
+              />
             </PropertyRow>
           )}
           <PropertyRow label="Stroke">
-            <ColorField label="Stroke" value={node.stroke} onValue={(stroke) => updateNode(node.id, { stroke })} />
+            <ColorField
+              label="Stroke"
+              value={view.stroke}
+              leading={keyframe('stroke')}
+              onValue={(stroke) => updateNode(node.id, { stroke })}
+            />
           </PropertyRow>
           <PropertyRow label="Weight">
             <SliderField
               label="Stroke width"
-              value={node.strokeWidth}
+              value={view.strokeWidth}
               min={0}
               max={24}
               step={0.5}
+              leading={keyframe('strokeWidth')}
               onValue={(strokeWidth) => updateNode(node.id, { strokeWidth })}
-              display={`${node.strokeWidth}px`}
+              display={`${view.strokeWidth}px`}
             />
           </PropertyRow>
         </CollapsibleSection>
@@ -633,20 +809,50 @@ export function Inspector() {
 
       <CollapsibleSection title="Effects">
         <EffectsPanel
-          effects={node.effects}
+          effects={view.effects}
           onChange={(effects) => updateNode(node.id, { effects })}
+          keyframe={keyframe}
         />
       </CollapsibleSection>
     </aside>
   )
 }
 
+function KeyframeButton({
+  nodeId,
+  property,
+  armed,
+  onToggle,
+}: {
+  nodeId: string
+  property: AnimatableProperty
+  armed: boolean
+  onToggle: (nodeId: string, property: AnimatableProperty) => void
+}) {
+  return (
+    <button
+      type="button"
+      className={`keyframe-toggle${armed ? ' is-armed' : ''}`}
+      aria-pressed={armed}
+      aria-label={`${armed ? 'Disarm' : 'Arm'} ${propertyLabel(property)}`}
+      title={`${armed ? 'Disarm' : 'Arm'} ${propertyLabel(property)}`}
+      onClick={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        onToggle(nodeId, property)
+      }}
+    />
+  )
+}
+
 function ImageProperties({
   node,
   onUpdate,
+  keyframe,
 }: {
   node: ImageNode
   onUpdate: (update: Partial<ImageNode>) => void
+  keyframe?: (property: AnimatableProperty) => ReactNode
 }) {
   const { adjustments } = node
   const chroma = adjustments.chroma
@@ -700,6 +906,7 @@ function ImageProperties({
             value={node.crop.x}
             min={0}
             max={node.naturalWidth - 1}
+            leading={keyframe?.('crop.x')}
             onValue={(x) => onUpdate({ crop: { ...node.crop, x } })}
           />
           <ScrubField
@@ -707,6 +914,7 @@ function ImageProperties({
             value={node.crop.y}
             min={0}
             max={node.naturalHeight - 1}
+            leading={keyframe?.('crop.y')}
             onValue={(y) => onUpdate({ crop: { ...node.crop, y } })}
           />
         </PropertyRow>
@@ -716,6 +924,7 @@ function ImageProperties({
             value={node.crop.width}
             min={1}
             max={node.naturalWidth - node.crop.x}
+            leading={keyframe?.('crop.width')}
             onValue={(width) => onUpdate({ crop: { ...node.crop, width } })}
           />
           <ScrubField
@@ -723,6 +932,7 @@ function ImageProperties({
             value={node.crop.height}
             min={1}
             max={node.naturalHeight - node.crop.y}
+            leading={keyframe?.('crop.height')}
             onValue={(height) => onUpdate({ crop: { ...node.crop, height } })}
           />
         </PropertyRow>
@@ -748,6 +958,7 @@ function ImageProperties({
             value={adjustments.brightness}
             min={-1}
             max={1}
+            leading={keyframe?.('brightness')}
             onValue={(brightness) => patchAdjustments({ brightness })}
             display={`${Math.round(adjustments.brightness * 100)}%`}
           />
@@ -758,6 +969,7 @@ function ImageProperties({
             value={adjustments.contrast}
             min={-1}
             max={1}
+            leading={keyframe?.('contrast')}
             onValue={(contrast) => patchAdjustments({ contrast })}
             display={`${Math.round(adjustments.contrast * 100)}%`}
           />
@@ -768,6 +980,7 @@ function ImageProperties({
             value={adjustments.saturation}
             min={-1}
             max={2}
+            leading={keyframe?.('saturation')}
             onValue={(saturation) => patchAdjustments({ saturation })}
             display={`${Math.round(adjustments.saturation * 100)}%`}
           />
@@ -784,6 +997,7 @@ function ImageProperties({
           <ColorField
             label="Chroma key color"
             value={chroma.color}
+            leading={keyframe?.('chroma.color')}
             onValue={(color) => patchChroma({ color })}
           />
         </PropertyRow>
@@ -793,6 +1007,7 @@ function ImageProperties({
             value={chroma.tolerance}
             min={0}
             max={0.5}
+            leading={keyframe?.('chroma.tolerance')}
             onValue={(tolerance) => patchChroma({ tolerance })}
             display={`${Math.round(chroma.tolerance * 100)}%`}
           />
@@ -803,6 +1018,7 @@ function ImageProperties({
             value={chroma.feather}
             min={0}
             max={0.5}
+            leading={keyframe?.('chroma.feather')}
             onValue={(feather) => patchChroma({ feather })}
             display={`${Math.round(chroma.feather * 100)}%`}
           />

@@ -27,6 +27,8 @@ const tools: { id: Tool; label: string; icon: typeof MousePointer2 }[] = [
   { id: 'image', label: 'Image', icon: ImageIcon },
 ]
 
+const motionTools: Tool[] = ['select', 'pan']
+
 export function Toolbar() {
   const imageInput = useRef<HTMLInputElement>(null)
   const mode = useEditorStore((state) => state.mode)
@@ -36,7 +38,7 @@ export function Toolbar() {
   const addShape = useEditorStore((state) => state.addShape)
   const addNode = useEditorStore((state) => state.addNode)
 
-  if (mode !== 'draw') {
+  if (mode === 'preview' || mode === 'export') {
     return (
       <aside className="toolbar" aria-label={`${mode} tools`}>
         <div className="toolbar-empty">{mode.slice(0, 1).toUpperCase()}</div>
@@ -44,8 +46,10 @@ export function Toolbar() {
     )
   }
 
+  const visible = mode === 'animate' ? tools.filter((item) => motionTools.includes(item.id)) : tools
+
   return (
-    <aside className="toolbar" aria-label="Drawing tools">
+    <aside className="toolbar" aria-label={mode === 'animate' ? 'Animation tools' : 'Drawing tools'}>
       <input
         ref={imageInput}
         type="file"
@@ -64,7 +68,7 @@ export function Toolbar() {
           }
         }}
       />
-      {tools.map(({ id, label, icon }) => (
+      {visible.map(({ id, label, icon }) => (
         <IconButton
           key={id}
           icon={icon}

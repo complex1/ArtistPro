@@ -54,6 +54,7 @@ export function ScrubField({
   max,
   precision = 2,
   disabled = false,
+  leading,
 }: {
   label: string
   value: number
@@ -63,6 +64,7 @@ export function ScrubField({
   max?: number
   precision?: number
   disabled?: boolean
+  leading?: ReactNode
 }) {
   const [draft, setDraft] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -92,13 +94,15 @@ export function ScrubField({
   }
 
   return (
-    <label className={`scrub-field${dragging ? ' is-dragging' : ''}${disabled ? ' is-disabled' : ''}`}>
+    <label className={`scrub-field${dragging ? ' is-dragging' : ''}${disabled ? ' is-disabled' : ''}${leading ? ' has-leading' : ''}`}>
+      {leading}
       <span className="scrub-handle" onPointerDown={beginScrub}>
         {label}
       </span>
       <input
         className="scrub-input"
         type="number"
+        aria-label={label}
         step={step}
         min={min}
         max={max}
@@ -182,6 +186,7 @@ export function SliderField({
   step = 0.01,
   display,
   disabled = false,
+  leading,
 }: {
   label: string
   value: number
@@ -191,9 +196,11 @@ export function SliderField({
   step?: number
   display: string
   disabled?: boolean
+  leading?: ReactNode
 }) {
   return (
-    <div className={`slider-field${disabled ? ' is-disabled' : ''}`}>
+    <div className={`slider-field${disabled ? ' is-disabled' : ''}${leading ? ' has-leading' : ''}`}>
+      {leading}
       <input
         type="range"
         aria-label={label}
@@ -253,14 +260,17 @@ export function ColorField({
   value,
   onValue,
   disabled = false,
+  leading,
 }: {
   label: string
   value: string
   onValue: (value: string) => void
   disabled?: boolean
+  leading?: ReactNode
 }) {
   return (
-    <div className={`color-field${disabled ? ' is-disabled' : ''}`}>
+    <div className={`color-field${disabled ? ' is-disabled' : ''}${leading ? ' has-leading' : ''}`}>
+      {leading}
       <label className="color-swatch" style={{ background: value }}>
         <input
           type="color"

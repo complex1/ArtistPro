@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import {
   ArrowDown,
   ArrowUp,
@@ -6,7 +7,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { createEffect, effectLabels } from '../model/effects'
-import type { EffectType, LayerEffect } from '../model/types'
+import type { AnimatableProperty, EffectType, LayerEffect } from '../model/types'
 import { Button, IconButton } from '../ui/controls'
 import {
   ColorField,
@@ -18,9 +19,11 @@ import {
 export function EffectsPanel({
   effects,
   onChange,
+  keyframe,
 }: {
   effects: LayerEffect[]
   onChange: (effects: LayerEffect[]) => void
+  keyframe?: (property: AnimatableProperty) => ReactNode
 }) {
   const update = (id: string, patch: Partial<LayerEffect>) =>
     onChange(
@@ -90,6 +93,7 @@ export function EffectsPanel({
             <RadiusControl
               label="Radius"
               value={effect.radius}
+              leading={keyframe?.(`effect.${effect.id}.radius`)}
               onValue={(radius) => update(effect.id, { radius })}
             />
           )}
@@ -100,6 +104,7 @@ export function EffectsPanel({
                 <ScrubField
                   label="X"
                   value={effect.offset.x}
+                  leading={keyframe?.(`effect.${effect.id}.offset.x`)}
                   onValue={(x) =>
                     update(effect.id, {
                       offset: { ...effect.offset, x },
@@ -109,6 +114,7 @@ export function EffectsPanel({
                 <ScrubField
                   label="Y"
                   value={effect.offset.y}
+                  leading={keyframe?.(`effect.${effect.id}.offset.y`)}
                   onValue={(y) =>
                     update(effect.id, {
                       offset: { ...effect.offset, y },
@@ -119,10 +125,12 @@ export function EffectsPanel({
               <RadiusControl
                 label="Blur"
                 value={effect.radius}
+                leading={keyframe?.(`effect.${effect.id}.radius`)}
                 onValue={(radius) => update(effect.id, { radius })}
               />
               <ColorControl
                 effect={effect}
+                keyframe={keyframe}
                 onUpdate={(patch) => update(effect.id, patch)}
               />
             </>
@@ -133,10 +141,12 @@ export function EffectsPanel({
               <RadiusControl
                 label="Radius"
                 value={effect.radius}
+                leading={keyframe?.(`effect.${effect.id}.radius`)}
                 onValue={(radius) => update(effect.id, { radius })}
               />
               <ColorControl
                 effect={effect}
+                keyframe={keyframe}
                 onUpdate={(patch) => update(effect.id, patch)}
               />
             </>
@@ -151,10 +161,12 @@ function RadiusControl({
   label,
   value,
   onValue,
+  leading,
 }: {
   label: string
   value: number
   onValue: (value: number) => void
+  leading?: ReactNode
 }) {
   return (
     <PropertyRow label={label}>
@@ -164,6 +176,7 @@ function RadiusControl({
         min={0}
         max={40}
         step={0.5}
+        leading={leading}
         onValue={onValue}
         display={`${value}px`}
       />
@@ -174,9 +187,11 @@ function RadiusControl({
 function ColorControl({
   effect,
   onUpdate,
+  keyframe,
 }: {
   effect: Extract<LayerEffect, { type: 'drop-shadow' | 'glow' }>
   onUpdate: (patch: Partial<LayerEffect>) => void
+  keyframe?: (property: AnimatableProperty) => ReactNode
 }) {
   return (
     <>
@@ -184,6 +199,7 @@ function ColorControl({
         <ColorField
           label={`${effectLabels[effect.type]} color`}
           value={effect.color}
+          leading={keyframe?.(`effect.${effect.id}.color`)}
           onValue={(color) => onUpdate({ color })}
         />
       </PropertyRow>
@@ -191,6 +207,7 @@ function ColorControl({
         <SliderField
           label={`${effectLabels[effect.type]} opacity`}
           value={effect.opacity}
+          leading={keyframe?.(`effect.${effect.id}.opacity`)}
           onValue={(opacity) => onUpdate({ opacity })}
           display={`${Math.round(effect.opacity * 100)}%`}
         />

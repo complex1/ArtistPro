@@ -223,6 +223,65 @@ export type EditorNode =
   | GroupNode
 export type ShapeType = 'rect' | 'ellipse'
 
+export type AnimatableProperty =
+  | 'position.x'
+  | 'position.y'
+  | 'rotation'
+  | 'scale.x'
+  | 'scale.y'
+  | 'skew.x'
+  | 'skew.y'
+  | 'opacity'
+  | 'fill'
+  | 'stroke'
+  | 'strokeWidth'
+  | 'width'
+  | 'height'
+  | 'rx'
+  | 'ry'
+  | 'fontSize'
+  | 'letterSpacing'
+  | 'fontWeight'
+  | 'pencil.size'
+  | 'pencil.color'
+  | 'brightness'
+  | 'contrast'
+  | 'saturation'
+  | 'chroma.color'
+  | 'chroma.tolerance'
+  | 'chroma.feather'
+  | 'crop.x'
+  | 'crop.y'
+  | 'crop.width'
+  | 'crop.height'
+  | `effect.${string}.radius`
+  | `effect.${string}.opacity`
+  | `effect.${string}.color`
+  | `effect.${string}.offset.x`
+  | `effect.${string}.offset.y`
+
+export type KeyframeEase = 'linear' | 'power2.inOut'
+
+export type KeyframeValue = number | string
+
+export type Keyframe = {
+  id: string
+  time: number
+  value: KeyframeValue
+  easing: KeyframeEase
+}
+
+export type AnimationTrack = {
+  nodeId: string
+  property: AnimatableProperty
+  keys: Keyframe[]
+}
+
+export type DocumentAnimation = {
+  duration: number
+  tracks: AnimationTrack[]
+}
+
 export type EditorDocument = {
   version: 1
   name: string
@@ -233,6 +292,7 @@ export type EditorDocument = {
     grid: GridSettings
   }
   children: EditorNode[]
+  animation: DocumentAnimation
 }
 
 export type EditorMode = 'draw' | 'animate' | 'preview' | 'export'

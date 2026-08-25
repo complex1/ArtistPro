@@ -12,20 +12,23 @@ import { Header } from './components/Header'
 import { Inspector } from './components/Inspector'
 import { LayersPanel } from './components/LayersPanel'
 import { PencilToolConfig } from './components/PencilToolConfig'
+import { PlaybackClock } from './components/PlaybackClock'
+import { Timeline } from './components/Timeline'
 import { Toolbar } from './components/Toolbar'
-import { useEditorStore } from './store/editorStore'
+import { findNode, useEditorStore } from './store/editorStore'
 
 const HEADER_HEIGHT = 44
 const MIN_BOTTOM_HEIGHT = 88
 const MIN_CANVAS_HEIGHT = 160
 const DEFAULT_BOTTOM_HEIGHT = 170
+const ANIMATE_BOTTOM_HEIGHT = 240
 
-function clampBottomHeight(height: number) {
+function clampBottomHeight(height: number, minHeight = MIN_BOTTOM_HEIGHT) {
   const max = Math.max(
-    MIN_BOTTOM_HEIGHT,
+    minHeight,
     window.innerHeight - HEADER_HEIGHT - MIN_CANVAS_HEIGHT,
   )
-  return Math.round(Math.min(max, Math.max(MIN_BOTTOM_HEIGHT, height)))
+  return Math.round(Math.min(max, Math.max(minHeight, height)))
 }
 
 function App() {
@@ -36,6 +39,12 @@ function App() {
   const removeSelected = useEditorStore((state) => state.removeSelected)
   const duplicateSelected = useEditorStore((state) => state.duplicateSelected)
   const tool = useEditorStore((state) => state.tool)
+  const mode = useEditorStore((state) => state.mode)
+  const playing = useEditorStore((state) => state.playing)
+  const setPlaying = useEditorStore((state) => state.setPlaying)
+  const setPlayhead = useEditorStore((state) => state.setPlayhead)
+  const armProperty = useEditorStore((state) => state.armProperty)
+  const minPanel = mode === 'animate' ? ANIMATE_BOTTOM_HEIGHT : MIN_BOTTOM_HEIGHT
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -55,12 +64,48 @@ function App() {
       }
       if (event.key === 'Delete' || event.key === 'Backspace') {
         event.preventDefault()
+        const state = useEditorStore.getState()
+        if (state.mode === 'animate' && state.selectedKeyIds.length > 0) {
+          state.removeSelectedKeys()
+          return
+        }
         removeSelected()
+      }
+      if (
+        event.key === ' ' &&
+        (mode === 'animate' || mode === 'preview') &&
+        !combo
+      ) {
+        event.preventDefault()
+        setPlaying(!playing)
+      }
+      if (event.key === 'Home' && (mode === 'animate' || mode === 'preview')) {
+        event.preventDefault()
+        setPlayhead(0, true)
+      }
+      if (event.key.toLowerCase() === 'k' && mode === 'animate' && !combo) {
+        const state = useEditorStore.getState()
+        const id = state.selectedIds[0]
+        if (!id || state.selectedIds.length !== 1) return
+        if (!findNode(state.document.children, id)) return
+        event.preventDefault()
+        armProperty(id, 'position.x')
+        armProperty(id, 'position.y')
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [duplicateSelected, groupSelected, removeSelected, ungroupSelected])
+  }, [
+    armProperty,
+    duplicateSelected,
+    groupSelected,
+    mode,
+    playing,
+    removeSelected,
+    setPlayhead,
+    setPlaying,
+    ungroupSelected,
+  ])
 
   const exportSvg = () => {
     const source = canvasRef.current?.exportSvg()
@@ -74,10 +119,11 @@ function App() {
   }
 
   useEffect(() => {
-    const onResize = () => setBottomHeight((height) => clampBottomHeight(height))
+    const onResize = () =>
+      setBottomHeight((height) => clampBottomHeight(height, minPanel))
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
-  }, [])
+  }, [minPanel])
 
   const beginBottomResize = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -91,7 +137,10 @@ function App() {
 
     const move = (moveEvent: PointerEvent) => {
       setBottomHeight(
-        clampBottomHeight(origin.height - (moveEvent.clientY - origin.y)),
+        clampBottomHeight(
+          origin.height - (moveEvent.clientY - origin.y),
+          minPanel,
+        ),
       )
     }
     const stop = () => {
@@ -103,44 +152,60 @@ function App() {
     window.addEventListener('pointerup', stop)
   }
 
+  const preview = mode === 'preview'
+  const panelHeight = preview ? 0 : clampBottomHeight(bottomHeight, minPanel)
+
   return (
     <div
-      className="app-shell"
+      className={`app-shell${preview ? ' is-preview' : ''}`}
       style={{
-        gridTemplateRows: `${HEADER_HEIGHT}px minmax(0, 1fr) ${bottomHeight}px`,
+        gridTemplateRows: `${HEADER_HEIGHT}px minmax(0, 1fr) ${panelHeight}px`,
         // Viewport-fixed canvas overlays ride above the panel as it resizes.
-        '--bottom-panel-height': `${bottomHeight}px`,
+        '--bottom-panel-height': `${panelHeight}px`,
       } as CSSProperties}
     >
+      <PlaybackClock />
       <Header onExport={exportSvg} />
-      <div className="editor-body">
-        <Toolbar />
+      <div className={`editor-body${preview ? ' is-preview' : ''}`}>
+        {!preview && <Toolbar />}
         <Canvas ref={canvasRef} />
-        <Inspector />
+        {!preview && <Inspector />}
       </div>
-      <div className="bottom-slot">
-        <div
-          className="bottom-resize-handle"
-          role="separator"
-          aria-orientation="horizontal"
-          aria-label="Resize bottom panel"
-          aria-valuemin={MIN_BOTTOM_HEIGHT}
-          aria-valuenow={bottomHeight}
-          tabIndex={0}
-          onPointerDown={beginBottomResize}
-          onKeyDown={(event: ReactKeyboardEvent<HTMLDivElement>) => {
-            if (event.key === 'ArrowUp') {
-              event.preventDefault()
-              setBottomHeight((height) => clampBottomHeight(height + 16))
-            }
-            if (event.key === 'ArrowDown') {
-              event.preventDefault()
-              setBottomHeight((height) => clampBottomHeight(height - 16))
-            }
-          }}
-        />
-        {tool === 'pencil' ? <PencilToolConfig /> : <LayersPanel />}
-      </div>
+      {!preview && (
+        <div className="bottom-slot">
+          <div
+            className="bottom-resize-handle"
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Resize bottom panel"
+            aria-valuemin={minPanel}
+            aria-valuenow={panelHeight}
+            tabIndex={0}
+            onPointerDown={beginBottomResize}
+            onKeyDown={(event: ReactKeyboardEvent<HTMLDivElement>) => {
+              if (event.key === 'ArrowUp') {
+                event.preventDefault()
+                setBottomHeight((height) =>
+                  clampBottomHeight(height + 16, minPanel),
+                )
+              }
+              if (event.key === 'ArrowDown') {
+                event.preventDefault()
+                setBottomHeight((height) =>
+                  clampBottomHeight(height - 16, minPanel),
+                )
+              }
+            }}
+          />
+          {mode === 'animate' ? (
+            <Timeline />
+          ) : tool === 'pencil' ? (
+            <PencilToolConfig />
+          ) : (
+            <LayersPanel />
+          )}
+        </div>
+      )}
     </div>
   )
 }

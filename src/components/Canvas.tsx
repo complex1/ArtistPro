@@ -30,6 +30,7 @@ import {
   pencilPathData,
 } from '../model/pencil'
 import { createText, naturalTextWidth } from '../model/text'
+import { evaluateScene } from '../model/animation'
 import {
   dragDelta,
   findNode,
@@ -92,10 +93,13 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
   const [isPanning, setIsPanning] = useState(false)
   const [snapHint, setSnapHint] = useState<Vec2 | null>(null)
   const document = useEditorStore((state) => state.document)
+  const mode = useEditorStore((state) => state.mode)
+  const playhead = useEditorStore((state) => state.playhead)
   const selectedIds = useEditorStore((state) => state.selectedIds)
   const select = useEditorStore((state) => state.select)
   const selectMany = useEditorStore((state) => state.selectMany)
   const updateNode = useEditorStore((state) => state.updateNode)
+  const editTransform = useEditorStore((state) => state.editTransform)
   const addNode = useEditorStore((state) => state.addNode)
   const removeNode = useEditorStore((state) => state.removeNode)
   const tool = useEditorStore((state) => state.tool)
@@ -256,6 +260,11 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
     draw.clear()
     draw.viewbox(0, 0, document.artboard.width, document.artboard.height)
     draw.attr({ 'aria-label': `${document.name} artboard` })
+
+    const motion = mode === 'animate' || mode === 'preview'
+    const scene = motion
+      ? evaluateScene(document.children, document.animation, playhead)
+      : document.children
 
     const grid = document.artboard.grid
     const gridPrimitives = grid.enabled
@@ -474,9 +483,9 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
 
     const beginDrag = (node: EditorNode, event: PointerEvent, nextIds: string[]) => {
       if (node.locked || tool !== 'select') return
-      const origins = dragRoots(document.children, nextIds).map((item) => ({
+      const origins = dragRoots(scene, nextIds).map((item) => ({
         id: item.id,
-        position: { ...item.transform.position },
+        transform: structuredClone(item.transform),
       }))
       const grabbed = draw.point(event.clientX, event.clientY)
       const move = (moveEvent: PointerEvent) => {
@@ -485,19 +494,25 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
           x: pointer.x - grabbed.x,
           y: pointer.y - grabbed.y,
         }
-        const liveNodes = useEditorStore.getState().document.children
-        const liveRoots = dragRoots(liveNodes, nextIds)
+        const state = useEditorStore.getState()
+        const liveScene =
+          state.mode === 'animate' || state.mode === 'preview'
+            ? evaluateScene(
+                state.document.children,
+                state.document.animation,
+                state.playhead,
+              )
+            : state.document.children
+        const liveRoots = dragRoots(liveScene, nextIds)
         for (const origin of origins) {
           const live = liveRoots.find((item) => item.id === origin.id)
           if (!live) continue
-          const delta = dragDelta(liveNodes, origin.id, canvasDelta)
-          updateNode(origin.id, {
-            transform: {
-              ...live.transform,
-              position: {
-                x: origin.position.x + delta.x,
-                y: origin.position.y + delta.y,
-              },
+          const delta = dragDelta(liveScene, origin.id, canvasDelta)
+          editTransform(origin.id, {
+            ...live.transform,
+            position: {
+              x: origin.transform.position.x + delta.x,
+              y: origin.transform.position.y + delta.y,
             },
           })
         }
@@ -528,7 +543,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
             : bounds.y + bounds.height,
       }
       const localMatrix = multiplyAffine(
-        parentAffine(document.children, node.id),
+        parentAffine(scene, node.id),
         transformToAffine(start.transform),
       )
       const move = (moveEvent: PointerEvent) => {
@@ -543,7 +558,10 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
           point,
           moveEvent.shiftKey,
         )
-        updateNode(node.id, resizeNode(start, factor, anchor))
+        const resized = resizeNode(start, factor, anchor)
+        const { transform, ...patch } = resized
+        updateNode(node.id, patch)
+        editTransform(node.id, transform)
       }
       const up = () => {
         setSnapHint(null)
@@ -559,7 +577,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
       event.preventDefault()
       event.stopPropagation()
       const startTransform = structuredClone(node.transform)
-      const parentMatrix = parentAffine(document.children, node.id)
+      const parentMatrix = parentAffine(scene, node.id)
       const start = invertPoint(
         parentMatrix,
         draw.point(event.clientX, event.clientY),
@@ -569,16 +587,14 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
           parentMatrix,
           draw.point(moveEvent.clientX, moveEvent.clientY),
         )
-        updateNode(node.id, {
-          transform: {
-            ...startTransform,
-            rotation: rotationFromPoints(
-              startTransform,
-              start,
-              current,
-              moveEvent.shiftKey,
-            ),
-          },
+        editTransform(node.id, {
+          ...startTransform,
+          rotation: rotationFromPoints(
+            startTransform,
+            start,
+            current,
+            moveEvent.shiftKey,
+          ),
         })
       }
       const up = () => {
@@ -591,7 +607,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
 
     // A stroke selects itself as it is drawn; the box would flash and grow
     // under the cursor, so the pencil keeps the canvas clear until you leave it.
-    const showOutline = tool !== 'pencil'
+    const showOutline = tool !== 'pencil' && mode !== 'preview'
 
     const drawTextEditor = (parent: SvgParent, node: TextNode) => {
       const editor = parent
@@ -659,7 +675,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
           setSelectedPointId(null)
           return
         }
-        const targetId = selectionTarget(document.children, node.id, selectedIds)
+        const targetId = selectionTarget(scene, node.id, selectedIds)
         const target = findNode(document.children, targetId) ?? node
         const additive = pointer.shiftKey || pointer.metaKey || pointer.ctrlKey
         const already = selectedIds.includes(target.id)
@@ -855,7 +871,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
             select(null)
             return
           }
-          selectMany(hitIds(document.children, box))
+          selectMany(hitIds(scene, box))
         }
         window.addEventListener('pointermove', move)
         window.addEventListener('pointerup', up)
@@ -895,11 +911,11 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
         draw.rect(document.artboard.width, document.artboard.height).move(0, 0),
       ),
     )
-    document.children.forEach((node) => paint(artwork, node))
+    scene.forEach((node) => paint(artwork, node))
 
     // Handles paint last so they stay on top of the artwork they guide.
     // A locked grid still draws and snaps; only the controls freeze.
-    if (grid.enabled && !grid.locked) {
+    if (grid.enabled && !grid.locked && mode !== 'preview') {
       const workspaceBox = workspaceRef.current?.getBoundingClientRect()
       let view: Box | null = null
       if (workspaceBox && workspaceBox.width > 0 && workspaceBox.height > 0) {
@@ -1001,7 +1017,10 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
     draftPathId,
     editingPathId,
     editingTextId,
+    editTransform,
+    mode,
     pencilSettings,
+    playhead,
     select,
     selectMany,
     selectedIds,

@@ -16,7 +16,9 @@ export function Header({ onExport }: { onExport: () => void }) {
   const svgInput = useRef<HTMLInputElement>(null)
   const document = useEditorStore((state) => state.document)
   const mode = useEditorStore((state) => state.mode)
+  const looping = useEditorStore((state) => state.looping)
   const setMode = useEditorStore((state) => state.setMode)
+  const setLooping = useEditorStore((state) => state.setLooping)
   const setArtboardSize = useEditorStore((state) => state.setArtboardSize)
   const addNodes = useEditorStore((state) => state.addNodes)
 
@@ -60,6 +62,14 @@ export function Header({ onExport }: { onExport: () => void }) {
       </div>
 
       <div className="header-actions">
+        {mode === 'preview' && (
+          <Button
+            aria-pressed={looping}
+            onClick={() => setLooping(!looping)}
+          >
+            {looping ? 'Loop on' : 'Loop off'}
+          </Button>
+        )}
         <input
           ref={svgInput}
           type="file"
