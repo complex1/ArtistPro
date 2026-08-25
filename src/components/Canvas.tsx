@@ -116,6 +116,8 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
   const selectMany = useEditorStore((state) => state.selectMany)
   const updateNode = useEditorStore((state) => state.updateNode)
   const editTransform = useEditorStore((state) => state.editTransform)
+  const beginHistoryGroup = useEditorStore((state) => state.beginHistoryGroup)
+  const endHistoryGroup = useEditorStore((state) => state.endHistoryGroup)
   const addNode = useEditorStore((state) => state.addNode)
   const removeNode = useEditorStore((state) => state.removeNode)
   const tool = useEditorStore((state) => state.tool)
@@ -356,6 +358,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
       const draft = draftPathId ? findNode(liveNodes, draftPathId) : undefined
 
       if (draft?.type !== 'path') {
+        beginHistoryGroup()
         const path = createPath(canvasPoint)
         addNode(path)
         setDraftPathId(path.id)
@@ -387,12 +390,15 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
                 : { x: 0, y: 0 },
           }))
         }
-        const up = () => {
+        const stop = () => {
           window.removeEventListener('pointermove', move)
-          window.removeEventListener('pointerup', up)
+          window.removeEventListener('pointerup', stop)
+          window.removeEventListener('pointercancel', stop)
+          endHistoryGroup()
         }
         window.addEventListener('pointermove', move)
-        window.addEventListener('pointerup', up)
+        window.addEventListener('pointerup', stop)
+        window.addEventListener('pointercancel', stop)
         return true
       }
 
@@ -416,6 +422,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
       }
 
       const added = createPathPoint(point)
+      beginHistoryGroup()
       updateNode(draft.id, { points: [...draft.points, added] })
       setSelectedPointId(added.id)
       const origin = point
@@ -448,12 +455,15 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
               : { x: 0, y: 0 },
         }))
       }
-      const up = () => {
+      const stop = () => {
         window.removeEventListener('pointermove', move)
-        window.removeEventListener('pointerup', up)
+        window.removeEventListener('pointerup', stop)
+        window.removeEventListener('pointercancel', stop)
+        endHistoryGroup()
       }
       window.addEventListener('pointermove', move)
-      window.addEventListener('pointerup', up)
+      window.addEventListener('pointerup', stop)
+      window.addEventListener('pointercancel', stop)
       return true
     }
 
@@ -461,6 +471,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
       if (tool !== 'brush') return false
       event.preventDefault()
       event.stopPropagation()
+      beginHistoryGroup()
       const origin = draw.point(event.clientX, event.clientY)
       const stroke = createBrushStroke(
         origin,
@@ -498,19 +509,20 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
           ],
         })
       }
-      const up = () => {
+      const stop = () => {
         const live = findNode(
           useEditorStore.getState().document.children,
           stroke.id,
         )
         if (live?.type === 'brush') updateNode(live.id, { complete: true })
         window.removeEventListener('pointermove', move)
-        window.removeEventListener('pointerup', up)
-        window.removeEventListener('pointercancel', up)
+        window.removeEventListener('pointerup', stop)
+        window.removeEventListener('pointercancel', stop)
+        endHistoryGroup()
       }
       window.addEventListener('pointermove', move)
-      window.addEventListener('pointerup', up)
-      window.addEventListener('pointercancel', up)
+      window.addEventListener('pointerup', stop)
+      window.addEventListener('pointercancel', stop)
       return true
     }
 
@@ -581,6 +593,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
 
     const beginDrag = (node: EditorNode, event: PointerEvent, nextIds: string[]) => {
       if (node.locked || tool !== 'select') return
+      beginHistoryGroup()
       const origins = dragRoots(channelScene, nextIds).map((item) => ({
         id: item.id,
         transform: structuredClone(item.transform),
@@ -616,19 +629,23 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
           })
         }
       }
-      const up = () => {
+      const stop = () => {
         setSnapHint(null)
         window.removeEventListener('pointermove', move)
-        window.removeEventListener('pointerup', up)
+        window.removeEventListener('pointerup', stop)
+        window.removeEventListener('pointercancel', stop)
+        endHistoryGroup()
       }
       window.addEventListener('pointermove', move)
-      window.addEventListener('pointerup', up)
+      window.addEventListener('pointerup', stop)
+      window.addEventListener('pointercancel', stop)
     }
 
     const beginResize = (node: EditorNode, handle: Vec2, event: PointerEvent) => {
       if (node.locked || tool !== 'select') return
       event.preventDefault()
       event.stopPropagation()
+      beginHistoryGroup()
       const start = structuredClone(node)
       const bounds = localBounds(start)
       const anchor = {
@@ -665,19 +682,23 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
           toChannelTransform(node.id, start.transform, transform),
         )
       }
-      const up = () => {
+      const stop = () => {
         setSnapHint(null)
         window.removeEventListener('pointermove', move)
-        window.removeEventListener('pointerup', up)
+        window.removeEventListener('pointerup', stop)
+        window.removeEventListener('pointercancel', stop)
+        endHistoryGroup()
       }
       window.addEventListener('pointermove', move)
-      window.addEventListener('pointerup', up)
+      window.addEventListener('pointerup', stop)
+      window.addEventListener('pointercancel', stop)
     }
 
     const beginRotate = (node: EditorNode, event: PointerEvent) => {
       if (node.locked || tool !== 'select') return
       event.preventDefault()
       event.stopPropagation()
+      beginHistoryGroup()
       const startTransform = structuredClone(node.transform)
       const parentMatrix = parentAffine(scene, node.id)
       const start = invertPoint(
@@ -702,12 +723,15 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
           }),
         )
       }
-      const up = () => {
+      const stop = () => {
         window.removeEventListener('pointermove', move)
-        window.removeEventListener('pointerup', up)
+        window.removeEventListener('pointerup', stop)
+        window.removeEventListener('pointercancel', stop)
+        endHistoryGroup()
       }
       window.addEventListener('pointermove', move)
-      window.addEventListener('pointerup', up)
+      window.addEventListener('pointerup', stop)
+      window.addEventListener('pointercancel', stop)
     }
 
     // A stroke selects itself as it is drawn; the box would flash and grow
@@ -1059,6 +1083,8 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
           ? selectedPointId
           : null,
         onSelectPoint: setSelectedPointId,
+        onDragStart: beginHistoryGroup,
+        onDragEnd: endHistoryGroup,
         onUpdatePoint: (pointId, update) =>
           updatePathPoint(editingNode, pointId, update),
         onContextMenu: (pointId, event) => {
@@ -1121,10 +1147,12 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
     }
   }, [
     addNode,
+    beginHistoryGroup,
     document,
     draftPathId,
     editingPathId,
     editingTextId,
+    endHistoryGroup,
     editTransform,
     mode,
     brushSettings,
@@ -1484,6 +1512,8 @@ type PathEditorActions = {
   drawing: boolean
   selectedPointId: string | null
   onSelectPoint: (pointId: string) => void
+  onDragStart: () => void
+  onDragEnd: () => void
   onUpdatePoint: (
     pointId: string,
     update: (point: PathPoint) => PathPoint,
@@ -1514,16 +1544,20 @@ function drawPathEditor(
     event.preventDefault()
     event.stopPropagation()
     actions.onSelectPoint(point.id)
+    actions.onDragStart()
     const move = (moveEvent: PointerEvent) => {
       const anchor = localPoint(moveEvent)
       actions.onUpdatePoint(point.id, (current) => ({ ...current, anchor }))
     }
-    const up = () => {
+    const stop = () => {
       window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointerup', stop)
+      window.removeEventListener('pointercancel', stop)
+      actions.onDragEnd()
     }
     window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
+    window.addEventListener('pointerup', stop)
+    window.addEventListener('pointercancel', stop)
   }
 
   const beginHandleDrag = (
@@ -1533,6 +1567,7 @@ function drawPathEditor(
   ) => {
     event.preventDefault()
     event.stopPropagation()
+    actions.onDragStart()
     const move = (moveEvent: PointerEvent) => {
       const cursor = localPoint(moveEvent)
       const handle = {
@@ -1543,12 +1578,15 @@ function drawPathEditor(
         moveHandle(current, side, handle),
       )
     }
-    const up = () => {
+    const stop = () => {
       window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointerup', stop)
+      window.removeEventListener('pointercancel', stop)
+      actions.onDragEnd()
     }
     window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
+    window.addEventListener('pointerup', stop)
+    window.addEventListener('pointercancel', stop)
   }
 
   for (const point of path.points) {

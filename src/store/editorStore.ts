@@ -94,6 +94,8 @@ const syncFirstFrameKey = (
 
 type EditorStore = {
   document: EditorDocument
+  canUndo: boolean
+  canRedo: boolean
   mode: EditorMode
   tool: Tool
   selectedIds: string[]
@@ -105,6 +107,11 @@ type EditorStore = {
   playing: boolean
   looping: boolean
   selectedKeyIds: string[]
+  undo: () => void
+  redo: () => void
+  clearHistory: () => void
+  beginHistoryGroup: () => void
+  endHistoryGroup: () => void
   setMode: (mode: EditorMode) => void
   setTool: (tool: Tool) => void
   setBrushSettings: (update: Partial<BrushSettings>) => void
@@ -157,6 +164,25 @@ type EditorStore = {
 
 const recordingModes: EditorMode[] = ['animate']
 
+type EditorSnapshot = Pick<
+  EditorStore,
+  'document' | 'selectedIds' | 'selectedKeyIds'
+>
+
+const HISTORY_LIMIT = 100
+const undoStack: EditorSnapshot[] = []
+const redoStack: EditorSnapshot[] = []
+let restoringHistory = false
+let historyGroupDepth = 0
+let groupedSnapshot: EditorSnapshot | null = null
+let groupedDocumentChanged = false
+
+const snapshot = (state: EditorStore): EditorSnapshot => ({
+  document: state.document,
+  selectedIds: state.selectedIds,
+  selectedKeyIds: state.selectedKeyIds,
+})
+
 export const useEditorStore = create<EditorStore>()(
   immer((set) => ({
     document: {
@@ -181,6 +207,8 @@ export const useEditorStore = create<EditorStore>()(
       children: [firstShape],
       animation: defaultAnimation(),
     },
+    canUndo: false,
+    canRedo: false,
     mode: 'draw',
     tool: 'select',
     selectedIds: [firstShape.id],
@@ -192,6 +220,72 @@ export const useEditorStore = create<EditorStore>()(
     playing: false,
     looping: false,
     selectedKeyIds: [],
+    undo: () => {
+      const previous = undoStack.pop()
+      if (!previous) return
+      const current = snapshot(useEditorStore.getState())
+      const playhead = Math.min(
+        useEditorStore.getState().playhead,
+        previous.document.animation.duration,
+      )
+      redoStack.push(current)
+      restoringHistory = true
+      useEditorStore.setState({
+        ...previous,
+        playhead,
+        canUndo: undoStack.length > 0,
+        canRedo: true,
+        playing: false,
+      })
+      restoringHistory = false
+    },
+    redo: () => {
+      const next = redoStack.pop()
+      if (!next) return
+      const current = snapshot(useEditorStore.getState())
+      const playhead = Math.min(
+        useEditorStore.getState().playhead,
+        next.document.animation.duration,
+      )
+      undoStack.push(current)
+      restoringHistory = true
+      useEditorStore.setState({
+        ...next,
+        playhead,
+        canUndo: true,
+        canRedo: redoStack.length > 0,
+        playing: false,
+      })
+      restoringHistory = false
+    },
+    clearHistory: () => {
+      undoStack.length = 0
+      redoStack.length = 0
+      historyGroupDepth = 0
+      groupedSnapshot = null
+      groupedDocumentChanged = false
+      set({ canUndo: false, canRedo: false })
+    },
+    beginHistoryGroup: () => {
+      if (historyGroupDepth === 0) {
+        groupedSnapshot = snapshot(useEditorStore.getState())
+        groupedDocumentChanged = false
+      }
+      historyGroupDepth += 1
+    },
+    endHistoryGroup: () => {
+      if (historyGroupDepth === 0) return
+      historyGroupDepth -= 1
+      if (historyGroupDepth > 0) return
+      if (groupedDocumentChanged && groupedSnapshot) {
+        undoStack.push(groupedSnapshot)
+        if (undoStack.length > HISTORY_LIMIT) undoStack.shift()
+        redoStack.length = 0
+        set({ canUndo: true, canRedo: false })
+      }
+      groupedSnapshot = null
+      groupedDocumentChanged = false
+    },
     setMode: (mode) =>
       set((state) => {
         state.mode = mode
@@ -681,6 +775,18 @@ export const useEditorStore = create<EditorStore>()(
       }),
   })),
 )
+
+useEditorStore.subscribe((state, previous) => {
+  if (restoringHistory || state.document === previous.document) return
+  if (historyGroupDepth > 0) {
+    groupedDocumentChanged = true
+    return
+  }
+  undoStack.push(snapshot(previous))
+  if (undoStack.length > HISTORY_LIMIT) undoStack.shift()
+  redoStack.length = 0
+  useEditorStore.setState({ canUndo: true, canRedo: false })
+})
 
 export const selectedNode = findSelectedNode
 export { canGroup, canUngroup, dragRoots, findNode }

@@ -95,6 +95,8 @@ export function Timeline() {
   const updateKey = useEditorStore((state) => state.updateKey)
   const retimeKey = useEditorStore((state) => state.retimeKey)
   const updateNode = useEditorStore((state) => state.updateNode)
+  const beginHistoryGroup = useEditorStore((state) => state.beginHistoryGroup)
+  const endHistoryGroup = useEditorStore((state) => state.endHistoryGroup)
   const [collapsedIds, setCollapsedIds] = useState<string[]>([])
   const rows = layersWithMotion(nodes, selectedIds, animation)
   const duration = Math.max(animation.duration, 0.1)
@@ -254,6 +256,8 @@ export function Timeline() {
                         onSelect={(additive) => selectKeys([key.id], additive)}
                         onRetime={retimeKey}
                         onSeek={(time) => setPlayhead(time, true)}
+                        onDragStart={beginHistoryGroup}
+                        onDragEnd={endHistoryGroup}
                       />
                     ))}
                 </div>
@@ -277,6 +281,8 @@ export function Timeline() {
                           onSelect={(additive) => selectKeys([key.id], additive)}
                           onRetime={retimeKey}
                           onSeek={(time) => setPlayhead(time, true)}
+                          onDragStart={beginHistoryGroup}
+                          onDragEnd={endHistoryGroup}
                         />
                       ))}
                     </div>
@@ -431,6 +437,8 @@ function KeyframeDiamond({
   onSelect,
   onRetime,
   onSeek,
+  onDragStart,
+  onDragEnd,
 }: {
   keyframe: Keyframe
   duration: number
@@ -438,6 +446,8 @@ function KeyframeDiamond({
   onSelect: (additive: boolean) => void
   onRetime: (id: string, time: number) => void
   onSeek: (time: number) => void
+  onDragStart: () => void
+  onDragEnd: () => void
 }) {
   return (
     <button
@@ -453,17 +463,21 @@ function KeyframeDiamond({
         onSeek(keyframe.time)
         const row = event.currentTarget.parentElement
         if (!row) return
+        onDragStart()
         const move = (moveEvent: PointerEvent) => {
           const bounds = row.getBoundingClientRect()
           const ratio = (moveEvent.clientX - bounds.left) / Math.max(1, bounds.width)
           onRetime(keyframe.id, ratio * duration)
         }
-        const up = () => {
+        const stop = () => {
           window.removeEventListener('pointermove', move)
-          window.removeEventListener('pointerup', up)
+          window.removeEventListener('pointerup', stop)
+          window.removeEventListener('pointercancel', stop)
+          onDragEnd()
         }
         window.addEventListener('pointermove', move)
-        window.addEventListener('pointerup', up)
+        window.addEventListener('pointerup', stop)
+        window.addEventListener('pointercancel', stop)
       }}
     />
   )

@@ -45,6 +45,8 @@ function App() {
   const setPlaying = useEditorStore((state) => state.setPlaying)
   const setPlayhead = useEditorStore((state) => state.setPlayhead)
   const armProperty = useEditorStore((state) => state.armProperty)
+  const undo = useEditorStore((state) => state.undo)
+  const redo = useEditorStore((state) => state.redo)
   const minPanel = mode === 'animate' ? ANIMATE_BOTTOM_HEIGHT : MIN_BOTTOM_HEIGHT
 
   useEffect(() => {
@@ -54,6 +56,17 @@ function App() {
         return
       }
       const combo = event.metaKey || event.ctrlKey
+      if (combo && event.key.toLowerCase() === 'z') {
+        event.preventDefault()
+        if (event.shiftKey) redo()
+        else undo()
+        return
+      }
+      if (event.ctrlKey && event.key.toLowerCase() === 'y') {
+        event.preventDefault()
+        redo()
+        return
+      }
       if (combo && event.key.toLowerCase() === 'g') {
         event.preventDefault()
         if (event.shiftKey) ungroupSelected()
@@ -103,8 +116,10 @@ function App() {
     mode,
     playing,
     removeSelected,
+    redo,
     setPlayhead,
     setPlaying,
+    undo,
     ungroupSelected,
   ])
 

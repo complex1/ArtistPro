@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { defaultAnimation, upsertKeyframe } from './animation'
 import {
+  ANIMATION_PRESETS,
+  PRESET_CATEGORIES,
   applyPreset,
   buildPresetTracks,
+  configForPreset,
   DEFAULT_PRESET_CONFIG,
   presetAffectedProperties,
   presetConflicts,
+  presetIsReady,
   type AnimationPresetConfig,
 } from './animationPresets'
 import { createShape } from './nodes'
@@ -15,6 +19,35 @@ const config = (
 ): AnimationPresetConfig => ({ ...DEFAULT_PRESET_CONFIG, ...update })
 
 describe('animation presets', () => {
+  it('loads the catalog categories and unique preset ids', () => {
+    expect(PRESET_CATEGORIES.map((item) => item.id)).toEqual([
+      'entrance',
+      'exit',
+      'emphasis',
+      'transform',
+      'loop',
+      'svg',
+      'text',
+      'ui',
+      'advanced',
+    ])
+    expect(ANIMATION_PRESETS.length).toBeGreaterThan(100)
+    expect(new Set(ANIMATION_PRESETS.map((item) => item.id)).size).toBe(
+      ANIMATION_PRESETS.length,
+    )
+  })
+
+  it('skips planned presets and path-only presets on shapes', () => {
+    const node = createShape('rect')
+    expect(buildPresetTracks(node, 'typewriter', config(), 0)).toEqual([])
+    expect(buildPresetTracks(node, 'draw-path', config(), 0)).toEqual([])
+    const typewriter = ANIMATION_PRESETS.find((item) => item.id === 'typewriter')
+    const drawPath = ANIMATION_PRESETS.find((item) => item.id === 'draw-path')
+    expect(typewriter && presetIsReady(typewriter, node)).toBe(false)
+    expect(drawPath && presetIsReady(drawPath, node)).toBe(false)
+    expect(configForPreset('fade-in-up').distance).toBe(40)
+  })
+
   it('builds fade, scale, and spin entrances relative to the rest pose', () => {
     const node = createShape('rect')
     node.transform.opacity = 0.8

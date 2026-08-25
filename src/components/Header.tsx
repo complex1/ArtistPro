@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { Download, FileUp, Save } from 'lucide-react'
+import { Download, FileUp, Redo2, Save, Undo2 } from 'lucide-react'
 import { importSvgText } from '../model/svgImport'
 import { useEditorStore } from '../store/editorStore'
 import type { EditorMode } from '../model/types'
@@ -21,6 +21,10 @@ export function Header({ onExport }: { onExport: () => void }) {
   const setLooping = useEditorStore((state) => state.setLooping)
   const setArtboardSize = useEditorStore((state) => state.setArtboardSize)
   const addNodes = useEditorStore((state) => state.addNodes)
+  const canUndo = useEditorStore((state) => state.canUndo)
+  const canRedo = useEditorStore((state) => state.canRedo)
+  const undo = useEditorStore((state) => state.undo)
+  const redo = useEditorStore((state) => state.redo)
 
   const sizeValue = `${document.artboard.width}x${document.artboard.height}`
 
@@ -62,6 +66,22 @@ export function Header({ onExport }: { onExport: () => void }) {
       </div>
 
       <div className="header-actions">
+        <Button
+          aria-label="Undo"
+          title="Undo (⌘Z)"
+          disabled={!canUndo}
+          onClick={undo}
+        >
+          <Undo2 size={14} /> Undo
+        </Button>
+        <Button
+          aria-label="Redo"
+          title="Redo (⇧⌘Z)"
+          disabled={!canRedo}
+          onClick={redo}
+        >
+          <Redo2 size={14} /> Redo
+        </Button>
         {mode === 'preview' && (
           <Button
             aria-pressed={looping}

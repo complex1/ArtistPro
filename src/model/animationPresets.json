@@ -1,0 +1,2886 @@
+{
+  "defaults": {
+    "duration": 1,
+    "easing": "power2.inOut",
+    "slideDirection": "left",
+    "distance": 120,
+    "startScale": 0,
+    "spinDirection": "clockwise",
+    "turns": 1,
+    "bounceHeight": 80,
+    "bounceCount": 2,
+    "pulseScale": 1.2,
+    "pulseCount": 2
+  },
+  "categories": [
+    {
+      "id": "entrance",
+      "name": "Entrance"
+    },
+    {
+      "id": "exit",
+      "name": "Exit"
+    },
+    {
+      "id": "emphasis",
+      "name": "Emphasis"
+    },
+    {
+      "id": "transform",
+      "name": "Transform / Movement"
+    },
+    {
+      "id": "loop",
+      "name": "Continuous / Loop"
+    },
+    {
+      "id": "svg",
+      "name": "SVG-Specific"
+    },
+    {
+      "id": "text",
+      "name": "Text"
+    },
+    {
+      "id": "ui",
+      "name": "Attention / UI"
+    },
+    {
+      "id": "advanced",
+      "name": "Advanced"
+    }
+  ],
+  "presets": [
+    {
+      "id": "fade-in",
+      "name": "Fade In",
+      "category": "entrance",
+      "description": "Reveal the layer from transparent.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "opacity",
+            "fromMode": "absolute",
+            "from": 0,
+            "toMode": "rest"
+          }
+        ]
+      }
+    },
+    {
+      "id": "fade-in-up",
+      "name": "Fade In Up",
+      "category": "entrance",
+      "description": "Fade in while rising into place.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "opacity",
+            "fromMode": "absolute",
+            "from": 0,
+            "toMode": "rest"
+          },
+          {
+            "property": "position.y",
+            "fromMode": "offset",
+            "fromConfig": "distance",
+            "fromScale": 1,
+            "toMode": "rest"
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ],
+      "defaults": {
+        "distance": 40
+      }
+    },
+    {
+      "id": "fade-in-down",
+      "name": "Fade In Down",
+      "category": "entrance",
+      "description": "Fade in while dropping into place.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "opacity",
+            "fromMode": "absolute",
+            "from": 0,
+            "toMode": "rest"
+          },
+          {
+            "property": "position.y",
+            "fromMode": "offset",
+            "fromConfig": "distance",
+            "fromScale": -1,
+            "toMode": "rest"
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ],
+      "defaults": {
+        "distance": 40
+      }
+    },
+    {
+      "id": "fade-in-left",
+      "name": "Fade In Left",
+      "category": "entrance",
+      "description": "Fade in from the left.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "opacity",
+            "fromMode": "absolute",
+            "from": 0,
+            "toMode": "rest"
+          },
+          {
+            "property": "position.x",
+            "fromMode": "offset",
+            "fromConfig": "distance",
+            "fromScale": -1,
+            "toMode": "rest"
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ],
+      "defaults": {
+        "distance": 40
+      }
+    },
+    {
+      "id": "fade-in-right",
+      "name": "Fade In Right",
+      "category": "entrance",
+      "description": "Fade in from the right.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "opacity",
+            "fromMode": "absolute",
+            "from": 0,
+            "toMode": "rest"
+          },
+          {
+            "property": "position.x",
+            "fromMode": "offset",
+            "fromConfig": "distance",
+            "fromScale": 1,
+            "toMode": "rest"
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ],
+      "defaults": {
+        "distance": 40
+      }
+    },
+    {
+      "id": "slide-in",
+      "name": "Slide In",
+      "category": "entrance",
+      "description": "Move the layer into its resting position.",
+      "recipe": {
+        "kind": "slide-in"
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "slideDirection",
+        "distance"
+      ]
+    },
+    {
+      "id": "slide-in-up",
+      "name": "Slide In Up",
+      "category": "entrance",
+      "description": "Slide up into the resting position.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "position.y",
+            "fromMode": "offset",
+            "fromConfig": "distance",
+            "fromScale": 1,
+            "toMode": "rest"
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ]
+    },
+    {
+      "id": "slide-in-down",
+      "name": "Slide In Down",
+      "category": "entrance",
+      "description": "Slide down into the resting position.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "position.y",
+            "fromMode": "offset",
+            "fromConfig": "distance",
+            "fromScale": -1,
+            "toMode": "rest"
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ]
+    },
+    {
+      "id": "slide-in-left",
+      "name": "Slide In Left",
+      "category": "entrance",
+      "description": "Slide in from the left.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "position.x",
+            "fromMode": "offset",
+            "fromConfig": "distance",
+            "fromScale": -1,
+            "toMode": "rest"
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ]
+    },
+    {
+      "id": "slide-in-right",
+      "name": "Slide In Right",
+      "category": "entrance",
+      "description": "Slide in from the right.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "position.x",
+            "fromMode": "offset",
+            "fromConfig": "distance",
+            "fromScale": 1,
+            "toMode": "rest"
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ]
+    },
+    {
+      "id": "zoom-in",
+      "name": "Zoom In",
+      "category": "entrance",
+      "description": "Zoom from a larger scale into rest.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "scale.x",
+            "fromMode": "multiply",
+            "from": 1.4,
+            "toMode": "rest"
+          },
+          {
+            "property": "scale.y",
+            "fromMode": "multiply",
+            "from": 1.4,
+            "toMode": "rest"
+          },
+          {
+            "property": "opacity",
+            "fromMode": "absolute",
+            "from": 0,
+            "toMode": "rest"
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "startScale"
+      ]
+    },
+    {
+      "id": "scale-in",
+      "name": "Scale In",
+      "category": "entrance",
+      "description": "Grow the layer into its resting scale.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "scale.x",
+            "fromMode": "multiply",
+            "fromConfig": "startScale",
+            "toMode": "rest"
+          },
+          {
+            "property": "scale.y",
+            "fromMode": "multiply",
+            "fromConfig": "startScale",
+            "toMode": "rest"
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "startScale"
+      ]
+    },
+    {
+      "id": "pop-in",
+      "name": "Pop In",
+      "category": "entrance",
+      "description": "Pop in with a short overshoot.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "opacity",
+            "mode": "absolute",
+            "keys": [
+              0,
+              1,
+              1,
+              1
+            ]
+          },
+          {
+            "property": "scale.x",
+            "mode": "multiply",
+            "keys": [
+              0.6,
+              1.12,
+              0.96,
+              1
+            ]
+          },
+          {
+            "property": "scale.y",
+            "mode": "multiply",
+            "keys": [
+              0.6,
+              1.12,
+              0.96,
+              1
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "bounce-in",
+      "name": "Bounce In",
+      "category": "entrance",
+      "description": "Drop in and bounce to rest.",
+      "recipe": {
+        "kind": "bounce-in"
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "bounceHeight",
+        "bounceCount"
+      ]
+    },
+    {
+      "id": "rotate-in",
+      "name": "Rotate In",
+      "category": "entrance",
+      "description": "Rotate the layer into place.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "rotation",
+            "fromMode": "offset",
+            "fromConfig": "turns",
+            "fromScale": -360,
+            "toMode": "rest"
+          },
+          {
+            "property": "opacity",
+            "fromMode": "absolute",
+            "from": 0,
+            "toMode": "rest"
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "spinDirection",
+        "turns"
+      ]
+    },
+    {
+      "id": "spin",
+      "name": "Spin In",
+      "category": "entrance",
+      "description": "Spin into the resting rotation.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "rotation",
+            "fromMode": "offset",
+            "fromConfig": "turns",
+            "fromScale": -360,
+            "toMode": "rest"
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "spinDirection",
+        "turns"
+      ]
+    },
+    {
+      "id": "flip-in",
+      "name": "Flip In",
+      "category": "entrance",
+      "description": "Flip onto the resting scale.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "scale.x",
+            "fromMode": "multiply",
+            "from": -1,
+            "toMode": "rest"
+          },
+          {
+            "property": "opacity",
+            "fromMode": "absolute",
+            "from": 0,
+            "toMode": "rest"
+          }
+        ]
+      }
+    },
+    {
+      "id": "blur-in",
+      "name": "Blur In",
+      "category": "entrance",
+      "description": "Sharpen into view.",
+      "recipe": {
+        "kind": "planned"
+      },
+      "planned": true
+    },
+    {
+      "id": "elastic-in",
+      "name": "Elastic In",
+      "category": "entrance",
+      "description": "Spring into the resting scale.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "scale.x",
+            "mode": "multiply",
+            "keys": [
+              0.2,
+              1.18,
+              0.92,
+              1.04,
+              1
+            ]
+          },
+          {
+            "property": "scale.y",
+            "mode": "multiply",
+            "keys": [
+              0.2,
+              1.18,
+              0.92,
+              1.04,
+              1
+            ]
+          },
+          {
+            "property": "opacity",
+            "mode": "absolute",
+            "keys": [
+              0,
+              1,
+              1,
+              1,
+              1
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "fade-out",
+      "name": "Fade Out",
+      "category": "exit",
+      "description": "Fade the layer to transparent.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "opacity",
+            "fromMode": "rest",
+            "toMode": "absolute",
+            "to": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "fade-out-up",
+      "name": "Fade Out Up",
+      "category": "exit",
+      "description": "Fade out while moving up.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "opacity",
+            "fromMode": "rest",
+            "toMode": "absolute",
+            "to": 0
+          },
+          {
+            "property": "position.y",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "toConfig": "distance",
+            "toScale": -1
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ],
+      "defaults": {
+        "distance": 40
+      }
+    },
+    {
+      "id": "fade-out-down",
+      "name": "Fade Out Down",
+      "category": "exit",
+      "description": "Fade out while moving down.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "opacity",
+            "fromMode": "rest",
+            "toMode": "absolute",
+            "to": 0
+          },
+          {
+            "property": "position.y",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "toConfig": "distance",
+            "toScale": 1
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ],
+      "defaults": {
+        "distance": 40
+      }
+    },
+    {
+      "id": "fade-out-left",
+      "name": "Fade Out Left",
+      "category": "exit",
+      "description": "Fade out to the left.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "opacity",
+            "fromMode": "rest",
+            "toMode": "absolute",
+            "to": 0
+          },
+          {
+            "property": "position.x",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "toConfig": "distance",
+            "toScale": -1
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ],
+      "defaults": {
+        "distance": 40
+      }
+    },
+    {
+      "id": "fade-out-right",
+      "name": "Fade Out Right",
+      "category": "exit",
+      "description": "Fade out to the right.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "opacity",
+            "fromMode": "rest",
+            "toMode": "absolute",
+            "to": 0
+          },
+          {
+            "property": "position.x",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "toConfig": "distance",
+            "toScale": 1
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ],
+      "defaults": {
+        "distance": 40
+      }
+    },
+    {
+      "id": "slide-out-up",
+      "name": "Slide Out Up",
+      "category": "exit",
+      "description": "Slide up and off.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "position.y",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "toConfig": "distance",
+            "toScale": -1
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ]
+    },
+    {
+      "id": "slide-out-down",
+      "name": "Slide Out Down",
+      "category": "exit",
+      "description": "Slide down and off.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "position.y",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "toConfig": "distance",
+            "toScale": 1
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ]
+    },
+    {
+      "id": "slide-out-left",
+      "name": "Slide Out Left",
+      "category": "exit",
+      "description": "Slide out to the left.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "position.x",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "toConfig": "distance",
+            "toScale": -1
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ]
+    },
+    {
+      "id": "slide-out-right",
+      "name": "Slide Out Right",
+      "category": "exit",
+      "description": "Slide out to the right.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "position.x",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "toConfig": "distance",
+            "toScale": 1
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ]
+    },
+    {
+      "id": "zoom-out",
+      "name": "Zoom Out",
+      "category": "exit",
+      "description": "Zoom away from rest.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "scale.x",
+            "fromMode": "rest",
+            "toMode": "multiply",
+            "to": 1.4
+          },
+          {
+            "property": "scale.y",
+            "fromMode": "rest",
+            "toMode": "multiply",
+            "to": 1.4
+          },
+          {
+            "property": "opacity",
+            "fromMode": "rest",
+            "toMode": "absolute",
+            "to": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "scale-out",
+      "name": "Scale Out",
+      "category": "exit",
+      "description": "Shrink away from rest.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "scale.x",
+            "fromMode": "rest",
+            "toMode": "multiply",
+            "to": 0
+          },
+          {
+            "property": "scale.y",
+            "fromMode": "rest",
+            "toMode": "multiply",
+            "to": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "pop-out",
+      "name": "Pop Out",
+      "category": "exit",
+      "description": "Pop out with a short overshoot.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "scale.x",
+            "mode": "multiply",
+            "keys": [
+              1,
+              1.12,
+              0.8,
+              0
+            ]
+          },
+          {
+            "property": "scale.y",
+            "mode": "multiply",
+            "keys": [
+              1,
+              1.12,
+              0.8,
+              0
+            ]
+          },
+          {
+            "property": "opacity",
+            "mode": "absolute",
+            "keys": [
+              1,
+              1,
+              0.4,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "bounce-out",
+      "name": "Bounce Out",
+      "category": "exit",
+      "description": "Bounce away from rest.",
+      "recipe": {
+        "kind": "bounce-out"
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "bounceHeight",
+        "bounceCount"
+      ]
+    },
+    {
+      "id": "rotate-out",
+      "name": "Rotate Out",
+      "category": "exit",
+      "description": "Rotate away from rest.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "rotation",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "toConfig": "turns",
+            "toScale": -360
+          },
+          {
+            "property": "opacity",
+            "fromMode": "rest",
+            "toMode": "absolute",
+            "to": 0
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "spinDirection",
+        "turns"
+      ]
+    },
+    {
+      "id": "flip-out",
+      "name": "Flip Out",
+      "category": "exit",
+      "description": "Flip away from rest.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "scale.x",
+            "fromMode": "rest",
+            "toMode": "multiply",
+            "to": -1
+          },
+          {
+            "property": "opacity",
+            "fromMode": "rest",
+            "toMode": "absolute",
+            "to": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "blur-out",
+      "name": "Blur Out",
+      "category": "exit",
+      "description": "Blur out of view.",
+      "recipe": {
+        "kind": "planned"
+      },
+      "planned": true
+    },
+    {
+      "id": "pulse",
+      "name": "Pulse",
+      "category": "emphasis",
+      "description": "Pulse the layer scale repeatedly.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "scale.x",
+          "scale.y"
+        ],
+        "peakMode": "multiply",
+        "peakConfig": "pulseScale",
+        "countConfig": "pulseCount"
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "pulseScale",
+        "pulseCount"
+      ]
+    },
+    {
+      "id": "heartbeat",
+      "name": "Heartbeat",
+      "category": "emphasis",
+      "description": "A double-beat scale pulse.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "scale.x",
+            "mode": "multiply",
+            "keys": [
+              1,
+              1.18,
+              1,
+              1.12,
+              1
+            ]
+          },
+          {
+            "property": "scale.y",
+            "mode": "multiply",
+            "keys": [
+              1,
+              1.18,
+              1,
+              1.12,
+              1
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "bounce",
+      "name": "Bounce",
+      "category": "emphasis",
+      "description": "Bounce vertically above rest.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "position.y"
+        ],
+        "peakMode": "offset",
+        "peakConfig": "bounceHeight",
+        "peakScale": -1,
+        "countConfig": "bounceCount"
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "bounceHeight",
+        "bounceCount"
+      ]
+    },
+    {
+      "id": "shake",
+      "name": "Shake",
+      "category": "emphasis",
+      "description": "Shake horizontally.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "position.x"
+        ],
+        "peakMode": "offset",
+        "peak": 14,
+        "count": 4,
+        "alternate": true
+      }
+    },
+    {
+      "id": "wiggle",
+      "name": "Wiggle",
+      "category": "emphasis",
+      "description": "Wiggle with rotation.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "rotation"
+        ],
+        "peakMode": "offset",
+        "peak": 12,
+        "count": 4,
+        "alternate": true
+      }
+    },
+    {
+      "id": "wobble",
+      "name": "Wobble",
+      "category": "emphasis",
+      "description": "Wobble on the skew axis.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "skew.x"
+        ],
+        "peakMode": "offset",
+        "peak": 18,
+        "count": 3,
+        "alternate": true
+      }
+    },
+    {
+      "id": "swing",
+      "name": "Swing",
+      "category": "emphasis",
+      "description": "Swing like a pendulum.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "rotation"
+        ],
+        "peakMode": "offset",
+        "peak": 18,
+        "count": 3,
+        "alternate": true
+      }
+    },
+    {
+      "id": "jello",
+      "name": "Jello",
+      "category": "emphasis",
+      "description": "Jello skew deformation.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "skew.x",
+            "mode": "offset",
+            "keys": [
+              0,
+              18,
+              -12,
+              8,
+              0
+            ]
+          },
+          {
+            "property": "skew.y",
+            "mode": "offset",
+            "keys": [
+              0,
+              -8,
+              6,
+              -3,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "flash",
+      "name": "Flash",
+      "category": "emphasis",
+      "description": "Flash opacity on and off.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "opacity",
+            "mode": "absolute",
+            "keys": [
+              1,
+              0,
+              1,
+              0,
+              1
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "blink",
+      "name": "Blink",
+      "category": "emphasis",
+      "description": "Blink opacity twice.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "opacity",
+            "mode": "absolute",
+            "keys": [
+              1,
+              0,
+              1,
+              0,
+              1
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "rubber-band",
+      "name": "Rubber Band",
+      "category": "emphasis",
+      "description": "Stretch and snap back.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "scale.x",
+            "mode": "multiply",
+            "keys": [
+              1,
+              1.25,
+              0.75,
+              1.15,
+              1
+            ]
+          },
+          {
+            "property": "scale.y",
+            "mode": "multiply",
+            "keys": [
+              1,
+              0.75,
+              1.25,
+              0.9,
+              1
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "tada",
+      "name": "Tada",
+      "category": "emphasis",
+      "description": "Scale and rotate for attention.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "scale.x",
+            "mode": "multiply",
+            "keys": [
+              1,
+              0.9,
+              1.1,
+              1.1,
+              1
+            ]
+          },
+          {
+            "property": "scale.y",
+            "mode": "multiply",
+            "keys": [
+              1,
+              0.9,
+              1.1,
+              1.1,
+              1
+            ]
+          },
+          {
+            "property": "rotation",
+            "mode": "offset",
+            "keys": [
+              0,
+              -8,
+              8,
+              -8,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "pop",
+      "name": "Pop",
+      "category": "emphasis",
+      "description": "A single scale pop.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "scale.x",
+            "mode": "multiply",
+            "keys": [
+              1,
+              1.16,
+              1
+            ]
+          },
+          {
+            "property": "scale.y",
+            "mode": "multiply",
+            "keys": [
+              1,
+              1.16,
+              1
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "spin-once",
+      "name": "Spin",
+      "category": "emphasis",
+      "description": "Spin once around rest.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "rotation",
+            "fromMode": "offset",
+            "from": -360,
+            "toMode": "rest"
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "spinDirection",
+        "turns"
+      ]
+    },
+    {
+      "id": "jump",
+      "name": "Jump",
+      "category": "emphasis",
+      "description": "Jump up and land.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "position.y",
+            "mode": "offset",
+            "keys": [
+              0,
+              -48,
+              0
+            ]
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "bounceHeight"
+      ]
+    },
+    {
+      "id": "move-left",
+      "name": "Move Left",
+      "category": "transform",
+      "description": "Offset left from rest.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "position.x",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "toConfig": "distance",
+            "toScale": -1
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ],
+      "defaults": {
+        "distance": 80
+      }
+    },
+    {
+      "id": "move-right",
+      "name": "Move Right",
+      "category": "transform",
+      "description": "Offset right from rest.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "position.x",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "toConfig": "distance",
+            "toScale": 1
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ],
+      "defaults": {
+        "distance": 80
+      }
+    },
+    {
+      "id": "move-up",
+      "name": "Move Up",
+      "category": "transform",
+      "description": "Offset up from rest.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "position.y",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "toConfig": "distance",
+            "toScale": -1
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ],
+      "defaults": {
+        "distance": 80
+      }
+    },
+    {
+      "id": "move-down",
+      "name": "Move Down",
+      "category": "transform",
+      "description": "Offset down from rest.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "position.y",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "toConfig": "distance",
+            "toScale": 1
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ],
+      "defaults": {
+        "distance": 80
+      }
+    },
+    {
+      "id": "move-x",
+      "name": "Move X",
+      "category": "transform",
+      "description": "Move on the X axis by distance.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "position.x",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "toConfig": "distance"
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ]
+    },
+    {
+      "id": "move-y",
+      "name": "Move Y",
+      "category": "transform",
+      "description": "Move on the Y axis by distance.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "position.y",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "toConfig": "distance"
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "distance"
+      ]
+    },
+    {
+      "id": "scale-up",
+      "name": "Scale Up",
+      "category": "transform",
+      "description": "Scale up from rest.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "scale.x",
+            "fromMode": "rest",
+            "toMode": "multiply",
+            "to": 1.25
+          },
+          {
+            "property": "scale.y",
+            "fromMode": "rest",
+            "toMode": "multiply",
+            "to": 1.25
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "pulseScale"
+      ]
+    },
+    {
+      "id": "scale-down",
+      "name": "Scale Down",
+      "category": "transform",
+      "description": "Scale down from rest.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "scale.x",
+            "fromMode": "rest",
+            "toMode": "multiply",
+            "to": 0.75
+          },
+          {
+            "property": "scale.y",
+            "fromMode": "rest",
+            "toMode": "multiply",
+            "to": 0.75
+          }
+        ]
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "startScale"
+      ]
+    },
+    {
+      "id": "rotate-left",
+      "name": "Rotate Left",
+      "category": "transform",
+      "description": "Rotate counter-clockwise.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "rotation",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "to": 90
+          }
+        ]
+      }
+    },
+    {
+      "id": "rotate-right",
+      "name": "Rotate Right",
+      "category": "transform",
+      "description": "Rotate clockwise.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "rotation",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "to": -90
+          }
+        ]
+      }
+    },
+    {
+      "id": "flip-x",
+      "name": "Flip X",
+      "category": "transform",
+      "description": "Flip horizontally.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "scale.x",
+            "fromMode": "rest",
+            "toMode": "multiply",
+            "to": -1
+          }
+        ]
+      }
+    },
+    {
+      "id": "flip-y",
+      "name": "Flip Y",
+      "category": "transform",
+      "description": "Flip vertically.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "scale.y",
+            "fromMode": "rest",
+            "toMode": "multiply",
+            "to": -1
+          }
+        ]
+      }
+    },
+    {
+      "id": "skew-x",
+      "name": "Skew X",
+      "category": "transform",
+      "description": "Skew on X.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "skew.x",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "to": 20,
+            "toScale": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "skew-y",
+      "name": "Skew Y",
+      "category": "transform",
+      "description": "Skew on Y.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "skew.y",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "to": 20,
+            "toScale": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "spin-loop",
+      "name": "Spin",
+      "category": "loop",
+      "description": "Continuous spin around rest.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "rotation"
+        ],
+        "peakMode": "offset",
+        "peakConfig": "turns",
+        "peakScale": 360,
+        "count": 1,
+        "loopToStart": true
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "spinDirection",
+        "turns"
+      ]
+    },
+    {
+      "id": "slow-spin",
+      "name": "Slow Spin",
+      "category": "loop",
+      "description": "A slower continuous spin.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "rotation"
+        ],
+        "peakMode": "offset",
+        "peakConfig": "turns",
+        "peakScale": 360,
+        "count": 1,
+        "loopToStart": true
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "spinDirection",
+        "turns"
+      ],
+      "defaults": {
+        "duration": 4
+      }
+    },
+    {
+      "id": "float",
+      "name": "Float",
+      "category": "loop",
+      "description": "Gently float up and down.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "position.y"
+        ],
+        "peakMode": "offset",
+        "peak": -16,
+        "count": 2
+      }
+    },
+    {
+      "id": "hover",
+      "name": "Hover",
+      "category": "loop",
+      "description": "Hover in place.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "position.y"
+        ],
+        "peakMode": "offset",
+        "peak": -8,
+        "count": 2
+      }
+    },
+    {
+      "id": "bob",
+      "name": "Bob",
+      "category": "loop",
+      "description": "Bob up and down.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "position.y"
+        ],
+        "peakMode": "offset",
+        "peak": -24,
+        "count": 3
+      }
+    },
+    {
+      "id": "sway",
+      "name": "Sway",
+      "category": "loop",
+      "description": "Sway left and right.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "rotation"
+        ],
+        "peakMode": "offset",
+        "peak": 8,
+        "count": 2,
+        "alternate": true
+      }
+    },
+    {
+      "id": "breathe",
+      "name": "Breathe",
+      "category": "loop",
+      "description": "Slow scale breathing.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "scale.x",
+          "scale.y"
+        ],
+        "peakMode": "multiply",
+        "peak": 1.06,
+        "count": 2
+      }
+    },
+    {
+      "id": "pulse-loop",
+      "name": "Pulse Loop",
+      "category": "loop",
+      "description": "Looping scale pulse.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "scale.x",
+          "scale.y"
+        ],
+        "peakMode": "multiply",
+        "peakConfig": "pulseScale",
+        "countConfig": "pulseCount"
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "pulseScale",
+        "pulseCount"
+      ]
+    },
+    {
+      "id": "bounce-loop",
+      "name": "Bounce Loop",
+      "category": "loop",
+      "description": "Looping bounce.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "position.y"
+        ],
+        "peakMode": "offset",
+        "peakConfig": "bounceHeight",
+        "peakScale": -1,
+        "countConfig": "bounceCount"
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "bounceHeight",
+        "bounceCount"
+      ]
+    },
+    {
+      "id": "shake-loop",
+      "name": "Shake Loop",
+      "category": "loop",
+      "description": "Looping shake.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "position.x"
+        ],
+        "peakMode": "offset",
+        "peak": 10,
+        "count": 6,
+        "alternate": true
+      }
+    },
+    {
+      "id": "pendulum",
+      "name": "Pendulum",
+      "category": "loop",
+      "description": "Pendulum rotation.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "rotation"
+        ],
+        "peakMode": "offset",
+        "peak": 22,
+        "count": 2,
+        "alternate": true
+      }
+    },
+    {
+      "id": "orbit",
+      "name": "Orbit",
+      "category": "loop",
+      "description": "Orbit around the rest position.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "position.x",
+            "mode": "offset",
+            "keys": [
+              0,
+              36,
+              0,
+              -36,
+              0
+            ]
+          },
+          {
+            "property": "position.y",
+            "mode": "offset",
+            "keys": [
+              -36,
+              0,
+              36,
+              0,
+              -36
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "wave",
+      "name": "Wave",
+      "category": "loop",
+      "description": "Wave along X.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "position.x",
+            "mode": "offset",
+            "keys": [
+              0,
+              12,
+              0,
+              -12,
+              0
+            ]
+          },
+          {
+            "property": "position.y",
+            "mode": "offset",
+            "keys": [
+              0,
+              -8,
+              0,
+              -8,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "flicker",
+      "name": "Flicker",
+      "category": "loop",
+      "description": "Flicker opacity.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "opacity",
+            "mode": "absolute",
+            "keys": [
+              1,
+              0.35,
+              1,
+              0.55,
+              1
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "draw-path",
+      "name": "Draw Path",
+      "category": "svg",
+      "description": "Reveal a stroke from start to end.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "path.trimEnd",
+            "fromMode": "absolute",
+            "from": 0,
+            "toMode": "absolute",
+            "to": 1
+          },
+          {
+            "property": "path.trimStart",
+            "fromMode": "absolute",
+            "from": 0,
+            "toMode": "absolute",
+            "to": 0
+          }
+        ]
+      },
+      "requires": [
+        "path"
+      ]
+    },
+    {
+      "id": "erase-path",
+      "name": "Erase Path",
+      "category": "svg",
+      "description": "Erase a stroke from start to end.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "path.trimStart",
+            "fromMode": "absolute",
+            "from": 0,
+            "toMode": "absolute",
+            "to": 1
+          }
+        ]
+      },
+      "requires": [
+        "path"
+      ]
+    },
+    {
+      "id": "trace-path",
+      "name": "Trace Path",
+      "category": "svg",
+      "description": "Trace a short window along the path.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "path.trimStart",
+            "mode": "absolute",
+            "keys": [
+              0,
+              0.7
+            ]
+          },
+          {
+            "property": "path.trimEnd",
+            "mode": "absolute",
+            "keys": [
+              0.3,
+              1
+            ]
+          }
+        ]
+      },
+      "requires": [
+        "path"
+      ]
+    },
+    {
+      "id": "follow-path",
+      "name": "Follow Path",
+      "category": "svg",
+      "description": "Follow another path with motion path.",
+      "recipe": {
+        "kind": "planned"
+      },
+      "planned": true
+    },
+    {
+      "id": "morph-shape",
+      "name": "Morph Shape",
+      "category": "svg",
+      "description": "Morph between path shapes.",
+      "recipe": {
+        "kind": "planned"
+      },
+      "planned": true
+    },
+    {
+      "id": "fill-reveal",
+      "name": "Fill Reveal",
+      "category": "svg",
+      "description": "Reveal fill by fading opacity in.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "opacity",
+            "fromMode": "absolute",
+            "from": 0,
+            "toMode": "rest"
+          }
+        ]
+      }
+    },
+    {
+      "id": "stroke-reveal",
+      "name": "Stroke Reveal",
+      "category": "svg",
+      "description": "Fade the stroke in.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "strokeWidth",
+            "fromMode": "absolute",
+            "from": 0,
+            "toMode": "rest"
+          }
+        ]
+      }
+    },
+    {
+      "id": "stroke-dash",
+      "name": "Stroke Dash",
+      "category": "svg",
+      "description": "Travel dashes along the path.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "path.trimOffset"
+        ],
+        "peakMode": "offset",
+        "peak": 1,
+        "count": 1,
+        "holdRest": false,
+        "loopToStart": true
+      },
+      "requires": [
+        "path"
+      ]
+    },
+    {
+      "id": "stroke-pulse",
+      "name": "Stroke Pulse",
+      "category": "svg",
+      "description": "Pulse stroke width.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "strokeWidth"
+        ],
+        "peakMode": "multiply",
+        "peak": 1.8,
+        "count": 2
+      }
+    },
+    {
+      "id": "color-change",
+      "name": "Color Change",
+      "category": "svg",
+      "description": "Tween fill color.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "fill",
+            "fromMode": "absolute",
+            "from": "#4f8cff",
+            "toMode": "rest"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gradient-shift",
+      "name": "Gradient Shift",
+      "category": "svg",
+      "description": "Shift a gradient fill.",
+      "recipe": {
+        "kind": "planned"
+      },
+      "planned": true
+    },
+    {
+      "id": "mask-reveal",
+      "name": "Mask Reveal",
+      "category": "svg",
+      "description": "Reveal through a mask.",
+      "recipe": {
+        "kind": "planned"
+      },
+      "planned": true
+    },
+    {
+      "id": "clip-reveal",
+      "name": "Clip Reveal",
+      "category": "svg",
+      "description": "Reveal through a clip path.",
+      "recipe": {
+        "kind": "planned"
+      },
+      "planned": true
+    },
+    {
+      "id": "typewriter",
+      "name": "Typewriter",
+      "category": "text",
+      "description": "Reveal text one character at a time.",
+      "recipe": {
+        "kind": "planned"
+      },
+      "planned": true,
+      "requires": [
+        "text"
+      ]
+    },
+    {
+      "id": "character-fade",
+      "name": "Character Fade",
+      "category": "text",
+      "description": "Fade characters in sequence.",
+      "recipe": {
+        "kind": "planned"
+      },
+      "planned": true,
+      "requires": [
+        "text"
+      ]
+    },
+    {
+      "id": "character-slide-up",
+      "name": "Character Slide Up",
+      "category": "text",
+      "description": "Slide characters up in sequence.",
+      "recipe": {
+        "kind": "planned"
+      },
+      "planned": true,
+      "requires": [
+        "text"
+      ]
+    },
+    {
+      "id": "character-pop",
+      "name": "Character Pop",
+      "category": "text",
+      "description": "Pop characters in sequence.",
+      "recipe": {
+        "kind": "planned"
+      },
+      "planned": true,
+      "requires": [
+        "text"
+      ]
+    },
+    {
+      "id": "word-reveal",
+      "name": "Word Reveal",
+      "category": "text",
+      "description": "Reveal words in sequence.",
+      "recipe": {
+        "kind": "planned"
+      },
+      "planned": true,
+      "requires": [
+        "text"
+      ]
+    },
+    {
+      "id": "line-reveal",
+      "name": "Line Reveal",
+      "category": "text",
+      "description": "Reveal lines in sequence.",
+      "recipe": {
+        "kind": "planned"
+      },
+      "planned": true,
+      "requires": [
+        "text"
+      ]
+    },
+    {
+      "id": "text-wave",
+      "name": "Text Wave",
+      "category": "text",
+      "description": "Wave the text baseline.",
+      "recipe": {
+        "kind": "planned"
+      },
+      "planned": true,
+      "requires": [
+        "text"
+      ]
+    },
+    {
+      "id": "text-bounce",
+      "name": "Text Bounce",
+      "category": "text",
+      "description": "Bounce text into place.",
+      "recipe": {
+        "kind": "planned"
+      },
+      "planned": true,
+      "requires": [
+        "text"
+      ]
+    },
+    {
+      "id": "text-blur-in",
+      "name": "Text Blur In",
+      "category": "text",
+      "description": "Blur text into view.",
+      "recipe": {
+        "kind": "planned"
+      },
+      "planned": true,
+      "requires": [
+        "text"
+      ]
+    },
+    {
+      "id": "text-tracking-in",
+      "name": "Text Tracking In",
+      "category": "text",
+      "description": "Tighten tracking into rest.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "letterSpacing",
+            "fromMode": "offset",
+            "from": 12,
+            "toMode": "rest"
+          },
+          {
+            "property": "opacity",
+            "fromMode": "absolute",
+            "from": 0,
+            "toMode": "rest"
+          }
+        ]
+      },
+      "requires": [
+        "text"
+      ]
+    },
+    {
+      "id": "button-press",
+      "name": "Button Press",
+      "category": "ui",
+      "description": "Press in and release.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "scale.x",
+            "mode": "multiply",
+            "keys": [
+              1,
+              0.92,
+              1
+            ]
+          },
+          {
+            "property": "scale.y",
+            "mode": "multiply",
+            "keys": [
+              1,
+              0.92,
+              1
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "button-hover",
+      "name": "Button Hover",
+      "category": "ui",
+      "description": "Lift slightly on hover.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "position.y",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "to": -6,
+            "toScale": 1
+          },
+          {
+            "property": "scale.x",
+            "fromMode": "rest",
+            "toMode": "multiply",
+            "to": 1.04
+          },
+          {
+            "property": "scale.y",
+            "fromMode": "rest",
+            "toMode": "multiply",
+            "to": 1.04
+          }
+        ]
+      }
+    },
+    {
+      "id": "toggle",
+      "name": "Toggle",
+      "category": "ui",
+      "description": "A quick on/off scale.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "scale.x",
+            "mode": "multiply",
+            "keys": [
+              1,
+              0.85,
+              1
+            ]
+          },
+          {
+            "property": "scale.y",
+            "mode": "multiply",
+            "keys": [
+              1,
+              0.85,
+              1
+            ]
+          },
+          {
+            "property": "rotation",
+            "mode": "offset",
+            "keys": [
+              0,
+              -8,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "notification-pop",
+      "name": "Notification Pop",
+      "category": "ui",
+      "description": "Pop in from above.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "opacity",
+            "fromMode": "absolute",
+            "from": 0,
+            "toMode": "rest"
+          },
+          {
+            "property": "position.y",
+            "fromMode": "offset",
+            "from": -24,
+            "fromScale": 1,
+            "toMode": "rest"
+          },
+          {
+            "property": "scale.x",
+            "fromMode": "multiply",
+            "from": 0.92,
+            "toMode": "rest"
+          },
+          {
+            "property": "scale.y",
+            "fromMode": "multiply",
+            "from": 0.92,
+            "toMode": "rest"
+          }
+        ]
+      }
+    },
+    {
+      "id": "success-check",
+      "name": "Success Check",
+      "category": "ui",
+      "description": "A confirming pop.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "scale.x",
+            "mode": "multiply",
+            "keys": [
+              0.8,
+              1.12,
+              1
+            ]
+          },
+          {
+            "property": "scale.y",
+            "mode": "multiply",
+            "keys": [
+              0.8,
+              1.12,
+              1
+            ]
+          },
+          {
+            "property": "opacity",
+            "mode": "absolute",
+            "keys": [
+              0,
+              1,
+              1
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "error-shake",
+      "name": "Error Shake",
+      "category": "ui",
+      "description": "Shake to signal an error.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "position.x"
+        ],
+        "peakMode": "offset",
+        "peak": 16,
+        "count": 4,
+        "alternate": true
+      }
+    },
+    {
+      "id": "loading-spin",
+      "name": "Loading Spin",
+      "category": "ui",
+      "description": "Spin for a loading state.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "rotation"
+        ],
+        "peakMode": "offset",
+        "peak": 360,
+        "count": 1,
+        "holdRest": false,
+        "loopToStart": true
+      }
+    },
+    {
+      "id": "loading-pulse",
+      "name": "Loading Pulse",
+      "category": "ui",
+      "description": "Pulse for a loading state.",
+      "recipe": {
+        "kind": "cycle",
+        "properties": [
+          "scale.x",
+          "scale.y"
+        ],
+        "peakMode": "multiply",
+        "peak": 1.12,
+        "count": 2
+      }
+    },
+    {
+      "id": "progress-fill",
+      "name": "Progress Fill",
+      "category": "ui",
+      "description": "Fill from empty to rest width.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "scale.x",
+            "fromMode": "multiply",
+            "from": 0.05,
+            "toMode": "rest"
+          }
+        ]
+      }
+    },
+    {
+      "id": "tooltip-in",
+      "name": "Tooltip In",
+      "category": "ui",
+      "description": "Fade and rise into view.",
+      "recipe": {
+        "kind": "entrance",
+        "channels": [
+          {
+            "property": "opacity",
+            "fromMode": "absolute",
+            "from": 0,
+            "toMode": "rest"
+          },
+          {
+            "property": "position.y",
+            "fromMode": "offset",
+            "from": 10,
+            "fromScale": 1,
+            "toMode": "rest"
+          }
+        ]
+      }
+    },
+    {
+      "id": "tooltip-out",
+      "name": "Tooltip Out",
+      "category": "ui",
+      "description": "Fade and drop out of view.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "opacity",
+            "fromMode": "rest",
+            "toMode": "absolute",
+            "to": 0
+          },
+          {
+            "property": "position.y",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "to": 10,
+            "toScale": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "spring",
+      "name": "Spring",
+      "category": "advanced",
+      "description": "Spring into rest with overshoot.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "scale.x",
+            "mode": "multiply",
+            "keys": [
+              0.7,
+              1.14,
+              0.96,
+              1
+            ]
+          },
+          {
+            "property": "scale.y",
+            "mode": "multiply",
+            "keys": [
+              0.7,
+              1.14,
+              0.96,
+              1
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "elastic",
+      "name": "Elastic",
+      "category": "advanced",
+      "description": "Elastic scale into rest.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "scale.x",
+            "mode": "multiply",
+            "keys": [
+              0.4,
+              1.2,
+              0.88,
+              1.06,
+              1
+            ]
+          },
+          {
+            "property": "scale.y",
+            "mode": "multiply",
+            "keys": [
+              0.4,
+              1.2,
+              0.88,
+              1.06,
+              1
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "overshoot",
+      "name": "Overshoot",
+      "category": "advanced",
+      "description": "Overshoot position then settle.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "position.y",
+            "mode": "offset",
+            "keys": [
+              40,
+              -12,
+              4,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "squash-stretch",
+      "name": "Squash & Stretch",
+      "category": "advanced",
+      "description": "Squash and stretch around rest.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "scale.x",
+            "mode": "multiply",
+            "keys": [
+              1,
+              1.25,
+              0.85,
+              1
+            ]
+          },
+          {
+            "property": "scale.y",
+            "mode": "multiply",
+            "keys": [
+              1,
+              0.75,
+              1.18,
+              1
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "anticipation",
+      "name": "Anticipation",
+      "category": "advanced",
+      "description": "Wind up before moving forward.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "position.x",
+            "mode": "offset",
+            "keys": [
+              0,
+              -18,
+              48
+            ]
+          },
+          {
+            "property": "rotation",
+            "mode": "offset",
+            "keys": [
+              0,
+              8,
+              -4
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "follow-through",
+      "name": "Follow Through",
+      "category": "advanced",
+      "description": "Settle after a move.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "position.x",
+            "mode": "offset",
+            "keys": [
+              -40,
+              8,
+              0
+            ]
+          },
+          {
+            "property": "rotation",
+            "mode": "offset",
+            "keys": [
+              -12,
+              6,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "motion-path",
+      "name": "Motion Path",
+      "category": "advanced",
+      "description": "Bind the layer to a motion path.",
+      "recipe": {
+        "kind": "planned"
+      },
+      "planned": true
+    },
+    {
+      "id": "arc-movement",
+      "name": "Arc Movement",
+      "category": "advanced",
+      "description": "Move along a shallow arc.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "position.x",
+            "mode": "offset",
+            "keys": [
+              -60,
+              0
+            ]
+          },
+          {
+            "property": "position.y",
+            "mode": "offset",
+            "keys": [
+              0,
+              -28,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "parallax",
+      "name": "Parallax",
+      "category": "advanced",
+      "description": "A slower depth offset.",
+      "recipe": {
+        "kind": "exit",
+        "channels": [
+          {
+            "property": "position.x",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "to": 24,
+            "toScale": 1
+          },
+          {
+            "property": "position.y",
+            "fromMode": "rest",
+            "toMode": "offset",
+            "to": 8,
+            "toScale": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "stagger",
+      "name": "Stagger",
+      "category": "advanced",
+      "description": "Stagger child layers.",
+      "recipe": {
+        "kind": "planned"
+      },
+      "planned": true
+    },
+    {
+      "id": "random-wiggle",
+      "name": "Random Wiggle",
+      "category": "advanced",
+      "description": "Irregular wiggle around rest.",
+      "recipe": {
+        "kind": "timeline",
+        "channels": [
+          {
+            "property": "position.x",
+            "mode": "offset",
+            "keys": [
+              0,
+              8,
+              -6,
+              10,
+              -4,
+              0
+            ]
+          },
+          {
+            "property": "position.y",
+            "mode": "offset",
+            "keys": [
+              0,
+              -5,
+              7,
+              -3,
+              6,
+              0
+            ]
+          },
+          {
+            "property": "rotation",
+            "mode": "offset",
+            "keys": [
+              0,
+              4,
+              -6,
+              3,
+              -2,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "physics-bounce",
+      "name": "Physics Bounce",
+      "category": "advanced",
+      "description": "A decaying physics-style bounce.",
+      "recipe": {
+        "kind": "bounce"
+      },
+      "controls": [
+        "duration",
+        "easing",
+        "bounceHeight",
+        "bounceCount"
+      ]
+    }
+  ]
+}

@@ -35,6 +35,72 @@ beforeEach(() => {
     playing: false,
     mode: 'animate',
   }))
+  store().clearHistory()
+})
+
+describe('undo and redo history', () => {
+  it('restores document edits and their selection', () => {
+    const originalId = rect().id
+    store().addShape('ellipse')
+    const addedId = store().selectedIds[0]
+
+    expect(store().document.children).toHaveLength(2)
+    expect(store().canUndo).toBe(true)
+
+    store().undo()
+    expect(store().document.children).toHaveLength(1)
+    expect(store().selectedIds).toEqual([originalId])
+    expect(store().canRedo).toBe(true)
+
+    store().redo()
+    expect(store().document.children).toHaveLength(2)
+    expect(store().selectedIds).toEqual([addedId])
+  })
+
+  it('clears redo after a new edit and ignores view-only changes', () => {
+    const id = rect().id
+    store().updateNode(id, { fill: '#ff0000' })
+    store().undo()
+
+    store().setZoom(2)
+    store().setPlayhead(1)
+    expect(store().canRedo).toBe(true)
+    expect(store().canUndo).toBe(false)
+
+    store().updateNode(id, { fill: '#00ff00' })
+    expect(store().canRedo).toBe(false)
+    store().undo()
+    expect(rect().fill).toBe('#cbd0d8')
+  })
+
+  it('combines a continuous gesture into one history entry', () => {
+    const id = rect().id
+    const originalX = rect().transform.position.x
+    store().beginHistoryGroup()
+    store().editTransform(id, {
+      ...rect().transform,
+      position: { ...rect().transform.position, x: originalX + 20 },
+    })
+    store().editTransform(id, {
+      ...rect().transform,
+      position: { ...rect().transform.position, x: originalX + 40 },
+    })
+    store().endHistoryGroup()
+
+    store().undo()
+    expect(rect().transform.position.x).toBe(originalX)
+    expect(store().canUndo).toBe(false)
+  })
+
+  it('clamps the playhead when history restores a shorter animation', () => {
+    store().setDuration(1)
+    store().setDuration(4)
+    store().setPlayhead(3)
+
+    store().undo()
+    expect(store().document.animation.duration).toBe(1)
+    expect(store().playhead).toBe(1)
+  })
 })
 
 describe('animate authoring', () => {
