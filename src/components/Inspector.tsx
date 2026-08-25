@@ -13,7 +13,7 @@ import {
   isArmed,
   propertyLabel,
 } from '../model/animation'
-import { pivotAnchor } from '../model/scene'
+import { pivotAnchor, walkNodes } from '../model/scene'
 import { retargetPivot } from '../model/transform'
 import type {
   AnimatableProperty,
@@ -41,6 +41,7 @@ import {
 import { naturalTextWidth } from '../model/text'
 import { chromaKey, processChroma } from '../model/image'
 import { EffectsPanel } from './EffectsPanel'
+import { AnimationPresetModal } from './AnimationPresetModal'
 
 const gridTypes: { value: GridSettings['type']; label: string }[] = [
   { value: 'grid', label: 'Grid' },
@@ -124,6 +125,10 @@ export function Inspector() {
   const mode = useEditorStore((state) => state.mode)
   const playhead = useEditorStore((state) => state.playhead)
   const togglePropertyArm = useEditorStore((state) => state.togglePropertyArm)
+  const applyAnimationPreset = useEditorStore(
+    (state) => state.applyAnimationPreset,
+  )
+  const setMotionPath = useEditorStore((state) => state.setMotionPath)
   const updateArtboard = useEditorStore((state) => state.updateArtboard)
   const setDocumentName = useEditorStore((state) => state.setDocumentName)
   const setViewport = useEditorStore((state) => state.setViewport)
@@ -132,6 +137,7 @@ export function Inspector() {
   const groupSelected = useEditorStore((state) => state.groupSelected)
   const ungroupSelected = useEditorStore((state) => state.ungroupSelected)
   const [scaleLinked, setScaleLinked] = useState(true)
+  const [presetOpen, setPresetOpen] = useState(false)
   const node = selectedNode(nodes, selectedIds)
   const grid = document.artboard.grid
   const grouping = canGroup(nodes, selectedIds)
@@ -386,7 +392,16 @@ export function Inspector() {
       />
     ) : undefined
 
+  const targetPaths: { id: string; name: string }[] = []
+  walkNodes(nodes, (candidate) => {
+    if (candidate.type === 'path' && candidate.id !== node.id) {
+      targetPaths.push({ id: candidate.id, name: candidate.name })
+    }
+  })
+  const motionPath = view.motionPath
+
   return (
+    <>
     <aside key={node.id} className="inspector">
       <CollapsibleSection title="Layer">
         <div className="row-actions">
@@ -498,6 +513,76 @@ export function Inspector() {
             display={`${Math.round(display.opacity * 100)}%`}
           />
         </PropertyRow>
+      </CollapsibleSection>
+
+      {mode === 'animate' && (
+        <CollapsibleSection title="Animation presets">
+          <p className="section-note">
+            Start from a ready-made animation and tune it for this layer.
+          </p>
+          <div className="preset-launch-row">
+            <Button onClick={() => setPresetOpen(true)}>Browse presets</Button>
+          </div>
+        </CollapsibleSection>
+      )}
+
+      <CollapsibleSection title="Motion path" defaultOpen={Boolean(motionPath)}>
+        <PropertyRow label="Target">
+          <Select
+            aria-label="Target path"
+            value={motionPath?.pathId ?? ''}
+            onChange={(event) => setMotionPath(node.id, event.target.value || null)}
+          >
+            <option value="">None</option>
+            {targetPaths.map((path) => (
+              <option key={path.id} value={path.id}>
+                {path.name}
+              </option>
+            ))}
+          </Select>
+        </PropertyRow>
+        {motionPath && (
+          <>
+            <PropertyRow label="Progress">
+              <ScrubField
+                label="%"
+                value={motionPath.progress * 100}
+                min={0}
+                max={100}
+                step={1}
+                precision={1}
+                leading={keyframe('motionPath.progress')}
+                onValue={(progress) =>
+                  updateNode(node.id, {
+                    motionPath: {
+                      ...motionPath,
+                      progress: progress / 100,
+                    },
+                  })
+                }
+              />
+            </PropertyRow>
+            <PropertyRow label="Auto rotate">
+              <Button
+                aria-label="Auto rotate along path"
+                aria-pressed={motionPath.autoRotate}
+                onClick={() =>
+                  updateNode(node.id, {
+                    motionPath: {
+                      ...motionPath,
+                      autoRotate: !motionPath.autoRotate,
+                    },
+                  })
+                }
+              >
+                {motionPath.autoRotate ? 'On' : 'Off'}
+              </Button>
+            </PropertyRow>
+            <p className="section-note">
+              Position and rotation remain additive offsets from the path.
+            </p>
+          </>
+        )}
       </CollapsibleSection>
 
       {mode !== 'animate' && (
@@ -815,6 +900,18 @@ export function Inspector() {
         />
       </CollapsibleSection>
     </aside>
+    {presetOpen && (
+      <AnimationPresetModal
+        node={node}
+        animation={document.animation}
+        startTime={playhead}
+        onApply={(presetId, config) =>
+          applyAnimationPreset(node.id, presetId, config)
+        }
+        onClose={() => setPresetOpen(false)}
+      />
+    )}
+    </>
   )
 }
 

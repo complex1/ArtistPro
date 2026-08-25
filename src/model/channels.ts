@@ -1,10 +1,10 @@
 import type {
   AnimatableProperty,
   EditorNode,
+  KeyframeValue,
   LayerEffect,
 } from './types'
-
-export type KeyframeValue = number | string
+export type { KeyframeValue } from './types'
 
 export const TRANSFORM_PROPERTIES: AnimatableProperty[] = [
   'position.x',
@@ -160,6 +160,10 @@ export function readChannel(
       return node.type === 'image' ? node.crop.width : undefined
     case 'crop.height':
       return node.type === 'image' ? node.crop.height : undefined
+    case 'path.points':
+      return node.type === 'path' ? node.points : undefined
+    case 'motionPath.progress':
+      return node.motionPath?.progress
   }
 }
 
@@ -324,6 +328,20 @@ export function writeChannel(
       return node.type === 'image'
         ? { ...node, crop: { ...node.crop, height: amount } }
         : node
+    case 'path.points':
+      return node.type === 'path' && Array.isArray(value)
+        ? { ...node, points: value }
+        : node
+    case 'motionPath.progress':
+      return node.motionPath
+        ? {
+            ...node,
+            motionPath: {
+              ...node.motionPath,
+              progress: Math.min(1, Math.max(0, amount)),
+            },
+          }
+        : node
     default:
       return node
   }
@@ -370,6 +388,10 @@ export function animatedEditsFromPatch(update: Record<string, unknown>) {
   push('fontSize', update.fontSize)
   push('letterSpacing', update.letterSpacing)
   push('fontWeight', update.fontWeight)
+  push('path.points', update.points)
+
+  const motionPath = update.motionPath as { progress?: number } | undefined
+  if (motionPath) push('motionPath.progress', motionPath.progress)
 
   const settings = update.settings as { size?: number; color?: string } | undefined
   if (settings) {

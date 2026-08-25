@@ -27,7 +27,7 @@ const tools: { id: Tool; label: string; icon: typeof MousePointer2 }[] = [
   { id: 'image', label: 'Image', icon: ImageIcon },
 ]
 
-const motionTools: Tool[] = ['select', 'pan']
+const motionTools: Tool[] = ['select', 'node', 'pan']
 
 export function Toolbar() {
   const imageInput = useRef<HTMLInputElement>(null)

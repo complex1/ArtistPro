@@ -30,7 +30,7 @@ import {
   pencilPathData,
 } from '../model/pencil'
 import { createText, naturalTextWidth } from '../model/text'
-import { evaluateScene } from '../model/animation'
+import { applyMotionPaths, evaluateChannels } from '../model/animation'
 import {
   dragDelta,
   findNode,
@@ -58,6 +58,7 @@ import type {
   PathPoint,
   TextNode,
   Tool,
+  Transform,
   Vec2,
 } from '../model/types'
 import { dragRoots, useEditorStore } from '../store/editorStore'
@@ -262,9 +263,37 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
     draw.attr({ 'aria-label': `${document.name} artboard` })
 
     const motion = mode === 'animate' || mode === 'preview'
-    const scene = motion
-      ? evaluateScene(document.children, document.animation, playhead)
+    // Two poses: `scene` is what the viewer sees, `channelScene` is the pose
+    // underneath the motion-path layer. Painting and hit-testing follow the
+    // former; anything that writes a transform back has to follow the latter,
+    // or the path offset gets baked into the value it edits. Draw resolves
+    // paths too, at their rest progress, so a follower sits in the same place
+    // in both modes.
+    const channelScene = motion
+      ? evaluateChannels(document.children, document.animation, playhead)
       : document.children
+    const scene = applyMotionPaths(channelScene)
+
+    const channelTransform = (id: string, rendered: Transform): Transform =>
+      findNode(channelScene, id)?.transform ?? rendered
+
+    // Rewrites a transform derived from the rendered pose into the channel it
+    // belongs to by peeling off the motion-path contribution.
+    const toChannelTransform = (
+      id: string,
+      rendered: Transform,
+      next: Transform,
+    ): Transform => {
+      const channel = channelTransform(id, rendered)
+      return {
+        ...next,
+        position: {
+          x: next.position.x - (rendered.position.x - channel.position.x),
+          y: next.position.y - (rendered.position.y - channel.position.y),
+        },
+        rotation: next.rotation - (rendered.rotation - channel.rotation),
+      }
+    }
 
     const grid = document.artboard.grid
     const gridPrimitives = grid.enabled
@@ -483,7 +512,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
 
     const beginDrag = (node: EditorNode, event: PointerEvent, nextIds: string[]) => {
       if (node.locked || tool !== 'select') return
-      const origins = dragRoots(scene, nextIds).map((item) => ({
+      const origins = dragRoots(channelScene, nextIds).map((item) => ({
         id: item.id,
         transform: structuredClone(item.transform),
       }))
@@ -495,15 +524,16 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
           y: pointer.y - grabbed.y,
         }
         const state = useEditorStore.getState()
-        const liveScene =
-          state.mode === 'animate' || state.mode === 'preview'
-            ? evaluateScene(
-                state.document.children,
-                state.document.animation,
-                state.playhead,
-              )
-            : state.document.children
-        const liveRoots = dragRoots(liveScene, nextIds)
+        const liveMotion = state.mode === 'animate' || state.mode === 'preview'
+        const liveChannels = liveMotion
+          ? evaluateChannels(
+              state.document.children,
+              state.document.animation,
+              state.playhead,
+            )
+          : state.document.children
+        const liveScene = applyMotionPaths(liveChannels)
+        const liveRoots = dragRoots(liveChannels, nextIds)
         for (const origin of origins) {
           const live = liveRoots.find((item) => item.id === origin.id)
           if (!live) continue
@@ -561,7 +591,10 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
         const resized = resizeNode(start, factor, anchor)
         const { transform, ...patch } = resized
         updateNode(node.id, patch)
-        editTransform(node.id, transform)
+        editTransform(
+          node.id,
+          toChannelTransform(node.id, start.transform, transform),
+        )
       }
       const up = () => {
         setSnapHint(null)
@@ -587,15 +620,18 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
           parentMatrix,
           draw.point(moveEvent.clientX, moveEvent.clientY),
         )
-        editTransform(node.id, {
-          ...startTransform,
-          rotation: rotationFromPoints(
-            startTransform,
-            start,
-            current,
-            moveEvent.shiftKey,
-          ),
-        })
+        editTransform(
+          node.id,
+          toChannelTransform(node.id, startTransform, {
+            ...startTransform,
+            rotation: rotationFromPoints(
+              startTransform,
+              start,
+              current,
+              moveEvent.shiftKey,
+            ),
+          }),
+        )
       }
       const up = () => {
         window.removeEventListener('pointermove', move)
@@ -939,11 +975,11 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
       )
     }
     const editingNode = editingPathId
-      ? findNode(document.children, editingPathId)
+      ? findNode(scene, editingPathId)
       : undefined
     draw.off('pointermove.pen-preview')
     if (editingNode?.type === 'path') {
-      drawPathEditor(draw, editingNode, document.children, zoom, {
+      drawPathEditor(draw, editingNode, scene, zoom, {
         drawing: draftPathId === editingNode.id,
         selectedPointId: editingNode.points.some(
           (point) => point.id === selectedPointId,
@@ -1033,9 +1069,13 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
     zoom,
   ])
 
+  const menuScene =
+    mode === 'animate' || mode === 'preview'
+      ? evaluateChannels(document.children, document.animation, playhead)
+      : document.children
   const menuPath =
     pointMenu && pointMenu.pathId === editingPathId
-      ? findNode(document.children, pointMenu.pathId)
+      ? findNode(menuScene, pointMenu.pathId)
       : undefined
   const menuPoint =
     menuPath?.type === 'path'

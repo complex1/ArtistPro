@@ -5,8 +5,12 @@ import {
   armProperty as seedArmedProperty,
   defaultAnimation,
   disarmProperty as dropArmedProperty,
+  duplicateKeys,
+  evaluateChannels,
   evaluateNodeAtTime,
   isArmed,
+  motionPathOffset,
+  offsetPositionTracks,
   pruneAnimation,
   remapAnimation,
   removeKeys,
@@ -14,6 +18,7 @@ import {
   retimeKey as moveKeyframe,
   setAnimationDuration,
   setRestValue,
+  updateKeyframe as patchKeyframe,
   upsertKeyframe,
 } from '../model/animation'
 import {
@@ -22,16 +27,23 @@ import {
   writeChannel,
   type KeyframeValue,
 } from '../model/channels'
+import {
+  applyPreset,
+  type AnimationPresetConfig,
+  type AnimationPresetId,
+} from '../model/animationPresets'
 import { createShape } from '../model/nodes'
 import { defaultPencilSettings } from '../model/pencil'
 import {
   canGroup,
   canUngroup,
+  clearMissingMotionPaths,
   cloneNode,
   dragRoots,
   findNode,
   groupNodes,
   moveLayer as moveLayerInScene,
+  remapMotionPaths,
   removeNodes,
   selectedNode as findSelectedNode,
   ungroupNode,
@@ -40,9 +52,11 @@ import {
 import type { LayerDropPosition } from '../model/scene'
 import type {
   AnimatableProperty,
+  DocumentAnimation,
   EditorDocument,
   EditorMode,
   EditorNode,
+  Keyframe,
   PencilSettings,
   ShapeType,
   Tool,
@@ -51,6 +65,31 @@ import type {
 } from '../model/types'
 
 const firstShape = createShape('rect')
+
+const copyKeyframeValue = (value: KeyframeValue): KeyframeValue =>
+  Array.isArray(value)
+    ? value.map((point) => ({
+        ...point,
+        anchor: { ...point.anchor },
+        handleIn: { ...point.handleIn },
+        handleOut: { ...point.handleOut },
+      }))
+    : value
+
+/**
+ * A tracked property's key at t=0 and the Draw rest pose describe the same
+ * first frame, so an edit outside Animate has to move both or the clip opens
+ * on a pose the artboard never shows.
+ */
+const syncFirstFrameKey = (
+  animation: DocumentAnimation,
+  id: string,
+  property: AnimatableProperty,
+  value: KeyframeValue,
+) =>
+  isArmed(animation, id, property)
+    ? upsertKeyframe(animation, id, property, 0, copyKeyframeValue(value))
+    : animation
 
 type EditorStore = {
   document: EditorDocument
@@ -75,6 +114,7 @@ type EditorStore = {
   removeNode: (id: string) => void
   updateNode: (id: string, update: Partial<EditorNode>) => void
   editTransform: (id: string, transform: Transform) => void
+  setMotionPath: (id: string, pathId: string | null) => void
   moveLayer: (
     sourceId: string,
     targetId: string | null,
@@ -97,8 +137,18 @@ type EditorStore = {
   armProperty: (nodeId: string, property: AnimatableProperty) => void
   disarmProperty: (nodeId: string, property: AnimatableProperty) => void
   togglePropertyArm: (nodeId: string, property: AnimatableProperty) => void
+  applyAnimationPreset: (
+    nodeId: string,
+    presetId: AnimationPresetId,
+    config: AnimationPresetConfig,
+  ) => void
   selectKeys: (ids: string[], additive?: boolean) => void
   removeSelectedKeys: () => void
+  duplicateSelectedKeys: () => void
+  updateKey: (
+    keyId: string,
+    update: Partial<Pick<Keyframe, 'value' | 'easing'>>,
+  ) => void
   retimeKey: (keyId: string, time: number) => void
 }
 
@@ -193,6 +243,7 @@ export const useEditorStore = create<EditorStore>()(
     removeNode: (id) =>
       set((state) => {
         state.document.children = removeNodes(state.document.children, [id])
+        state.document.children = clearMissingMotionPaths(state.document.children)
         state.selectedIds = state.selectedIds.filter((selectedId) =>
           Boolean(findNode(state.document.children, selectedId)),
         )
@@ -206,7 +257,13 @@ export const useEditorStore = create<EditorStore>()(
         const node = findNode(state.document.children, id)
         if (!node) return
         if (state.mode !== 'animate') {
+          let animation = state.document.animation
+          for (const edit of animatedEditsFromPatch(update as Record<string, unknown>)) {
+            if (readChannel(node, edit.property) === edit.value) continue
+            animation = syncFirstFrameKey(animation, id, edit.property, edit.value)
+          }
           updateNodeById(state.document.children, id, update)
+          state.document.animation = animation
           return
         }
 
@@ -220,6 +277,20 @@ export const useEditorStore = create<EditorStore>()(
         for (const edit of animatedEditsFromPatch(update as Record<string, unknown>)) {
           const rest = readChannel(node, edit.property)
           const changed = readChannel(shown, edit.property) !== edit.value
+          if (
+            changed &&
+            edit.property === 'path.points' &&
+            rest !== undefined &&
+            !isArmed(animation, id, edit.property)
+          ) {
+            animation = seedArmedProperty(
+              animation,
+              id,
+              edit.property,
+              copyKeyframeValue(rest),
+              state.playhead,
+            )
+          }
           if (changed && !isArmed(animation, id, edit.property)) continue
           if (changed) {
             animation = upsertKeyframe(
@@ -227,12 +298,15 @@ export const useEditorStore = create<EditorStore>()(
               id,
               edit.property,
               state.playhead,
-              edit.value,
+              copyKeyframeValue(edit.value),
             )
             if (state.playhead < 1e-4) continue
           }
           if (rest !== undefined && rest !== edit.value) {
-            restores.push({ property: edit.property, value: rest })
+            restores.push({
+              property: edit.property,
+              value: copyKeyframeValue(rest),
+            })
           }
         }
 
@@ -252,7 +326,14 @@ export const useEditorStore = create<EditorStore>()(
         if (!node) return
         const recording = recordingModes.includes(state.mode)
         if (!recording) {
+          let animation = state.document.animation
+          for (const property of ANIMATABLE_PROPERTIES) {
+            const nextValue = restValue(transform, property)
+            if (restValue(node.transform, property) === nextValue) continue
+            animation = syncFirstFrameKey(animation, id, property, nextValue)
+          }
           updateNodeById(state.document.children, id, { transform })
+          state.document.animation = animation
           return
         }
 
@@ -278,6 +359,71 @@ export const useEditorStore = create<EditorStore>()(
         state.document.animation = animation
         updateNodeById(state.document.children, id, { transform: rest })
       }),
+    setMotionPath: (id, pathId) =>
+      set((state) => {
+        const node = findNode(state.document.children, id)
+        if (!node) return
+        const current = node.motionPath
+        const position = {
+          x: node.transform.position.x,
+          y: node.transform.position.y,
+        }
+
+        if (pathId) {
+          if (current) {
+            // Swapping targets keeps an offset that already reads as a delta
+            // from a path, so only the reference changes.
+            updateNodeById(state.document.children, id, {
+              motionPath: { ...current, pathId },
+            })
+            return
+          }
+          // Until a path takes over, position is an absolute placement. Folding
+          // it into the path sample would land the box at "path point plus
+          // wherever it happened to sit", so rebase it to a zero offset and let
+          // the path place it. Keys move by the same amount to keep any
+          // position animation intact, now relative to the path.
+          state.document.animation = offsetPositionTracks(
+            state.document.animation,
+            id,
+            { x: -position.x, y: -position.y },
+          )
+          updateNodeById(state.document.children, id, {
+            motionPath: { pathId, progress: 0, autoRotate: false },
+            transform: { ...node.transform, position: { x: 0, y: 0 } },
+          })
+          return
+        }
+
+        if (!current) return
+        // Detaching removes the layer that was doing the placing, so bake the
+        // sample at the playhead into position and the box stays put.
+        const channels = evaluateChannels(
+          state.document.children,
+          state.document.animation,
+          state.playhead,
+        )
+        const live = findNode(channels, id)
+        const motion = live ? motionPathOffset(channels, live) : null
+        const delta = motion?.offset ?? { x: 0, y: 0 }
+        let animation = dropArmedProperty(
+          state.document.animation,
+          id,
+          'motionPath.progress',
+        )
+        animation = offsetPositionTracks(animation, id, delta)
+        state.document.animation = animation
+        updateNodeById(state.document.children, id, {
+          motionPath: undefined,
+          transform: {
+            ...node.transform,
+            position: {
+              x: position.x + delta.x,
+              y: position.y + delta.y,
+            },
+          },
+        })
+      }),
     moveLayer: (sourceId, targetId, position) =>
       set((state) => {
         moveLayerInScene(state.document.children, sourceId, targetId, position)
@@ -296,6 +442,7 @@ export const useEditorStore = create<EditorStore>()(
           state.document.children,
           state.selectedIds,
         )
+        state.document.children = clearMissingMotionPaths(state.document.children)
         state.selectedIds = []
         state.document.animation = pruneAnimation(
           state.document.animation,
@@ -305,10 +452,12 @@ export const useEditorStore = create<EditorStore>()(
     duplicateSelected: () =>
       set((state) => {
         const idMap = new Map<string, string>()
-        const copies = dragRoots(
-          state.document.children,
-          state.selectedIds,
-        ).map((node) => cloneNode(node, true, idMap))
+        const copies = remapMotionPaths(
+          dragRoots(state.document.children, state.selectedIds).map((node) =>
+            cloneNode(node, true, idMap),
+          ),
+          idMap,
+        )
         if (copies.length === 0) return
         state.document.children.push(...copies)
         state.selectedIds = copies.map((node) => node.id)
@@ -438,6 +587,20 @@ export const useEditorStore = create<EditorStore>()(
           state.playhead,
         )
       }),
+    applyAnimationPreset: (nodeId, presetId, config) =>
+      set((state) => {
+        const node = findNode(state.document.children, nodeId)
+        if (!node) return
+        state.document.animation = applyPreset(
+          state.document.animation,
+          node,
+          presetId,
+          config,
+          state.playhead,
+        )
+        state.playing = false
+        state.selectedKeyIds = []
+      }),
     selectKeys: (ids, additive = false) =>
       set((state) => {
         state.selectedKeyIds = additive
@@ -454,6 +617,51 @@ export const useEditorStore = create<EditorStore>()(
           state.selectedKeyIds,
         )
         state.selectedKeyIds = []
+      }),
+    duplicateSelectedKeys: () =>
+      set((state) => {
+        const duplicated = duplicateKeys(
+          state.document.animation,
+          state.selectedKeyIds,
+        )
+        state.document.animation = duplicated.animation
+        state.selectedKeyIds = duplicated.keyIds
+        const selected = duplicated.keyIds[0]
+        if (!selected) return
+        for (const track of state.document.animation.tracks) {
+          const key = track.keys.find((item) => item.id === selected)
+          if (key) {
+            state.playhead = key.time
+            break
+          }
+        }
+      }),
+    updateKey: (keyId, update) =>
+      set((state) => {
+        const track = state.document.animation.tracks.find((item) =>
+          item.keys.some((key) => key.id === keyId),
+        )
+        const key = track?.keys.find((item) => item.id === keyId)
+        state.document.animation = patchKeyframe(
+          state.document.animation,
+          keyId,
+          update,
+        )
+        if (
+          !track ||
+          !key ||
+          key.time >= 1e-4 ||
+          update.value === undefined
+        ) {
+          return
+        }
+        const node = findNode(state.document.children, track.nodeId)
+        if (!node) return
+        updateNodeById(
+          state.document.children,
+          node.id,
+          writeChannel(node, track.property, update.value),
+        )
       }),
     retimeKey: (keyId, time) =>
       set((state) => {

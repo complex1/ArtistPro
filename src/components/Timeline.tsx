@@ -1,4 +1,14 @@
-import { ChevronDown, ChevronRight, Eye, EyeOff, Pause, Play, RotateCcw } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Eye,
+  EyeOff,
+  Pause,
+  Play,
+  RotateCcw,
+  Trash2,
+} from 'lucide-react'
 import {
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -10,9 +20,16 @@ import {
   tracksForNode,
 } from '../model/animation'
 import { walkNodes } from '../model/scene'
-import type { DocumentAnimation, EditorNode, Keyframe } from '../model/types'
+import type {
+  AnimationTrack,
+  DocumentAnimation,
+  EditorNode,
+  Keyframe,
+  KeyframeEase,
+  KeyframeValue,
+} from '../model/types'
 import { useEditorStore } from '../store/editorStore'
-import { Button, IconButton } from '../ui/controls'
+import { Button, IconButton, Select } from '../ui/controls'
 import { ScrubField } from '../ui/fields'
 
 function layersWithMotion(
@@ -32,6 +49,31 @@ function layersWithMotion(
   return [...keyed, ...extras]
 }
 
+type SelectedKey = {
+  keyframe: Keyframe
+  track: AnimationTrack
+  node?: EditorNode
+}
+
+function selectedKeys(
+  nodes: EditorNode[],
+  animation: DocumentAnimation,
+  ids: string[],
+): SelectedKey[] {
+  const selected = new Set(ids)
+  const byId = new Map<string, EditorNode>()
+  walkNodes(nodes, (node) => byId.set(node.id, node))
+  return animation.tracks.flatMap((track) =>
+    track.keys
+      .filter((keyframe) => selected.has(keyframe.id))
+      .map((keyframe) => ({
+        keyframe,
+        track,
+        node: byId.get(track.nodeId),
+      })),
+  )
+}
+
 export function Timeline() {
   const nodes = useEditorStore((state) => state.document.children)
   const animation = useEditorStore((state) => state.document.animation)
@@ -46,12 +88,18 @@ export function Timeline() {
   const setDuration = useEditorStore((state) => state.setDuration)
   const select = useEditorStore((state) => state.select)
   const selectKeys = useEditorStore((state) => state.selectKeys)
+  const removeSelectedKeys = useEditorStore((state) => state.removeSelectedKeys)
+  const duplicateSelectedKeys = useEditorStore(
+    (state) => state.duplicateSelectedKeys,
+  )
+  const updateKey = useEditorStore((state) => state.updateKey)
   const retimeKey = useEditorStore((state) => state.retimeKey)
   const updateNode = useEditorStore((state) => state.updateNode)
   const [collapsedIds, setCollapsedIds] = useState<string[]>([])
   const rows = layersWithMotion(nodes, selectedIds, animation)
   const duration = Math.max(animation.duration, 0.1)
   const collapsed = new Set(collapsedIds)
+  const keySelection = selectedKeys(nodes, animation, selectedKeyIds)
 
   const toggleCollapsed = (id: string) =>
     setCollapsedIds((ids) =>
@@ -237,8 +285,142 @@ export function Timeline() {
             )
           })}
         </div>
+        <KeyframeConfig
+          selection={keySelection}
+          duration={duration}
+          onRetime={retimeKey}
+          onUpdate={updateKey}
+          onDuplicate={duplicateSelectedKeys}
+          onDelete={removeSelectedKeys}
+        />
       </div>
     </section>
+  )
+}
+
+function KeyframeConfig({
+  selection,
+  duration,
+  onRetime,
+  onUpdate,
+  onDuplicate,
+  onDelete,
+}: {
+  selection: SelectedKey[]
+  duration: number
+  onRetime: (id: string, time: number) => void
+  onUpdate: (
+    id: string,
+    update: Partial<Pick<Keyframe, 'value' | 'easing'>>,
+  ) => void
+  onDuplicate: () => void
+  onDelete: () => void
+}) {
+  const selected = selection.length === 1 ? selection[0] : undefined
+  return (
+    <aside className="timeline-key-config" aria-label="Keyframe settings">
+      <div className="timeline-key-config-head">
+        <span>Keyframe</span>
+        {selection.length > 0 && (
+          <span className="timeline-key-count">{selection.length} selected</span>
+        )}
+      </div>
+      {!selected && selection.length === 0 && (
+        <p className="timeline-key-empty">Select a diamond to edit its values.</p>
+      )}
+      {!selected && selection.length > 1 && (
+        <p className="timeline-key-empty">
+          Edit one key at a time, or manage all selected keys below.
+        </p>
+      )}
+      {selected && (
+        <div className="timeline-key-fields">
+          <div className="timeline-key-meta">
+            <span>{selected.node?.name ?? 'Layer'}</span>
+            <strong>{propertyLabel(selected.track.property)}</strong>
+          </div>
+          <div className="timeline-key-field">
+            <span>Time</span>
+            <ScrubField
+              label="SEC"
+              value={selected.keyframe.time}
+              min={0}
+              max={duration}
+              step={0.01}
+              precision={2}
+              onValue={(time) => onRetime(selected.keyframe.id, time)}
+            />
+          </div>
+          <div className="timeline-key-field">
+            <span>Value</span>
+            <KeyframeValueField
+              value={selected.keyframe.value}
+              onValue={(value) => onUpdate(selected.keyframe.id, { value })}
+            />
+          </div>
+          <div className="timeline-key-field">
+            <span>Easing</span>
+            <Select
+              aria-label="Keyframe easing"
+              value={selected.keyframe.easing}
+              onChange={(event) =>
+                onUpdate(selected.keyframe.id, {
+                  easing: event.target.value as KeyframeEase,
+                })
+              }
+            >
+              <option value="linear">Linear</option>
+              <option value="power2.inOut">Ease in/out</option>
+            </Select>
+          </div>
+        </div>
+      )}
+      {selection.length > 0 && (
+        <div className="timeline-key-actions">
+          <Button onClick={onDuplicate}>
+            <Copy size={12} /> Duplicate
+          </Button>
+          <Button onClick={onDelete}>
+            <Trash2 size={12} /> Delete
+          </Button>
+        </div>
+      )}
+    </aside>
+  )
+}
+
+function KeyframeValueField({
+  value,
+  onValue,
+}: {
+  value: KeyframeValue
+  onValue: (value: KeyframeValue) => void
+}) {
+  if (typeof value === 'number') {
+    return (
+      <ScrubField
+        label="VALUE"
+        value={value}
+        step={0.01}
+        precision={3}
+        onValue={onValue}
+      />
+    )
+  }
+  if (typeof value === 'string') {
+    return (
+      <input
+        className="timeline-key-input"
+        aria-label="Keyframe value"
+        value={value}
+        onChange={(event) => onValue(event.target.value)}
+      />
+    )
+  }
+  return (
+    <output className="timeline-key-output">
+      {value.length} path {value.length === 1 ? 'point' : 'points'}
+    </output>
   )
 }
 

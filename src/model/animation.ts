@@ -7,7 +7,15 @@ import {
   writeChannel,
   type KeyframeValue,
 } from './channels'
-import { findNode, walkNodes } from './scene'
+import { findNode, parentAffine, walkNodes } from './scene'
+import { samplePathAt } from './path'
+import {
+  affineDelta,
+  affinePoint,
+  invertAffine,
+  multiplyAffine,
+  transformToAffine,
+} from './transform'
 import type {
   AnimatableProperty,
   AnimationTrack,
@@ -16,6 +24,7 @@ import type {
   Keyframe,
   KeyframeEase,
   Transform,
+  Vec2,
 } from './types'
 
 export { TRANSFORM_PROPERTIES }
@@ -91,6 +100,10 @@ export const propertyLabel = (property: AnimatableProperty) => {
       return 'Crop W'
     case 'crop.height':
       return 'Crop H'
+    case 'path.points':
+      return 'Path'
+    case 'motionPath.progress':
+      return 'Motion path'
     default: {
       if (property.endsWith('.offset.x')) return 'Effect offset X'
       if (property.endsWith('.offset.y')) return 'Effect offset Y'
@@ -189,6 +202,36 @@ function mixValues(
   progress: number,
   property: AnimatableProperty,
 ): KeyframeValue {
+  if (Array.isArray(from) || Array.isArray(to)) {
+    if (!Array.isArray(from) || !Array.isArray(to)) {
+      return progress < 1 ? from : to
+    }
+    const sameTopology =
+      from.length === to.length &&
+      from.every((point, index) => point.id === to[index]?.id)
+    if (!sameTopology) return progress < 1 ? from : to
+    return from.map((point, index) => {
+      const target = to[index]
+      const mixPoint = (start: number, end: number) =>
+        start + (end - start) * progress
+      return {
+        ...point,
+        anchor: {
+          x: mixPoint(point.anchor.x, target.anchor.x),
+          y: mixPoint(point.anchor.y, target.anchor.y),
+        },
+        handleIn: {
+          x: mixPoint(point.handleIn.x, target.handleIn.x),
+          y: mixPoint(point.handleIn.y, target.handleIn.y),
+        },
+        handleOut: {
+          x: mixPoint(point.handleOut.x, target.handleOut.x),
+          y: mixPoint(point.handleOut.y, target.handleOut.y),
+        },
+        handleMode: progress < 1 ? point.handleMode : target.handleMode,
+      }
+    })
+  }
   if (typeof from === 'string' || typeof to === 'string' || isColorProperty(property)) {
     return mixHex(String(from), String(to), progress)
   }
@@ -201,7 +244,10 @@ function interpolate(
   property: AnimatableProperty,
 ): KeyframeValue {
   const sorted = [...keys].sort((a, b) => a.time - b.time)
-  if (sorted.length === 0) return isColorProperty(property) ? '#000000' : 0
+  if (sorted.length === 0) {
+    if (property === 'path.points') return []
+    return isColorProperty(property) ? '#000000' : 0
+  }
   if (time <= sorted[0].time) return sorted[0].value
   const last = sorted[sorted.length - 1]
   if (time >= last.time) return last.value
@@ -267,13 +313,129 @@ export function evaluateNodeAtTime(
   return next
 }
 
-export function evaluateScene(
+/**
+ * Pass one: every channel a track can drive. Motion paths are deliberately left
+ * out, so this is the pose that `editTransform` reads and writes. Interactive
+ * tools need this pose; renderers need `evaluateScene`.
+ */
+export function evaluateChannels(
   nodes: EditorNode[],
   animation: DocumentAnimation,
   time: number,
 ): EditorNode[] {
   const t = clampTime(time, animation.duration)
   return nodes.map((node) => evaluateNodeAtTime(node, animation, t))
+}
+
+export function evaluateScene(
+  nodes: EditorNode[],
+  animation: DocumentAnimation,
+  time: number,
+): EditorNode[] {
+  return applyMotionPaths(evaluateChannels(nodes, animation, time))
+}
+
+export type MotionPathOffset = {
+  offset: Vec2
+  rotation: number
+}
+
+/**
+ * Where the path wants to put a follower, expressed as a delta on top of the
+ * follower's own position. Reported in the follower's parent space so it can be
+ * added to (or subtracted from) `transform.position` directly.
+ */
+export function motionPathOffset(
+  scene: EditorNode[],
+  node: EditorNode,
+): MotionPathOffset | null {
+  const binding = node.motionPath
+  if (!binding || binding.pathId === node.id) return null
+  const target = findNode(scene, binding.pathId)
+  if (target?.type !== 'path') return null
+  const sample = samplePathAt(target, binding.progress)
+  if (!sample) return null
+  const targetWorld = multiplyAffine(
+    parentAffine(scene, target.id),
+    transformToAffine(target.transform),
+  )
+  const followerParentInverse = invertAffine(parentAffine(scene, node.id))
+  const point = affinePoint(
+    followerParentInverse,
+    affinePoint(targetWorld, sample.point),
+  )
+  const tangent = affineDelta(
+    followerParentInverse,
+    affineDelta(targetWorld, sample.tangent),
+  )
+  return {
+    offset: {
+      x: point.x - node.transform.pivot.x,
+      y: point.y - node.transform.pivot.y,
+    },
+    rotation: (Math.atan2(tangent.y, tangent.x) * 180) / Math.PI,
+  }
+}
+
+/** Pass two: fold the path layer on top of the evaluated channels. */
+export function applyMotionPaths(scene: EditorNode[]): EditorNode[] {
+  const apply = (node: EditorNode): EditorNode => {
+    let next = node
+    const motion = motionPathOffset(scene, node)
+    if (motion) {
+      next = {
+        ...next,
+        transform: {
+          ...next.transform,
+          position: {
+            x: next.transform.position.x + motion.offset.x,
+            y: next.transform.position.y + motion.offset.y,
+          },
+          rotation: node.motionPath?.autoRotate
+            ? next.transform.rotation + motion.rotation
+            : next.transform.rotation,
+        },
+      }
+    }
+    if (next.type === 'group') {
+      return { ...next, children: next.children.map(apply) }
+    }
+    return next
+  }
+  return scene.map(apply)
+}
+
+/**
+ * Shifts the position channel — rest pose and any keys — by a constant. Used
+ * when a motion path attaches or detaches so the follower keeps whatever
+ * relative motion it already had while its baseline moves.
+ */
+export function offsetPositionTracks(
+  animation: DocumentAnimation,
+  nodeId: string,
+  delta: Vec2,
+): DocumentAnimation {
+  if (delta.x === 0 && delta.y === 0) return animation
+  return {
+    ...animation,
+    tracks: animation.tracks.map((track) => {
+      if (track.nodeId !== nodeId) return track
+      const amount =
+        track.property === 'position.x'
+          ? delta.x
+          : track.property === 'position.y'
+            ? delta.y
+            : 0
+      if (amount === 0) return track
+      return {
+        ...track,
+        keys: track.keys.map((key) => ({
+          ...key,
+          value: typeof key.value === 'number' ? key.value + amount : key.value,
+        })),
+      }
+    }),
+  }
 }
 
 function sortKeys(keys: Keyframe[]) {
@@ -361,6 +523,85 @@ export function removeKeys(
   }
 }
 
+export function updateKeyframe(
+  animation: DocumentAnimation,
+  keyId: string,
+  update: Partial<Pick<Keyframe, 'value' | 'easing'>>,
+): DocumentAnimation {
+  return {
+    ...animation,
+    tracks: animation.tracks.map((track) => ({
+      ...track,
+      keys: track.keys.map((key) =>
+        key.id === keyId ? { ...key, ...update } : key,
+      ),
+    })),
+  }
+}
+
+const copyKeyValue = (value: KeyframeValue): KeyframeValue =>
+  Array.isArray(value)
+    ? value.map((point) => ({
+        ...point,
+        anchor: { ...point.anchor },
+        handleIn: { ...point.handleIn },
+        handleOut: { ...point.handleOut },
+      }))
+    : value
+
+export function duplicateKeys(
+  animation: DocumentAnimation,
+  keyIds: string[],
+  offset = 0.1,
+): { animation: DocumentAnimation; keyIds: string[] } {
+  const selected = new Set(keyIds)
+  const duplicatedIds: string[] = []
+  const tracks = animation.tracks.map((track) => {
+    const occupied = track.keys.map((key) => key.time)
+    const freeTime = (time: number) => {
+      const normalize = (candidate: number) =>
+        Math.round(clampTime(candidate, animation.duration) * 10_000) / 10_000
+      const available = (candidate: number) =>
+        !occupied.some((used) => Math.abs(used - candidate) < 1e-4)
+      for (
+        let candidate = time + offset;
+        candidate <= animation.duration + 1e-4;
+        candidate += offset
+      ) {
+        const clamped = normalize(candidate)
+        if (available(clamped)) {
+          occupied.push(clamped)
+          return clamped
+        }
+      }
+      for (let candidate = time - offset; candidate >= -1e-4; candidate -= offset) {
+        const clamped = normalize(candidate)
+        if (available(clamped)) {
+          occupied.push(clamped)
+          return clamped
+        }
+      }
+      return normalize(time)
+    }
+    const copies = track.keys
+      .filter((key) => selected.has(key.id))
+      .map((key) => {
+        const id = nanoid()
+        duplicatedIds.push(id)
+        return {
+          ...key,
+          id,
+          time: freeTime(key.time),
+          value: copyKeyValue(key.value),
+        }
+      })
+    return copies.length === 0
+      ? track
+      : { ...track, keys: sortKeys([...track.keys, ...copies]) }
+  })
+  return { animation: { ...animation, tracks }, keyIds: duplicatedIds }
+}
+
 export function retimeKey(
   animation: DocumentAnimation,
   keyId: string,
@@ -406,12 +647,18 @@ export function pruneAnimation(
   nodes: EditorNode[],
 ): DocumentAnimation {
   const live = new Set<string>()
+  const motionBound = new Set<string>()
   walkNodes(nodes, (node) => {
     live.add(node.id)
+    if (node.motionPath) motionBound.add(node.id)
   })
   return {
     ...animation,
-    tracks: animation.tracks.filter((track) => live.has(track.nodeId)),
+    tracks: animation.tracks.filter(
+      (track) =>
+        live.has(track.nodeId) &&
+        (track.property !== 'motionPath.progress' || motionBound.has(track.nodeId)),
+    ),
   }
 }
 

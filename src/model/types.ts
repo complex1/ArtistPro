@@ -69,6 +69,12 @@ export type Paint = {
   strokeWidth: number
 }
 
+export type MotionPathBinding = {
+  pathId: string
+  progress: number
+  autoRotate: boolean
+}
+
 type EffectBase = {
   id: string
   enabled: boolean
@@ -105,6 +111,7 @@ export type NodeBase = {
   pivotPreset: PivotPreset
   effects: LayerEffect[]
   transform: Transform
+  motionPath?: MotionPathBinding
 }
 
 export type RectNode = NodeBase &
@@ -254,6 +261,8 @@ export type AnimatableProperty =
   | 'crop.y'
   | 'crop.width'
   | 'crop.height'
+  | 'path.points'
+  | 'motionPath.progress'
   | `effect.${string}.radius`
   | `effect.${string}.opacity`
   | `effect.${string}.color`
@@ -262,7 +271,7 @@ export type AnimatableProperty =
 
 export type KeyframeEase = 'linear' | 'power2.inOut'
 
-export type KeyframeValue = number | string
+export type KeyframeValue = number | string | PathPoint[]
 
 export type Keyframe = {
   id: string

@@ -5,6 +5,7 @@ import {
   createPathPoint,
   moveHandle,
   pathData,
+  samplePathAt,
   setHandleMode,
 } from './path'
 import { resizeNode } from './scene'
@@ -118,5 +119,43 @@ describe('path geometry resize', () => {
     expect(resized.points[1].handleOut).toEqual({ x: 20, y: -10 })
     expect(resized.transform.scale).toEqual({ x: 1, y: 1 })
     expect(resized.strokeWidth).toBe(path.strokeWidth)
+  })
+})
+
+describe('samplePathAt', () => {
+  it('samples straight segments by total arc length', () => {
+    const points = [
+      createPathPoint({ x: 0, y: 0 }),
+      createPathPoint({ x: 100, y: 0 }),
+      createPathPoint({ x: 100, y: 300 }),
+    ]
+
+    expect(samplePathAt({ points, closed: false }, 0.5)).toMatchObject({
+      point: { x: 100, y: 100 },
+      tangent: { x: 0, y: 1 },
+    })
+  })
+
+  it('returns a normalized tangent along a curve', () => {
+    const first = createPathPoint({ x: 0, y: 0 })
+    first.handleOut = { x: 0, y: 100 }
+    const second = createPathPoint({ x: 100, y: 100 })
+    second.handleIn = { x: 0, y: -100 }
+
+    const sample = samplePathAt({ points: [first, second], closed: false }, 0.5)
+
+    expect(sample?.point.x).toBeCloseTo(50, 1)
+    expect(sample?.point.y).toBeCloseTo(50, 1)
+    expect(Math.hypot(sample?.tangent.x ?? 0, sample?.tangent.y ?? 0)).toBeCloseTo(1)
+  })
+
+  it('returns to the first point at the end of a closed path', () => {
+    const points = [
+      createPathPoint({ x: 0, y: 0 }),
+      createPathPoint({ x: 100, y: 0 }),
+      createPathPoint({ x: 100, y: 100 }),
+    ]
+
+    expect(samplePathAt({ points, closed: true }, 1)?.point).toEqual({ x: 0, y: 0 })
   })
 })

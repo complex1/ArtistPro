@@ -49,6 +49,53 @@ export function findNode(
   }
 }
 
+export function clearMissingMotionPaths(nodes: EditorNode[]): EditorNode[] {
+  const pathIds = new Set<string>()
+  walkNodes(nodes, (node) => {
+    if (node.type === 'path') pathIds.add(node.id)
+  })
+
+  const clean = (node: EditorNode): EditorNode => {
+    const motionPath =
+      node.motionPath &&
+      node.motionPath.pathId !== node.id &&
+      pathIds.has(node.motionPath.pathId)
+        ? node.motionPath
+        : undefined
+    if (node.type === 'group') {
+      return {
+        ...node,
+        motionPath,
+        children: node.children.map(clean),
+      }
+    }
+    return { ...node, motionPath }
+  }
+  return nodes.map(clean)
+}
+
+export function remapMotionPaths(
+  nodes: EditorNode[],
+  idMap: Map<string, string>,
+): EditorNode[] {
+  const remap = (node: EditorNode): EditorNode => {
+    const targetId = node.motionPath && idMap.get(node.motionPath.pathId)
+    const motionPath =
+      node.motionPath && targetId
+        ? { ...node.motionPath, pathId: targetId }
+        : node.motionPath
+    if (node.type === 'group') {
+      return {
+        ...node,
+        motionPath,
+        children: node.children.map(remap),
+      }
+    }
+    return { ...node, motionPath }
+  }
+  return nodes.map(remap)
+}
+
 export function findList(
   nodes: EditorNode[],
   id: string,
@@ -543,7 +590,9 @@ export function cloneNode(
   offset = false,
   idMap?: Map<string, string>,
 ): EditorNode {
-  const copy = structuredClone(node)
+  // Store actions pass Immer drafts here, and structuredClone rejects proxies.
+  // Editor nodes contain JSON-safe data, so serialization cleanly unwraps them.
+  const copy = JSON.parse(JSON.stringify(node)) as EditorNode
   const previousId = copy.id
   copy.id = nanoid()
   idMap?.set(previousId, copy.id)

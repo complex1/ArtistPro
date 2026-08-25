@@ -10,6 +10,12 @@ import type {
 const zero = (): Vec2 => ({ x: 0, y: 0 })
 const add = (a: Vec2, b: Vec2): Vec2 => ({ x: a.x + b.x, y: a.y + b.y })
 const length = (value: Vec2) => Math.hypot(value.x, value.y)
+const subtract = (a: Vec2, b: Vec2): Vec2 => ({ x: a.x - b.x, y: a.y - b.y })
+
+export type PathSample = {
+  point: Vec2
+  tangent: Vec2
+}
 
 export function createPathPoint(
   anchor: Vec2,
@@ -70,6 +76,153 @@ export function pathData(path: Pick<PathNode, 'points' | 'closed'>): string {
     commands.push(segmentCommand(previous, first), 'Z')
   }
   return commands.join(' ')
+}
+
+type PathSegment = {
+  pointAt: (progress: number) => Vec2
+  tangentAt: (progress: number) => Vec2
+}
+
+const lineSegment = (from: Vec2, to: Vec2): PathSegment => ({
+  pointAt: (progress) => ({
+    x: from.x + (to.x - from.x) * progress,
+    y: from.y + (to.y - from.y) * progress,
+  }),
+  tangentAt: () => subtract(to, from),
+})
+
+const cubicSegment = (
+  start: Vec2,
+  control1: Vec2,
+  control2: Vec2,
+  end: Vec2,
+): PathSegment => ({
+  pointAt: (progress) => {
+    const inverse = 1 - progress
+    const inverse2 = inverse * inverse
+    const progress2 = progress * progress
+    return {
+      x:
+        inverse2 * inverse * start.x +
+        3 * inverse2 * progress * control1.x +
+        3 * inverse * progress2 * control2.x +
+        progress2 * progress * end.x,
+      y:
+        inverse2 * inverse * start.y +
+        3 * inverse2 * progress * control1.y +
+        3 * inverse * progress2 * control2.y +
+        progress2 * progress * end.y,
+    }
+  },
+  tangentAt: (progress) => {
+    const inverse = 1 - progress
+    return {
+      x:
+        3 * inverse * inverse * (control1.x - start.x) +
+        6 * inverse * progress * (control2.x - control1.x) +
+        3 * progress * progress * (end.x - control2.x),
+      y:
+        3 * inverse * inverse * (control1.y - start.y) +
+        6 * inverse * progress * (control2.y - control1.y) +
+        3 * progress * progress * (end.y - control2.y),
+    }
+  },
+})
+
+function segmentBetween(from: PathPoint, to: PathPoint): PathSegment {
+  if (!hasHandle(from.handleOut) && !hasHandle(to.handleIn)) {
+    return lineSegment(from.anchor, to.anchor)
+  }
+  return cubicSegment(
+    from.anchor,
+    add(from.anchor, from.handleOut),
+    add(to.anchor, to.handleIn),
+    to.anchor,
+  )
+}
+
+const ARC_STEPS = 32
+
+type MeasuredSegment = {
+  segment: PathSegment
+  lengths: number[]
+  length: number
+}
+
+function measureSegment(segment: PathSegment): MeasuredSegment {
+  const lengths = [0]
+  let previous = segment.pointAt(0)
+  let total = 0
+  for (let step = 1; step <= ARC_STEPS; step += 1) {
+    const point = segment.pointAt(step / ARC_STEPS)
+    total += length(subtract(point, previous))
+    lengths.push(total)
+    previous = point
+  }
+  return { segment, lengths, length: total }
+}
+
+function segmentProgressAtLength(measured: MeasuredSegment, target: number) {
+  if (measured.length <= 1e-9) return 0
+  const clamped = Math.min(measured.length, Math.max(0, target))
+  let step = 1
+  while (step < measured.lengths.length && measured.lengths[step] < clamped) {
+    step += 1
+  }
+  const previousLength = measured.lengths[step - 1]
+  const nextLength = measured.lengths[step]
+  const span = nextLength - previousLength
+  const local = span <= 1e-9 ? 0 : (clamped - previousLength) / span
+  return (step - 1 + local) / ARC_STEPS
+}
+
+/**
+ * Samples a path by approximate arc length so a linear progress animation
+ * produces visually even motion across lines and Bézier curves.
+ */
+export function samplePathAt(
+  path: Pick<PathNode, 'points' | 'closed'>,
+  progress: number,
+): PathSample | null {
+  if (path.points.length === 0) return null
+  if (path.points.length === 1) {
+    return { point: { ...path.points[0].anchor }, tangent: { x: 1, y: 0 } }
+  }
+
+  const measured: MeasuredSegment[] = []
+  for (let index = 1; index < path.points.length; index += 1) {
+    measured.push(measureSegment(segmentBetween(path.points[index - 1], path.points[index])))
+  }
+  if (path.closed) {
+    measured.push(
+      measureSegment(segmentBetween(path.points[path.points.length - 1], path.points[0])),
+    )
+  }
+
+  const totalLength = measured.reduce((sum, item) => sum + item.length, 0)
+  if (totalLength <= 1e-9) {
+    return { point: { ...path.points[0].anchor }, tangent: { x: 1, y: 0 } }
+  }
+
+  let remaining = Math.min(1, Math.max(0, progress)) * totalLength
+  let selected = measured[measured.length - 1]
+  for (const item of measured) {
+    if (remaining <= item.length) {
+      selected = item
+      break
+    }
+    remaining -= item.length
+  }
+
+  const localProgress = segmentProgressAtLength(selected, remaining)
+  let tangent = selected.segment.tangentAt(localProgress)
+  const tangentLength = length(tangent)
+  if (tangentLength <= 1e-9) tangent = { x: 1, y: 0 }
+  else tangent = { x: tangent.x / tangentLength, y: tangent.y / tangentLength }
+  return {
+    point: selected.segment.pointAt(localProgress),
+    tangent,
+  }
 }
 
 export function setHandleMode(point: PathPoint, mode: HandleMode): PathPoint {

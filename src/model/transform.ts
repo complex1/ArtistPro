@@ -104,6 +104,20 @@ export function multiplyAffine(parent: Affine, child: Affine): Affine {
   }
 }
 
+export function affinePoint(matrix: Affine, point: Vec2): Vec2 {
+  return {
+    x: matrix.a * point.x + matrix.c * point.y + matrix.tx,
+    y: matrix.b * point.x + matrix.d * point.y + matrix.ty,
+  }
+}
+
+export function affineDelta(matrix: Affine, delta: Vec2): Vec2 {
+  return {
+    x: matrix.a * delta.x + matrix.c * delta.y,
+    y: matrix.b * delta.x + matrix.d * delta.y,
+  }
+}
+
 export function identityAffine(): Affine {
   return { a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 }
 }
