@@ -20,7 +20,7 @@ export const TRANSFORM_PROPERTIES: AnimatableProperty[] = [
 const COLOR_PROPERTIES = new Set<string>([
   'fill',
   'stroke',
-  'pencil.color',
+  'brush.color',
   'chroma.color',
 ])
 
@@ -122,6 +122,12 @@ export function readChannel(
       return 'stroke' in node ? node.stroke : undefined
     case 'strokeWidth':
       return 'strokeWidth' in node ? node.strokeWidth : undefined
+    case 'path.trimStart':
+      return node.type === 'path' ? node.trimStart : undefined
+    case 'path.trimEnd':
+      return node.type === 'path' ? node.trimEnd : undefined
+    case 'path.trimOffset':
+      return node.type === 'path' ? node.trimOffset : undefined
     case 'width':
       return 'width' in node ? node.width : undefined
     case 'height':
@@ -136,10 +142,10 @@ export function readChannel(
       return node.type === 'text' ? node.letterSpacing : undefined
     case 'fontWeight':
       return node.type === 'text' ? node.fontWeight : undefined
-    case 'pencil.size':
-      return node.type === 'pencil' ? node.settings.size : undefined
-    case 'pencil.color':
-      return node.type === 'pencil' ? node.settings.color : undefined
+    case 'brush.size':
+      return node.type === 'brush' ? node.settings.size : undefined
+    case 'brush.color':
+      return node.type === 'brush' ? node.settings.color : undefined
     case 'brightness':
       return node.type === 'image' ? node.adjustments.brightness : undefined
     case 'contrast':
@@ -242,6 +248,12 @@ export function writeChannel(
       return 'stroke' in node ? { ...node, stroke: String(value) } : node
     case 'strokeWidth':
       return 'strokeWidth' in node ? { ...node, strokeWidth: amount } : node
+    case 'path.trimStart':
+      return node.type === 'path' ? { ...node, trimStart: amount } : node
+    case 'path.trimEnd':
+      return node.type === 'path' ? { ...node, trimEnd: amount } : node
+    case 'path.trimOffset':
+      return node.type === 'path' ? { ...node, trimOffset: amount } : node
     case 'width':
       return 'width' in node ? { ...node, width: amount } : node
     case 'height':
@@ -256,12 +268,12 @@ export function writeChannel(
       return node.type === 'text' ? { ...node, letterSpacing: amount } : node
     case 'fontWeight':
       return node.type === 'text' ? { ...node, fontWeight: amount } : node
-    case 'pencil.size':
-      return node.type === 'pencil'
+    case 'brush.size':
+      return node.type === 'brush'
         ? { ...node, settings: { ...node.settings, size: amount } }
         : node
-    case 'pencil.color':
-      return node.type === 'pencil'
+    case 'brush.color':
+      return node.type === 'brush'
         ? { ...node, settings: { ...node.settings, color: String(value) } }
         : node
     case 'brightness':
@@ -389,14 +401,17 @@ export function animatedEditsFromPatch(update: Record<string, unknown>) {
   push('letterSpacing', update.letterSpacing)
   push('fontWeight', update.fontWeight)
   push('path.points', update.points)
+  push('path.trimStart', update.trimStart)
+  push('path.trimEnd', update.trimEnd)
+  push('path.trimOffset', update.trimOffset)
 
   const motionPath = update.motionPath as { progress?: number } | undefined
   if (motionPath) push('motionPath.progress', motionPath.progress)
 
   const settings = update.settings as { size?: number; color?: string } | undefined
   if (settings) {
-    push('pencil.size', settings.size)
-    push('pencil.color', settings.color)
+    push('brush.size', settings.size)
+    push('brush.color', settings.color)
   }
   const adjustments = update.adjustments as
     | {

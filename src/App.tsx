@@ -12,6 +12,7 @@ import { Header } from './components/Header'
 import { Inspector } from './components/Inspector'
 import { LayersPanel } from './components/LayersPanel'
 import { PencilToolConfig } from './components/PencilToolConfig'
+import { BrushToolConfig } from './components/BrushToolConfig'
 import { PlaybackClock } from './components/PlaybackClock'
 import { Timeline } from './components/Timeline'
 import { Toolbar } from './components/Toolbar'
@@ -199,6 +200,8 @@ function App() {
           />
           {mode === 'animate' ? (
             <Timeline />
+          ) : tool === 'brush' ? (
+            <BrushToolConfig />
           ) : tool === 'pencil' ? (
             <PencilToolConfig />
           ) : (

@@ -853,11 +853,11 @@ body.is-scrubbing { cursor: ew-resize; user-select: none; }
 }
 .symbols-panel p { margin: 0 8px; color: var(--text-faint); font-size: 9px; }
 
-.pencil-tool-title {
+:is(.brush-tool-title, .pencil-tool-title) {
   border-right: 1px solid var(--border);
 }
 
-.pencil-tool-title > div:last-child {
+:is(.brush-tool-title, .pencil-tool-title) > div:last-child {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -866,7 +866,7 @@ body.is-scrubbing { cursor: ew-resize; user-select: none; }
   font-size: 12px;
 }
 
-.pencil-tool-controls {
+:is(.brush-tool-controls, .pencil-tool-controls) {
   display: grid;
   grid-template-columns: 110px 150px repeat(3, minmax(150px, 1fr));
   align-items: start;
@@ -875,14 +875,23 @@ body.is-scrubbing { cursor: ew-resize; user-select: none; }
   overflow-x: auto;
 }
 
-.pencil-tool-controls > label {
+.pencil-tool-controls {
+  grid-template-columns: minmax(220px, 360px);
+}
+
+.pencil-path-preview {
+  opacity: .85;
+  vector-effect: non-scaling-stroke;
+}
+
+:is(.brush-tool-controls, .pencil-tool-controls) > label {
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-width: 0;
 }
 
-.pencil-tool-controls > label > span {
+:is(.brush-tool-controls, .pencil-tool-controls) > label > span {
   color: var(--text-muted);
   font-size: 9px;
   font-weight: 600;
@@ -890,7 +899,7 @@ body.is-scrubbing { cursor: ew-resize; user-select: none; }
   text-transform: uppercase;
 }
 
-.pencil-tool-controls .slider-field { width: 100%; }
+:is(.brush-tool-controls, .pencil-tool-controls) .slider-field { width: 100%; }
 
 .keyframe-toggle {
   flex-shrink: 0;

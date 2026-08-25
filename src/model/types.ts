@@ -149,13 +149,16 @@ export type PathNode = NodeBase &
     type: 'path'
     closed: boolean
     points: PathPoint[]
+    trimStart: number
+    trimEnd: number
+    trimOffset: number
   }
 
-export type PencilSample = Vec2 & {
+export type BrushSample = Vec2 & {
   pressure: number
 }
 
-export type PencilSettings = {
+export type BrushSettings = {
   size: number
   color: string
   smoothing: number
@@ -163,12 +166,16 @@ export type PencilSettings = {
   pressure: number
 }
 
-export type PencilNode = NodeBase & {
-  type: 'pencil'
-  samples: PencilSample[]
-  settings: PencilSettings
+export type BrushNode = NodeBase & {
+  type: 'brush'
+  samples: BrushSample[]
+  settings: BrushSettings
   simulatePressure: boolean
   complete: boolean
+}
+
+export type PencilSettings = {
+  smoothing: number
 }
 
 export type TextAlign = 'left' | 'center' | 'right'
@@ -224,7 +231,7 @@ export type EditorNode =
   | RectNode
   | EllipseNode
   | PathNode
-  | PencilNode
+  | BrushNode
   | TextNode
   | ImageNode
   | GroupNode
@@ -242,6 +249,9 @@ export type AnimatableProperty =
   | 'fill'
   | 'stroke'
   | 'strokeWidth'
+  | 'path.trimStart'
+  | 'path.trimEnd'
+  | 'path.trimOffset'
   | 'width'
   | 'height'
   | 'rx'
@@ -249,8 +259,8 @@ export type AnimatableProperty =
   | 'fontSize'
   | 'letterSpacing'
   | 'fontWeight'
-  | 'pencil.size'
-  | 'pencil.color'
+  | 'brush.size'
+  | 'brush.color'
   | 'brightness'
   | 'contrast'
   | 'saturation'
@@ -312,6 +322,7 @@ export type Tool =
   | 'rect'
   | 'ellipse'
   | 'pen'
+  | 'brush'
   | 'pencil'
   | 'text'
   | 'image'

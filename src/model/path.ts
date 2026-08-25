@@ -45,6 +45,9 @@ export function createPath(position: Vec2, firstPoint = createPathPoint(zero()))
     strokeWidth: 2,
     closed: false,
     points: [firstPoint],
+    trimStart: 0,
+    trimEnd: 1,
+    trimOffset: 0,
     transform: {
       ...defaultTransform(),
       position,

@@ -1,14 +1,9 @@
 import { nanoid } from 'nanoid'
 import { getStroke } from 'perfect-freehand'
 import { defaultTransform } from './transform'
-import type {
-  PencilNode,
-  PencilSample,
-  PencilSettings,
-  Vec2,
-} from './types'
+import type { BrushNode, BrushSample, BrushSettings, Vec2 } from './types'
 
-export const defaultPencilSettings: PencilSettings = {
+export const defaultBrushSettings: BrushSettings = {
   size: 8,
   color: '#1f2937',
   smoothing: 0.6,
@@ -16,16 +11,16 @@ export const defaultPencilSettings: PencilSettings = {
   pressure: 0.5,
 }
 
-export function createPencilStroke(
+export function createBrushStroke(
   position: Vec2,
-  sample: PencilSample,
-  settings: PencilSettings,
+  sample: BrushSample,
+  settings: BrushSettings,
   simulatePressure: boolean,
-): PencilNode {
+): BrushNode {
   return {
     id: nanoid(),
-    name: 'Pencil stroke',
-    type: 'pencil',
+    name: 'Brush stroke',
+    type: 'brush',
     visible: true,
     locked: false,
     pivotPreset: 'center',
@@ -41,7 +36,7 @@ export function createPencilStroke(
   }
 }
 
-export function pencilOutline(node: PencilNode): Vec2[] {
+export function brushOutline(node: BrushNode): Vec2[] {
   return getStroke(
     node.samples.map(({ x, y, pressure }) => [x, y, pressure]),
     {
@@ -62,11 +57,7 @@ const fixed = (value: number) => value.toFixed(2)
 
 /**
  * Converts perfect-freehand's outline polygon to a smooth, closed SVG path,
- * following the getSvgPathFromStroke helper in the library's official README:
- * https://github.com/steveruizok/perfect-freehand#rendering
- *
- * The chain of smooth quadratics only stays on the outline when every segment
- * ends on a midpoint, so the first curve must end between points 1 and 2.
+ * following the getSvgPathFromStroke helper in the library's official README.
  */
 export function outlinePathData(points: Vec2[]): string {
   if (points.length < 4) return ''
@@ -89,5 +80,5 @@ export function outlinePathData(points: Vec2[]): string {
   return `${data}Z`
 }
 
-export const pencilPathData = (node: PencilNode) =>
-  outlinePathData(pencilOutline(node))
+export const brushPathData = (node: BrushNode) =>
+  outlinePathData(brushOutline(node))

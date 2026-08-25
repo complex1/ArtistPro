@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid'
-import { pencilOutline } from './pencil'
+import { brushOutline } from './brush'
 import {
   affineToTransform,
   bakeParentTransform,
@@ -237,8 +237,8 @@ export function localBounds(node: EditorNode): Box {
       height: Math.max(...ys) - y,
     }
   }
-  if (node.type === 'pencil') {
-    const points = pencilOutline(node)
+  if (node.type === 'brush') {
+    const points = brushOutline(node)
     if (points.length === 0) return { x: 0, y: 0, width: 0, height: 0 }
     const xs = points.map((point) => point.x)
     const ys = points.map((point) => point.y)
@@ -431,7 +431,7 @@ export function resizeNode(
           y: point.handleOut.y * factor.y,
         },
       }))
-    } else if (next.type === 'pencil') {
+    } else if (next.type === 'brush') {
       next.samples = next.samples.map((sample) => ({
         ...sample,
         x: sample.x * factor.x,

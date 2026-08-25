@@ -11,7 +11,7 @@ import {
   Group,
   Image as ImageIcon,
   PenLine,
-  Pencil,
+  Paintbrush,
   RectangleHorizontal,
   Trash2,
   Type,
@@ -155,8 +155,8 @@ function LayerRow({
         ? RectangleHorizontal
         : node.type === 'path'
           ? PenLine
-          : node.type === 'pencil'
-            ? Pencil
+          : node.type === 'brush'
+            ? Paintbrush
             : node.type === 'text'
               ? Type
               : node.type === 'image'

@@ -33,7 +33,7 @@ import {
   type AnimationPresetId,
 } from '../model/animationPresets'
 import { createShape } from '../model/nodes'
-import { defaultPencilSettings } from '../model/pencil'
+import { defaultBrushSettings } from '../model/brush'
 import {
   canGroup,
   canUngroup,
@@ -57,6 +57,7 @@ import type {
   EditorMode,
   EditorNode,
   Keyframe,
+  BrushSettings,
   PencilSettings,
   ShapeType,
   Tool,
@@ -96,6 +97,7 @@ type EditorStore = {
   mode: EditorMode
   tool: Tool
   selectedIds: string[]
+  brushSettings: BrushSettings
   pencilSettings: PencilSettings
   zoom: number
   pan: Vec2
@@ -105,6 +107,7 @@ type EditorStore = {
   selectedKeyIds: string[]
   setMode: (mode: EditorMode) => void
   setTool: (tool: Tool) => void
+  setBrushSettings: (update: Partial<BrushSettings>) => void
   setPencilSettings: (update: Partial<PencilSettings>) => void
   select: (id: string | null, additive?: boolean) => void
   selectMany: (ids: string[]) => void
@@ -181,7 +184,8 @@ export const useEditorStore = create<EditorStore>()(
     mode: 'draw',
     tool: 'select',
     selectedIds: [firstShape.id],
-    pencilSettings: defaultPencilSettings,
+    brushSettings: defaultBrushSettings,
+    pencilSettings: { smoothing: 0.5 },
     zoom: 0.82,
     pan: { x: 0, y: 0 },
     playhead: 0,
@@ -200,6 +204,10 @@ export const useEditorStore = create<EditorStore>()(
         }
       }),
     setTool: (tool) => set({ tool }),
+    setBrushSettings: (update) =>
+      set((state) => {
+        Object.assign(state.brushSettings, update)
+      }),
     setPencilSettings: (update) =>
       set((state) => {
         Object.assign(state.pencilSettings, update)

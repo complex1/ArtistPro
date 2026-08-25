@@ -601,7 +601,7 @@ export function Inspector() {
       </CollapsibleSection>
       )}
 
-      {node.type !== 'group' && !(mode === 'animate' && node.type === 'path') && (
+      {node.type !== 'group' && (
         <CollapsibleSection title="Geometry">
           {view.type === 'rect' ? (
             <>
@@ -652,8 +652,9 @@ export function Inspector() {
               />
             </PropertyRow>
           ) : view.type === 'path' ? (
-            mode !== 'animate' && (
-              <>
+            <>
+              {mode !== 'animate' && (
+                <>
                 <PropertyRow label="Points">
                   <span className="geometry-value">{view.points.length}</span>
                 </PropertyRow>
@@ -662,9 +663,41 @@ export function Inspector() {
                     {view.closed ? 'Closed' : 'Open'}
                   </Button>
                 </PropertyRow>
-              </>
-            )
-          ) : view.type === 'pencil' ? (
+                </>
+              )}
+              <PropertyRow label="Trim start">
+                <SliderField
+                  label="Path trim start"
+                  value={view.trimStart}
+                  leading={keyframe('path.trimStart')}
+                  onValue={(trimStart) => updateNode(node.id, { trimStart })}
+                  display={`${Math.round(view.trimStart * 100)}%`}
+                />
+              </PropertyRow>
+              <PropertyRow label="Trim end">
+                <SliderField
+                  label="Path trim end"
+                  value={view.trimEnd}
+                  leading={keyframe('path.trimEnd')}
+                  onValue={(trimEnd) => updateNode(node.id, { trimEnd })}
+                  display={`${Math.round(view.trimEnd * 100)}%`}
+                />
+              </PropertyRow>
+              <PropertyRow label="Trim offset">
+                <ScrubField
+                  label="%"
+                  value={view.trimOffset * 100}
+                  min={-100}
+                  max={100}
+                  step={1}
+                  leading={keyframe('path.trimOffset')}
+                  onValue={(trimOffset) =>
+                    updateNode(node.id, { trimOffset: trimOffset / 100 })
+                  }
+                />
+              </PropertyRow>
+            </>
+          ) : view.type === 'brush' ? (
             <>
               {mode !== 'animate' && (
                 <PropertyRow label="Samples">
@@ -676,10 +709,10 @@ export function Inspector() {
                   label="PX"
                   value={view.settings.size}
                   min={1}
-                  leading={keyframe('pencil.size')}
+                  leading={keyframe('brush.size')}
                   onValue={(size) =>
                     updateNode(node.id, {
-                      settings: { ...node.type === 'pencil' ? node.settings : view.settings, size },
+                      settings: { ...node.type === 'brush' ? node.settings : view.settings, size },
                     })
                   }
                 />
@@ -688,10 +721,10 @@ export function Inspector() {
                 <ColorField
                   label="Brush color"
                   value={view.settings.color}
-                  leading={keyframe('pencil.color')}
+                  leading={keyframe('brush.color')}
                   onValue={(color) =>
                     updateNode(node.id, {
-                      settings: { ...node.type === 'pencil' ? node.settings : view.settings, color },
+                      settings: { ...node.type === 'brush' ? node.settings : view.settings, color },
                     })
                   }
                 />
@@ -857,7 +890,7 @@ export function Inspector() {
         />
       )}
 
-      {view.type !== 'group' && view.type !== 'pencil' && view.type !== 'image' && (
+      {view.type !== 'group' && view.type !== 'brush' && view.type !== 'image' && (
         <CollapsibleSection title="Appearance">
           {view.type !== 'path' && (
             <PropertyRow label="Fill">

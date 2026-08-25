@@ -25,10 +25,8 @@ import {
   pathData,
   setHandleMode,
 } from '../model/path'
-import {
-  createPencilStroke,
-  pencilPathData,
-} from '../model/pencil'
+import { brushPathData, createBrushStroke } from '../model/brush'
+import { fitFreehandPath } from '../model/freehandPath'
 import { createText, naturalTextWidth } from '../model/text'
 import { applyMotionPaths, evaluateChannels } from '../model/animation'
 import {
@@ -66,8 +64,25 @@ import { IconButton } from '../ui/controls'
 
 type SvgParent = Svg | G
 
+function pathTrimAttributes(node: PathNode) {
+  const start = Math.max(0, Math.min(1, node.trimStart ?? 0))
+  const end = Math.max(0, Math.min(1, node.trimEnd ?? 1))
+  const visible = end >= start ? end - start : 1 - start + end
+  return {
+    pathLength: 1,
+    'stroke-dasharray':
+      visible >= 1 - 1e-6 ? 'none' : `${visible} ${1 - visible}`,
+    'stroke-dashoffset': -(start + (node.trimOffset ?? 0)),
+  }
+}
+
 function shapeCursor(tool: Tool, locked: boolean): string {
-  if (tool === 'pen' || tool === 'pencil' || tool === 'text') return 'crosshair'
+  if (
+    tool === 'pen' ||
+    tool === 'brush' ||
+    tool === 'pencil' ||
+    tool === 'text'
+  ) return 'crosshair'
   if (locked) return 'not-allowed'
   return tool === 'node' ? 'pointer' : 'move'
 }
@@ -105,6 +120,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
   const removeNode = useEditorStore((state) => state.removeNode)
   const tool = useEditorStore((state) => state.tool)
   const setTool = useEditorStore((state) => state.setTool)
+  const brushSettings = useEditorStore((state) => state.brushSettings)
   const pencilSettings = useEditorStore((state) => state.pencilSettings)
   const zoom = useEditorStore((state) => state.zoom)
   const setZoom = useEditorStore((state) => state.setZoom)
@@ -441,15 +457,15 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
       return true
     }
 
-    const beginPencilStroke = (event: PointerEvent) => {
-      if (tool !== 'pencil') return false
+    const beginBrushStroke = (event: PointerEvent) => {
+      if (tool !== 'brush') return false
       event.preventDefault()
       event.stopPropagation()
       const origin = draw.point(event.clientX, event.clientY)
-      const stroke = createPencilStroke(
+      const stroke = createBrushStroke(
         origin,
         { x: 0, y: 0, pressure: event.pressure || 0.5 },
-        pencilSettings,
+        brushSettings,
         event.pointerType !== 'pen',
       )
       addNode(stroke)
@@ -460,7 +476,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
           useEditorStore.getState().document.children,
           stroke.id,
         )
-        if (live?.type !== 'pencil') return
+        if (live?.type !== 'brush') return
         const point = invertPoint(
           matrix,
           draw.point(moveEvent.clientX, moveEvent.clientY),
@@ -487,7 +503,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
           useEditorStore.getState().document.children,
           stroke.id,
         )
-        if (live?.type === 'pencil') updateNode(live.id, { complete: true })
+        if (live?.type === 'brush') updateNode(live.id, { complete: true })
         window.removeEventListener('pointermove', move)
         window.removeEventListener('pointerup', up)
         window.removeEventListener('pointercancel', up)
@@ -495,6 +511,59 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
       window.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up)
       window.addEventListener('pointercancel', up)
+      return true
+    }
+
+    const beginPencilStroke = (event: PointerEvent) => {
+      if (tool !== 'pencil') return false
+      event.preventDefault()
+      event.stopPropagation()
+      const origin = draw.point(event.clientX, event.clientY)
+      const points: Vec2[] = [{ x: 0, y: 0 }]
+      const preview = draw
+        .path(`M ${origin.x} ${origin.y}`)
+        .fill('none')
+        .stroke({ color: '#4f8cff', width: 2, linecap: 'round', linejoin: 'round' })
+        .attr({
+          class: 'pencil-path-preview',
+          'pointer-events': 'none',
+          'data-editor-overlay': 'pencil-preview',
+        })
+
+      const updatePreview = () => {
+        preview.plot(
+          `M ${points.map((point) => `${point.x + origin.x} ${point.y + origin.y}`).join(' L ')}`,
+        )
+      }
+      const move = (moveEvent: PointerEvent) => {
+        const world = draw.point(moveEvent.clientX, moveEvent.clientY)
+        const point = { x: world.x - origin.x, y: world.y - origin.y }
+        const previous = points.at(-1)!
+        if (Math.hypot(point.x - previous.x, point.y - previous.y) < 0.5 / zoom) {
+          return
+        }
+        points.push(point)
+        updatePreview()
+      }
+      const cleanup = () => {
+        preview.remove()
+        window.removeEventListener('pointermove', move)
+        window.removeEventListener('pointerup', up)
+        window.removeEventListener('pointercancel', cancel)
+      }
+      const up = () => {
+        cleanup()
+        const fitted = fitFreehandPath(points, pencilSettings.smoothing)
+        if (fitted.length < 2) return
+        const path = createPath(origin, fitted[0])
+        path.name = 'Pencil path'
+        path.points = fitted
+        addNode(path)
+      }
+      const cancel = () => cleanup()
+      window.addEventListener('pointermove', move)
+      window.addEventListener('pointerup', up)
+      window.addEventListener('pointercancel', cancel)
       return true
     }
 
@@ -642,8 +711,8 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
     }
 
     // A stroke selects itself as it is drawn; the box would flash and grow
-    // under the cursor, so the pencil keeps the canvas clear until you leave it.
-    const showOutline = tool !== 'pencil' && mode !== 'preview'
+    // under the cursor, so the brush keeps the canvas clear until you leave it.
+    const showOutline = tool !== 'brush' && mode !== 'preview'
 
     const drawTextEditor = (parent: SvgParent, node: TextNode) => {
       const editor = parent
@@ -702,6 +771,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
       const onDown = (event: Event) => {
         const pointer = event as PointerEvent
         if (beginText(pointer)) return
+        if (beginBrushStroke(pointer)) return
         if (beginPencilStroke(pointer)) return
         if (beginPenPoint(pointer)) return
         pointer.stopPropagation()
@@ -799,16 +869,17 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
             ? parent.ellipse(node.rx * 2, node.ry * 2).move(0, 0)
             : node.type === 'path'
               ? parent.path(pathData(node))
-              : node.type === 'pencil'
-                ? parent.path(pencilPathData(node))
+              : node.type === 'brush'
+                ? parent.path(brushPathData(node))
                 : parent.text(node.text)
 
       element
         .attr({
           id: node.id,
-          fill: node.type === 'pencil' ? node.settings.color : node.fill,
-          stroke: node.type === 'pencil' ? 'none' : node.stroke,
-          'stroke-width': node.type === 'pencil' ? 0 : node.strokeWidth,
+          fill: node.type === 'brush' ? node.settings.color : node.fill,
+          stroke: node.type === 'brush' ? 'none' : node.stroke,
+          'stroke-width': node.type === 'brush' ? 0 : node.strokeWidth,
+          ...(node.type === 'path' ? pathTrimAttributes(node) : {}),
           opacity: node.transform.opacity,
           transform: composeTransform(node.transform),
           cursor: shapeCursor(tool, node.locked),
@@ -864,13 +935,14 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
       .fill(document.artboard.background)
       .attr({
         cursor:
-          tool === 'pen' || tool === 'pencil' || tool === 'text'
+          tool === 'pen' || tool === 'brush' || tool === 'pencil' || tool === 'text'
             ? 'crosshair'
             : 'default',
       })
       .on('pointerdown', (event) => {
         const pointer = event as PointerEvent
         if (beginText(pointer)) return
+        if (beginBrushStroke(pointer)) return
         if (beginPencilStroke(pointer)) return
         if (beginPenPoint(pointer)) return
         if (tool !== 'select') {
@@ -1055,6 +1127,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
     editingTextId,
     editTransform,
     mode,
+    brushSettings,
     pencilSettings,
     playhead,
     select,

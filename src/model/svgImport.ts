@@ -524,6 +524,9 @@ function pathNode(
     type: 'path',
     closed: subpath.closed,
     points: subpath.points,
+    trimStart: 0,
+    trimEnd: 1,
+    trimOffset: 0,
   }
 }
 

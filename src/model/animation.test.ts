@@ -192,6 +192,46 @@ describe('color interpolation', () => {
 })
 
 describe('path interpolation', () => {
+  it('animates trim start, end, and offset channels', () => {
+    const path = createPath({ x: 0, y: 0 })
+    let animation = upsertKeyframe(
+      defaultAnimation(),
+      path.id,
+      'path.trimEnd',
+      0,
+      0,
+      'linear',
+    )
+    animation = upsertKeyframe(
+      animation,
+      path.id,
+      'path.trimEnd',
+      2,
+      1,
+      'linear',
+    )
+    animation = upsertKeyframe(
+      animation,
+      path.id,
+      'path.trimStart',
+      0,
+      0.1,
+    )
+    animation = upsertKeyframe(
+      animation,
+      path.id,
+      'path.trimOffset',
+      0,
+      0.25,
+    )
+
+    const painted = evaluateNodeAtTime(path, animation, 1)
+    if (painted.type !== 'path') throw new Error('expected path')
+    expect(painted.trimStart).toBe(0.1)
+    expect(painted.trimEnd).toBe(0.5)
+    expect(painted.trimOffset).toBe(0.25)
+  })
+
   it('morphs anchors and handles between matching path keys', () => {
     const path = createPath(
       { x: 0, y: 0 },

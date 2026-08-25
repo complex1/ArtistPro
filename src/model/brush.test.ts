@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
-  createPencilStroke,
-  defaultPencilSettings,
+  brushOutline,
+  createBrushStroke,
+  defaultBrushSettings,
   outlinePathData,
-  pencilOutline,
-} from './pencil'
+} from './brush'
 
-describe('pencil stroke', () => {
+describe('brush stroke', () => {
   it('creates a pressure-sensitive vector outline', () => {
-    const node = createPencilStroke(
+    const node = createBrushStroke(
       { x: 20, y: 30 },
       { x: 0, y: 0, pressure: 0.5 },
-      defaultPencilSettings,
+      defaultBrushSettings,
       true,
     )
     node.samples.push(
@@ -20,7 +20,7 @@ describe('pencil stroke', () => {
     )
     node.complete = true
 
-    const outline = pencilOutline(node)
+    const outline = brushOutline(node)
     expect(outline.length).toBeGreaterThan(node.samples.length)
     expect(outline.every((point) => Number.isFinite(point.x))).toBe(true)
     expect(outline.every((point) => Number.isFinite(point.y))).toBe(true)
@@ -34,7 +34,6 @@ describe('pencil stroke', () => {
       { x: 0, y: 10 },
     ])
 
-    // First curve ends between points 1 and 2, not between points 0 and 1.
     expect(data).toBe('M0.00,0.00 Q10.00,0.00 10.00,5.00 T5.00,10.00 Z')
   })
 
@@ -43,10 +42,10 @@ describe('pencil stroke', () => {
   })
 
   it('traces a straight vertical drag without doubling back', () => {
-    const node = createPencilStroke(
+    const node = createBrushStroke(
       { x: 0, y: 0 },
       { x: 0, y: 0, pressure: 0.5 },
-      { ...defaultPencilSettings, size: 10, pressure: 0 },
+      { ...defaultBrushSettings, size: 10, pressure: 0 },
       true,
     )
     for (let y = 10; y <= 120; y += 10) {
@@ -54,11 +53,11 @@ describe('pencil stroke', () => {
     }
     node.complete = true
 
-    const outline = pencilOutline(node)
-    const width = Math.max(...outline.map((point) => point.x)) -
+    const outline = brushOutline(node)
+    const width =
+      Math.max(...outline.map((point) => point.x)) -
       Math.min(...outline.map((point) => point.x))
 
-    // A steady vertical stroke stays within its own brush width.
     expect(width).toBeLessThanOrEqual(node.settings.size + 0.5)
   })
 })

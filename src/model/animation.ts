@@ -62,6 +62,12 @@ export const propertyLabel = (property: AnimatableProperty) => {
       return 'Stroke'
     case 'strokeWidth':
       return 'Stroke width'
+    case 'path.trimStart':
+      return 'Trim start'
+    case 'path.trimEnd':
+      return 'Trim end'
+    case 'path.trimOffset':
+      return 'Trim offset'
     case 'width':
       return 'Width'
     case 'height':
@@ -76,9 +82,9 @@ export const propertyLabel = (property: AnimatableProperty) => {
       return 'Letter spacing'
     case 'fontWeight':
       return 'Weight'
-    case 'pencil.size':
+    case 'brush.size':
       return 'Brush size'
-    case 'pencil.color':
+    case 'brush.color':
       return 'Brush color'
     case 'brightness':
       return 'Brightness'
