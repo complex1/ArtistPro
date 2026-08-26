@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   useEffect,
   useRef,
   useState,
@@ -17,12 +19,18 @@ import { PlaybackClock } from './components/PlaybackClock'
 import { Timeline } from './components/Timeline'
 import { Toolbar } from './components/Toolbar'
 import { activeChildren, findNode, useEditorStore } from './store/editorStore'
+import { renderDocumentSvg } from './render/svgFrame'
 
 const HEADER_HEIGHT = 44
 const MIN_BOTTOM_HEIGHT = 88
 const MIN_CANVAS_HEIGHT = 160
 const DEFAULT_BOTTOM_HEIGHT = 170
 const ANIMATE_BOTTOM_HEIGHT = 240
+const PreviewStudio = lazy(() =>
+  import('./components/PreviewStudio').then((module) => ({
+    default: module.PreviewStudio,
+  })),
+)
 
 function clampBottomHeight(height: number, minHeight = MIN_BOTTOM_HEIGHT) {
   const max = Math.max(
@@ -93,13 +101,13 @@ function App() {
       }
       if (
         event.key === ' ' &&
-        (mode === 'animate' || mode === 'preview') &&
+        mode === 'animate' &&
         !combo
       ) {
         event.preventDefault()
         setPlaying(!playing)
       }
-      if (event.key === 'Home' && (mode === 'animate' || mode === 'preview')) {
+      if (event.key === 'Home' && mode === 'animate') {
         event.preventDefault()
         setPlayhead(0, true)
       }
@@ -131,8 +139,10 @@ function App() {
   ])
 
   const exportSvg = () => {
-    const source = canvasRef.current?.exportSvg()
-    if (!source) return
+    const state = useEditorStore.getState()
+    const source =
+      canvasRef.current?.exportSvg() ??
+      renderDocumentSvg(state.document, state.playhead)
     const url = URL.createObjectURL(new Blob([source], { type: 'image/svg+xml' }))
     const anchor = document.createElement('a')
     anchor.href = url
@@ -191,7 +201,15 @@ function App() {
       <Header onExport={exportSvg} />
       <div className={`editor-body${preview ? ' is-preview' : ''}`}>
         {!preview && <Toolbar />}
-        <Canvas ref={canvasRef} />
+        {preview ? (
+          <Suspense
+            fallback={<div className="preview-loading">Loading Render Studio…</div>}
+          >
+            <PreviewStudio />
+          </Suspense>
+        ) : (
+          <Canvas ref={canvasRef} />
+        )}
         {!preview && <Inspector />}
       </div>
       {!preview && (

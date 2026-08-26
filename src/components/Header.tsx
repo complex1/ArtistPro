@@ -9,16 +9,13 @@ const modes: { id: EditorMode; label: string }[] = [
   { id: 'draw', label: 'Draw' },
   { id: 'animate', label: 'Animate' },
   { id: 'preview', label: 'Preview' },
-  { id: 'export', label: 'Export' },
 ]
 
 export function Header({ onExport }: { onExport: () => void }) {
   const svgInput = useRef<HTMLInputElement>(null)
   const document = useEditorStore((state) => state.document)
   const mode = useEditorStore((state) => state.mode)
-  const looping = useEditorStore((state) => state.looping)
   const setMode = useEditorStore((state) => state.setMode)
-  const setLooping = useEditorStore((state) => state.setLooping)
   const setArtboardSize = useEditorStore((state) => state.setArtboardSize)
   const addNodes = useEditorStore((state) => state.addNodes)
   const canUndo = useEditorStore((state) => state.canUndo)
@@ -73,7 +70,7 @@ export function Header({ onExport }: { onExport: () => void }) {
         <Select
           aria-label="Canvas size"
           value={sizeValue}
-          disabled={Boolean(editingSymbol)}
+          disabled={Boolean(editingSymbol) || mode === 'preview'}
           onChange={(event) => {
             const [width, height] = event.target.value.split('x').map(Number)
             setArtboardSize(width, height)
@@ -103,14 +100,6 @@ export function Header({ onExport }: { onExport: () => void }) {
         >
           <Redo2 size={14} /> Redo
         </Button>
-        {mode === 'preview' && (
-          <Button
-            aria-pressed={looping}
-            onClick={() => setLooping(!looping)}
-          >
-            {looping ? 'Loop on' : 'Loop off'}
-          </Button>
-        )}
         <input
           ref={svgInput}
           type="file"

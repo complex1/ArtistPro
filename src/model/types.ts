@@ -355,7 +355,7 @@ export type EditorDocumentV2 = DocumentBase & {
 
 export type EditorDocument = EditorDocumentV1 | EditorDocumentV2
 
-export type EditorMode = 'draw' | 'animate' | 'preview' | 'export'
+export type EditorMode = 'draw' | 'animate' | 'preview'
 export type Tool =
   | 'select'
   | 'node'

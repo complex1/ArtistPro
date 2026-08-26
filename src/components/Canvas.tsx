@@ -11,7 +11,14 @@ import {
 } from 'react'
 import { SVG, type Element as SvgElement, type G, type Svg } from '@svgdotjs/svg.js'
 import { Maximize, Minus, Plus } from 'lucide-react'
-import { filterPrimitives, imageAdjustmentPrimitives } from '../model/effects'
+import {
+  effectsFilter,
+  imageAdjustmentsFilter,
+  imageHref,
+  imageLayout,
+  shapeAttributes,
+  type SvgElementSpec,
+} from '../render/svgFrame'
 import {
   generateGridPrimitives,
   gridColorGroups,
@@ -27,7 +34,7 @@ import {
   pathData,
   setHandleMode,
 } from '../model/path'
-import { brushPathData, createBrushStroke } from '../model/brush'
+import { createBrushStroke } from '../model/brush'
 import { fitFreehandPath } from '../model/freehandPath'
 import { evaluateSymbolInstance } from '../model/symbols'
 import { createText, naturalTextWidth } from '../model/text'
@@ -77,18 +84,6 @@ function activeSceneFromState(state: ReturnType<typeof useEditorStore.getState>)
   return {
     children: (definition?.children ?? state.document.children) as EditorNode[],
     animation: definition?.animation ?? state.document.animation,
-  }
-}
-
-function pathTrimAttributes(node: PathNode) {
-  const start = Math.max(0, Math.min(1, node.trimStart ?? 0))
-  const end = Math.max(0, Math.min(1, node.trimEnd ?? 1))
-  const visible = end >= start ? end - start : 1 - start + end
-  return {
-    pathLength: 1,
-    'stroke-dasharray':
-      visible >= 1 - 1e-6 ? 'none' : `${visible} ${1 - visible}`,
-    'stroke-dashoffset': -(start + (node.trimOffset ?? 0)),
   }
 }
 
@@ -946,13 +941,12 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
         }
         const content = group.group()
         applyEffects(draw, content, node)
-        const scaleX = node.width / Math.max(1, node.crop.width)
-        const scaleY = node.height / Math.max(1, node.crop.height)
+        const layout = imageLayout(node)
         const clip = draw.clip().add(draw.rect(node.width, node.height).move(0, 0))
         const image = content
-          .image(node.processedSource ?? node.source)
-          .size(node.naturalWidth * scaleX, node.naturalHeight * scaleY)
-          .move(-node.crop.x * scaleX, -node.crop.y * scaleY)
+          .image(imageHref(node))
+          .size(layout.width, layout.height)
+          .move(layout.x, layout.y)
           .attr({ preserveAspectRatio: 'none' })
           .clipWith(clip)
         applyImageAdjustments(draw, image, node)
@@ -967,52 +961,22 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
         return
       }
 
+      // Geometry and paint come from the shared frame descriptor, so the canvas
+      // and an exported frame cannot drift; only the cursor is editor-only.
       const element =
-        node.type === 'rect'
-          ? parent.rect(node.width, node.height).radius(node.rx, node.ry)
-          : node.type === 'ellipse'
-            ? parent.ellipse(node.rx * 2, node.ry * 2).move(0, 0)
-            : node.type === 'path'
-              ? parent.path(pathData(node))
-              : node.type === 'brush'
-                ? parent.path(brushPathData(node))
-                : parent.text(node.text)
+        node.type === 'text'
+          ? parent.text(node.text)
+          : node.type === 'rect'
+            ? parent.rect(0, 0)
+            : node.type === 'ellipse'
+              ? parent.ellipse(0, 0)
+              : parent.path()
 
-      element
-        .attr({
-          id: node.id,
-          fill: node.type === 'brush' ? node.settings.color : node.fill,
-          stroke: node.type === 'brush' ? 'none' : node.stroke,
-          'stroke-width': node.type === 'brush' ? 0 : node.strokeWidth,
-          ...(node.type === 'path' ? pathTrimAttributes(node) : {}),
-          opacity: node.transform.opacity,
-          transform: composeTransform(node.transform),
-          cursor: shapeCursor(tool, node.locked),
-          ...(node.type === 'text'
-            ? {
-                x:
-                  node.textAlign === 'left'
-                    ? 0
-                    : node.textAlign === 'center'
-                      ? node.width / 2
-                      : node.width,
-                y: 0,
-                'font-family': node.fontFamily,
-                'font-size': node.fontSize,
-                'font-weight': node.fontWeight,
-                'letter-spacing': node.letterSpacing,
-                'text-anchor':
-                  node.textAlign === 'left'
-                    ? 'start'
-                    : node.textAlign === 'center'
-                      ? 'middle'
-                      : 'end',
-                'dominant-baseline': 'text-before-edge',
-                textLength: node.width,
-                lengthAdjust: 'spacingAndGlyphs',
-              }
-            : {}),
-        })
+      element.attr({
+        ...shapeAttributes(node),
+        id: node.id,
+        cursor: shapeCursor(tool, node.locked),
+      })
       if (interactive) {
         element.on('pointerdown', onDown).on('dblclick', onDoubleClick)
       }
@@ -1122,15 +1086,8 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
     // The SVG viewport is allowed to overflow so guide handles stay reachable
     // outside the artboard. While editing, artwork overflows with it so a layer
     // dragged past the page edge stays visible and selectable on the pasteboard;
-    // the modes that stand in for the delivered file clip to the page instead.
-    const framed = mode === 'preview' || mode === 'export'
-    const artwork = framed
-      ? draw.group().clipWith(
-          draw.clip().add(
-            draw.rect(activeArtboard.width, activeArtboard.height).move(0, 0),
-          ),
-        )
-      : draw.group()
+    // delivered output is clipped by the non-interactive frame renderer.
+    const artwork = draw.group()
     scene.forEach((node) => paint(artwork, node))
 
     // Handles paint last so they stay on top of the artwork they guide.
@@ -1370,38 +1327,36 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
 
 const svgNamespace = 'http://www.w3.org/2000/svg'
 
-function applyEffects(draw: Svg, element: SvgElement, node: EditorNode) {
-  const primitives = filterPrimitives(node.effects)
-  if (primitives.length === 0) return
+function createFromSpec(spec: SvgElementSpec): Element {
+  const element = globalThis.document.createElementNS(svgNamespace, spec.tag)
+  for (const [name, value] of Object.entries(spec.attributes)) {
+    element.setAttribute(name, String(value))
+  }
+  if (spec.text !== undefined) element.textContent = spec.text
+  for (const child of spec.children ?? []) {
+    element.appendChild(createFromSpec(child))
+  }
+  return element
+}
 
+/** Materialises a shared filter descriptor into the live canvas defs. */
+function applyFilterSpec(
+  draw: Svg,
+  element: SvgElement,
+  spec: SvgElementSpec | null,
+) {
+  if (!spec) return
   let defs = draw.node.querySelector(':scope > defs')
   if (!defs) {
     defs = globalThis.document.createElementNS(svgNamespace, 'defs')
     draw.node.insertBefore(defs, draw.node.firstChild)
   }
+  defs.appendChild(createFromSpec(spec))
+  element.attr('filter', `url(#${spec.attributes.id})`)
+}
 
-  const id = `effects-${node.id}`
-  const filter = globalThis.document.createElementNS(svgNamespace, 'filter')
-  filter.setAttribute('id', id)
-  filter.setAttribute('x', '-50%')
-  filter.setAttribute('y', '-50%')
-  filter.setAttribute('width', '200%')
-  filter.setAttribute('height', '200%')
-  filter.setAttribute('color-interpolation-filters', 'sRGB')
-
-  for (const primitive of primitives) {
-    const element = globalThis.document.createElementNS(
-      svgNamespace,
-      primitive.tag,
-    )
-    for (const [name, value] of Object.entries(primitive.attributes)) {
-      element.setAttribute(name, String(value))
-    }
-    filter.appendChild(element)
-  }
-
-  defs.appendChild(filter)
-  element.attr('filter', `url(#${id})`)
+function applyEffects(draw: Svg, element: SvgElement, node: EditorNode) {
+  applyFilterSpec(draw, element, effectsFilter(node))
 }
 
 /**
@@ -1579,26 +1534,7 @@ function drawGridHandles(
 }
 
 function applyImageAdjustments(draw: Svg, element: SvgElement, node: ImageNode) {
-  const primitives = imageAdjustmentPrimitives(node.adjustments)
-  if (primitives.length === 0) return
-  let defs = draw.node.querySelector(':scope > defs')
-  if (!defs) {
-    defs = globalThis.document.createElementNS(svgNamespace, 'defs')
-    draw.node.insertBefore(defs, draw.node.firstChild)
-  }
-  const id = `image-adjustments-${node.id}`
-  const filter = globalThis.document.createElementNS(svgNamespace, 'filter')
-  filter.setAttribute('id', id)
-  filter.setAttribute('color-interpolation-filters', 'sRGB')
-  for (const primitive of primitives) {
-    const item = globalThis.document.createElementNS(svgNamespace, primitive.tag)
-    for (const [name, value] of Object.entries(primitive.attributes)) {
-      item.setAttribute(name, String(value))
-    }
-    filter.appendChild(item)
-  }
-  defs.appendChild(filter)
-  element.attr('filter', `url(#${id})`)
+  applyFilterSpec(draw, element, imageAdjustmentsFilter(node))
 }
 
 type PathEditorActions = {

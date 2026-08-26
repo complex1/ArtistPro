@@ -41,7 +41,7 @@ export function Toolbar() {
   const addShape = useEditorStore((state) => state.addShape)
   const addNode = useEditorStore((state) => state.addNode)
 
-  if (mode === 'preview' || mode === 'export') {
+  if (mode === 'preview') {
     return (
       <aside className="toolbar" aria-label={`${mode} tools`}>
         <div className="toolbar-empty">{mode.slice(0, 1).toUpperCase()}</div>
