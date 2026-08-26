@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { ArrowLeft, Download, FileUp, Redo2, Save, Undo2 } from 'lucide-react'
+import { navigate } from '../app/routes'
 import { importSvgText } from '../model/svgImport'
 import { useEditorStore } from '../store/editorStore'
 import type { EditorMode } from '../model/types'
@@ -11,7 +12,13 @@ const modes: { id: EditorMode; label: string }[] = [
   { id: 'preview', label: 'Preview' },
 ]
 
-export function Header({ onExport }: { onExport: () => void }) {
+export function Header({
+  onExport,
+  onSave,
+}: {
+  onExport: () => void
+  onSave: () => void
+}) {
   const svgInput = useRef<HTMLInputElement>(null)
   const document = useEditorStore((state) => state.document)
   const mode = useEditorStore((state) => state.mode)
@@ -34,7 +41,22 @@ export function Header({ onExport }: { onExport: () => void }) {
   return (
     <header className="app-header">
       <div className="brand">
-        <div className="brand-mark">V</div>
+        <button
+          type="button"
+          className="studio-crumb"
+          onClick={() => navigate({ page: 'home' })}
+        >
+          Artist Pro
+        </button>
+        <b>/</b>
+        <button
+          type="button"
+          className="studio-crumb"
+          onClick={() => navigate({ page: 'svg-home' })}
+        >
+          SVG
+        </button>
+        <b>/</b>
         {editingSymbol ? (
           <button
             type="button"
@@ -48,7 +70,7 @@ export function Header({ onExport }: { onExport: () => void }) {
             <strong>{editingSymbol.name}</strong>
           </button>
         ) : (
-          <span>{document.name}</span>
+          <strong>{document.name}</strong>
         )}
       </div>
 
@@ -118,7 +140,7 @@ export function Header({ onExport }: { onExport: () => void }) {
             }
           }}
         />
-        <Button><Save size={14} /> Save</Button>
+        <Button onClick={onSave}><Save size={14} /> Save</Button>
         <Button onClick={() => svgInput.current?.click()}>
           <FileUp size={14} /> Import SVG
         </Button>

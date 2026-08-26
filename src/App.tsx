@@ -9,6 +9,9 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import './App.css'
+import { navigate } from './app/routes'
+import { useHashRoute } from './app/useHashRoute'
+import { ArtistHome } from './components/ArtistHome'
 import { Canvas, type CanvasHandle } from './components/Canvas'
 import { Header } from './components/Header'
 import { Inspector } from './components/Inspector'
@@ -16,8 +19,10 @@ import { LayersPanel } from './components/LayersPanel'
 import { PencilToolConfig } from './components/PencilToolConfig'
 import { BrushToolConfig } from './components/BrushToolConfig'
 import { PlaybackClock } from './components/PlaybackClock'
+import { SvgToolHome } from './components/SvgToolHome'
 import { Timeline } from './components/Timeline'
 import { Toolbar } from './components/Toolbar'
+import { getProject, saveProject } from './projects/library'
 import { activeChildren, findNode, useEditorStore } from './store/editorStore'
 import { renderDocumentSvg } from './render/svgFrame'
 
@@ -40,9 +45,39 @@ function clampBottomHeight(height: number, minHeight = MIN_BOTTOM_HEIGHT) {
   return Math.round(Math.min(max, Math.max(minHeight, height)))
 }
 
-function App() {
+function persistProject(projectId: string): void {
+  const existing = getProject(projectId)
+  if (!existing) return
+  saveProject({
+    ...existing,
+    document: useEditorStore.getState().document,
+  })
+}
+
+function EditorApp({ projectId }: { projectId: string }) {
+  const project = getProject(projectId)
+  if (!project) return <MissingProject />
+  return <LoadedEditor key={project.id} project={project} />
+}
+
+function MissingProject() {
+  useEffect(() => {
+    navigate({ page: 'svg-home' })
+  }, [])
+  return <div className="studio-loading">Opening project…</div>
+}
+
+function LoadedEditor({
+  project,
+}: {
+  project: NonNullable<ReturnType<typeof getProject>>
+}) {
   const canvasRef = useRef<CanvasHandle>(null)
   const [bottomHeight, setBottomHeight] = useState(DEFAULT_BOTTOM_HEIGHT)
+  useState(() => {
+    useEditorStore.getState().loadDocument(project.document)
+    return project.id
+  })
   const groupSelected = useEditorStore((state) => state.groupSelected)
   const ungroupSelected = useEditorStore((state) => state.ungroupSelected)
   const removeSelected = useEditorStore((state) => state.removeSelected)
@@ -50,6 +85,7 @@ function App() {
   const tool = useEditorStore((state) => state.tool)
   const mode = useEditorStore((state) => state.mode)
   const playing = useEditorStore((state) => state.playing)
+  const scene = useEditorStore((state) => state.document)
   const setPlaying = useEditorStore((state) => state.setPlaying)
   const setPlayhead = useEditorStore((state) => state.setPlayhead)
   const armProperty = useEditorStore((state) => state.armProperty)
@@ -57,6 +93,12 @@ function App() {
   const redo = useEditorStore((state) => state.redo)
   const exitSymbol = useEditorStore((state) => state.exitSymbol)
   const minPanel = mode === 'animate' ? ANIMATE_BOTTOM_HEIGHT : MIN_BOTTOM_HEIGHT
+  const projectId = project.id
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => persistProject(projectId), 400)
+    return () => window.clearTimeout(timer)
+  }, [scene, projectId])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -70,6 +112,11 @@ function App() {
         return
       }
       const combo = event.metaKey || event.ctrlKey
+      if (combo && event.key.toLowerCase() === 's') {
+        event.preventDefault()
+        persistProject(projectId)
+        return
+      }
       if (combo && event.key.toLowerCase() === 'z') {
         event.preventDefault()
         if (event.shiftKey) redo()
@@ -130,6 +177,7 @@ function App() {
     groupSelected,
     mode,
     playing,
+    projectId,
     removeSelected,
     redo,
     setPlayhead,
@@ -146,7 +194,7 @@ function App() {
     const url = URL.createObjectURL(new Blob([source], { type: 'image/svg+xml' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = 'untitled.svg'
+    anchor.download = `${state.document.name || 'untitled'}.svg`
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -198,7 +246,10 @@ function App() {
       } as CSSProperties}
     >
       <PlaybackClock />
-      <Header onExport={exportSvg} />
+      <Header
+        onExport={exportSvg}
+        onSave={() => persistProject(projectId)}
+      />
       <div className={`editor-body${preview ? ' is-preview' : ''}`}>
         {!preview && <Toolbar />}
         {preview ? (
@@ -251,6 +302,20 @@ function App() {
       )}
     </div>
   )
+}
+
+function App() {
+  const route = useHashRoute()
+
+  useEffect(() => {
+    if (route.page === 'home') document.title = 'Artist Pro'
+    else if (route.page === 'svg-home') document.title = 'SVG — Artist Pro'
+    else document.title = 'SVG — Artist Pro'
+  }, [route])
+
+  if (route.page === 'home') return <ArtistHome />
+  if (route.page === 'svg-home') return <SvgToolHome />
+  return <EditorApp projectId={route.projectId} />
 }
 
 export default App

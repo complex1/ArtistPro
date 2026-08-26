@@ -145,6 +145,7 @@ export type EditorStore = {
   setArtboardSize: (width: number, height: number) => void
   updateArtboard: (update: Partial<EditorDocument['artboard']>) => void
   setDocumentName: (name: string) => void
+  loadDocument: (document: EditorDocument) => void
   setZoom: (zoom: number) => void
   setPan: (pan: Vec2) => void
   setViewport: (zoom: number, pan: Vec2) => void
@@ -732,6 +733,27 @@ export const useEditorStore = create<EditorStore>()(
       set((state) => {
         state.document.name = name
       }),
+    loadDocument: (document) => {
+      undoStack.length = 0
+      redoStack.length = 0
+      historyGroupDepth = 0
+      groupedSnapshot = null
+      groupedDocumentChanged = false
+      set((state) => {
+        state.document = document
+        state.editingSymbolId = null
+        state.selectedIds = []
+        state.selectedKeyIds = []
+        state.playhead = 0
+        state.playing = false
+        state.mode = 'draw'
+        state.tool = 'select'
+        state.zoom = 0.82
+        state.pan = { x: 0, y: 0 }
+        state.canUndo = false
+        state.canRedo = false
+      })
+    },
     setZoom: (zoom) => set({ zoom: Math.min(4, Math.max(0.1, zoom)) }),
     setPan: (pan) => set({ pan }),
     setViewport: (zoom, pan) =>
