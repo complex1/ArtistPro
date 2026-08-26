@@ -23,6 +23,7 @@ import type {
   EditorNode,
   Keyframe,
   KeyframeEase,
+  SymbolDefinition,
   Transform,
   Vec2,
 } from './types'
@@ -339,6 +340,21 @@ export function evaluateScene(
   time: number,
 ): EditorNode[] {
   return applyMotionPaths(evaluateChannels(nodes, animation, time))
+}
+
+/**
+ * Evaluates definition-owned content as a private scene. The returned nodes are
+ * for rendering under an instance and are never inserted into document roots.
+ */
+export function evaluateSymbolDefinitionAtTime(
+  definition: SymbolDefinition,
+  time: number,
+): EditorNode[] {
+  return evaluateScene(
+    definition.children as EditorNode[],
+    definition.animation,
+    time,
+  )
 }
 
 export type MotionPathOffset = {

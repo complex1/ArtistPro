@@ -75,8 +75,14 @@ function selectedKeys(
 }
 
 export function Timeline() {
-  const nodes = useEditorStore((state) => state.document.children)
-  const animation = useEditorStore((state) => state.document.animation)
+  const document = useEditorStore((state) => state.document)
+  const editingSymbolId = useEditorStore((state) => state.editingSymbolId)
+  const editingSymbol =
+    document.version === 2
+      ? document.symbols.find((symbol) => symbol.id === editingSymbolId)
+      : undefined
+  const nodes = (editingSymbol?.children ?? document.children) as EditorNode[]
+  const animation = editingSymbol?.animation ?? document.animation
   const selectedIds = useEditorStore((state) => state.selectedIds)
   const playhead = useEditorStore((state) => state.playhead)
   const playing = useEditorStore((state) => state.playing)

@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
-import { useEditorStore } from '../store/editorStore'
+import { activeAnimation, useEditorStore } from '../store/editorStore'
 
 gsap.registerPlugin(useGSAP)
 
@@ -12,7 +12,7 @@ gsap.registerPlugin(useGSAP)
 export function PlaybackClock() {
   const playing = useEditorStore((state) => state.playing)
   const looping = useEditorStore((state) => state.looping)
-  const duration = useEditorStore((state) => state.document.animation.duration)
+  const duration = useEditorStore((state) => activeAnimation(state).duration)
   const setPlayhead = useEditorStore((state) => state.setPlayhead)
   const setPlaying = useEditorStore((state) => state.setPlaying)
   const host = useRef<HTMLDivElement>(null)

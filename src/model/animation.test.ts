@@ -6,6 +6,7 @@ import {
   evaluateChannels,
   evaluateNodeAtTime,
   evaluateScene,
+  evaluateSymbolDefinitionAtTime,
   evaluateTransform,
   formatTimecode,
   pruneAnimation,
@@ -20,7 +21,7 @@ import { mixHex } from './channels'
 import { createShape } from './nodes'
 import { createPath, createPathPoint } from './path'
 import { defaultTransform, transformPoint } from './transform'
-import type { EditorNode } from './types'
+import type { EditorNode, SymbolDefinition, SymbolInstanceNode } from './types'
 
 const rest = {
   ...defaultTransform(),
@@ -368,5 +369,60 @@ describe('motion path evaluation', () => {
     follower.motionPath.pathId = 'missing'
     const missing = evaluateScene([follower], defaultAnimation(), 0)[0]
     expect(missing.transform).toEqual(follower.transform)
+  })
+})
+
+describe('symbol animation isolation', () => {
+  it('evaluates definition children without expanding the scene instance', () => {
+    const child = createShape('rect', { x: 0, y: 0 })
+    if (child.type !== 'rect') throw new Error('expected rect')
+    child.id = 'internal'
+    let animation = upsertKeyframe(
+      defaultAnimation(),
+      child.id,
+      'position.x',
+      0,
+      0,
+      'linear',
+    )
+    animation = upsertKeyframe(
+      animation,
+      child.id,
+      'position.x',
+      2,
+      100,
+      'linear',
+    )
+    const definition: SymbolDefinition = {
+      id: 'definition',
+      name: 'Animated',
+      width: 110,
+      height: 140,
+      children: [child],
+      animation,
+    }
+    const instance: SymbolInstanceNode = {
+      id: 'instance',
+      type: 'symbol',
+      symbolId: definition.id,
+      name: definition.name,
+      visible: true,
+      locked: false,
+      pivotPreset: 'center',
+      effects: [],
+      width: definition.width,
+      height: definition.height,
+      playback: { startTime: 0, mode: 'once' },
+      transform: defaultTransform(),
+    }
+
+    const internals = evaluateSymbolDefinitionAtTime(definition, 1)
+    const scene = evaluateScene([instance], defaultAnimation(), 1)
+
+    expect(internals[0].id).toBe('internal')
+    expect(internals[0].transform.position.x).toBe(50)
+    expect(scene).toHaveLength(1)
+    expect(scene[0].type).toBe('symbol')
+    expect('children' in scene[0]).toBe(false)
   })
 })

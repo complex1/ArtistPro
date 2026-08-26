@@ -16,7 +16,7 @@ import { BrushToolConfig } from './components/BrushToolConfig'
 import { PlaybackClock } from './components/PlaybackClock'
 import { Timeline } from './components/Timeline'
 import { Toolbar } from './components/Toolbar'
-import { findNode, useEditorStore } from './store/editorStore'
+import { activeChildren, findNode, useEditorStore } from './store/editorStore'
 
 const HEADER_HEIGHT = 44
 const MIN_BOTTOM_HEIGHT = 88
@@ -47,12 +47,18 @@ function App() {
   const armProperty = useEditorStore((state) => state.armProperty)
   const undo = useEditorStore((state) => state.undo)
   const redo = useEditorStore((state) => state.redo)
+  const exitSymbol = useEditorStore((state) => state.exitSymbol)
   const minPanel = mode === 'animate' ? ANIMATE_BOTTOM_HEIGHT : MIN_BOTTOM_HEIGHT
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
+        return
+      }
+      if (event.key === 'Escape' && useEditorStore.getState().editingSymbolId) {
+        event.preventDefault()
+        exitSymbol()
         return
       }
       const combo = event.metaKey || event.ctrlKey
@@ -101,7 +107,7 @@ function App() {
         const state = useEditorStore.getState()
         const id = state.selectedIds[0]
         if (!id || state.selectedIds.length !== 1) return
-        if (!findNode(state.document.children, id)) return
+        if (!findNode(activeChildren(state), id)) return
         event.preventDefault()
         armProperty(id, 'position.x')
         armProperty(id, 'position.y')
@@ -112,6 +118,7 @@ function App() {
   }, [
     armProperty,
     duplicateSelected,
+    exitSymbol,
     groupSelected,
     mode,
     playing,

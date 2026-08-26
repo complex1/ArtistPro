@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createShape } from './nodes'
 import {
+  cloneNode,
   dragDelta,
   findNode,
   groupNodes,
@@ -20,6 +21,7 @@ import type {
   GroupNode,
   ImageNode,
   RectNode,
+  SymbolInstanceNode,
 } from './types'
 
 const sampleRect = (name: string, x: number, y: number): EditorNode => {
@@ -85,6 +87,49 @@ describe('image nodes', () => {
     expect(resized.width).toBe(100)
     expect(resized.height).toBe(200)
     expect(resized.crop).toEqual({ x: 0, y: 0, width: 400, height: 200 })
+  })
+})
+
+describe('symbol instance leaves', () => {
+  const sampleSymbol = (): SymbolInstanceNode => ({
+    id: 'instance',
+    type: 'symbol',
+    symbolId: 'definition',
+    name: 'Badge',
+    visible: true,
+    locked: false,
+    pivotPreset: 'center',
+    effects: [],
+    width: 240,
+    height: 120,
+    playback: { startTime: 1.5, mode: 'loop' },
+    transform: {
+      pivot: { x: 120, y: 60 },
+      position: { x: 30, y: 40 },
+      rotation: 0,
+      scale: { x: 1, y: 1 },
+      skew: { x: 0, y: 0 },
+      opacity: 0.75,
+    },
+  })
+
+  it('uses instance dimensions for local bounds', () => {
+    expect(localBounds(sampleSymbol())).toEqual({
+      x: 0,
+      y: 0,
+      width: 240,
+      height: 120,
+    })
+  })
+
+  it('clones the instance as a leaf without cloning definition internals', () => {
+    const original = sampleSymbol()
+    const cloned = cloneNode(original) as SymbolInstanceNode
+
+    expect(cloned.id).not.toBe(original.id)
+    expect(cloned.symbolId).toBe(original.symbolId)
+    expect(cloned.playback).toEqual(original.playback)
+    expect('children' in cloned).toBe(false)
   })
 })
 

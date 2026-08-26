@@ -254,7 +254,7 @@ export function localBounds(node: EditorNode): Box {
   if (node.type === 'text') {
     return { x: 0, y: 0, width: node.width, height: node.fontSize }
   }
-  if (node.type === 'image') {
+  if (node.type === 'image' || node.type === 'symbol') {
     return { x: 0, y: 0, width: node.width, height: node.height }
   }
   return boundsOf(node.children)

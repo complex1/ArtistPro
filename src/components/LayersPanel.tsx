@@ -12,6 +12,9 @@ import {
   Image as ImageIcon,
   PenLine,
   Paintbrush,
+  Package,
+  Pencil,
+  Plus,
   RectangleHorizontal,
   Trash2,
   Type,
@@ -21,11 +24,18 @@ import type { LayerDropPosition } from '../model/scene'
 import type { EditorNode } from '../model/types'
 import { canGroup, canUngroup, useEditorStore } from '../store/editorStore'
 import { Button } from '../ui/controls'
+import { NewSymbolModal } from './NewSymbolModal'
 
 type DropHint = { targetId: string | null; position: LayerDropPosition }
 
 export function LayersPanel() {
-  const nodes = useEditorStore((state) => state.document.children)
+  const document = useEditorStore((state) => state.document)
+  const editingSymbolId = useEditorStore((state) => state.editingSymbolId)
+  const editingSymbol =
+    document.version === 2
+      ? document.symbols.find((symbol) => symbol.id === editingSymbolId)
+      : undefined
+  const nodes = (editingSymbol?.children ?? document.children) as EditorNode[]
   const selectedIds = useEditorStore((state) => state.selectedIds)
   const select = useEditorStore((state) => state.select)
   const updateNode = useEditorStore((state) => state.updateNode)
@@ -34,11 +44,31 @@ export function LayersPanel() {
   const duplicateSelected = useEditorStore((state) => state.duplicateSelected)
   const groupSelected = useEditorStore((state) => state.groupSelected)
   const ungroupSelected = useEditorStore((state) => state.ungroupSelected)
+  const createSymbolFromSelection = useEditorStore(
+    (state) => state.createSymbolFromSelection,
+  )
+  const createBlankSymbol = useEditorStore((state) => state.createBlankSymbol)
+  const addSymbolInstance = useEditorStore((state) => state.addSymbolInstance)
+  const enterSymbol = useEditorStore((state) => state.enterSymbol)
+  const removeUnusedSymbol = useEditorStore((state) => state.removeUnusedSymbol)
+  const [newSymbolOpen, setNewSymbolOpen] = useState(false)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dropHint, setDropHint] = useState<DropHint | null>(null)
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set())
   const grouping = canGroup(nodes, selectedIds)
   const ungrouping = canUngroup(nodes, selectedIds)
+  const symbols = document.version === 2 ? document.symbols : []
+  const symbolUsage = new Map<string, number>()
+  const countInstances = (items: EditorNode[]) => {
+    for (const item of items) {
+      if (item.type === 'symbol') {
+        symbolUsage.set(item.symbolId, (symbolUsage.get(item.symbolId) ?? 0) + 1)
+      } else if (item.type === 'group') {
+        countInstances(item.children)
+      }
+    }
+  }
+  countInstances(document.children)
 
   const drop = (targetId: string | null, position: LayerDropPosition) => {
     if (draggingId) moveLayer(draggingId, targetId, position)
@@ -106,10 +136,80 @@ export function LayersPanel() {
         </div>
       </section>
       <section className="symbols-panel">
-        <div className="panel-tabs"><span>Symbols</span></div>
-        <button type="button" disabled className="create-symbol">＋ Create from selection</button>
-        <p>Select two or more layers, then Group. Symbols come next.</p>
+        <div className="panel-tabs"><span className="is-active">Symbols</span></div>
+        <div className="symbols-actions">
+          <Button
+            disabled={Boolean(editingSymbolId) || selectedIds.length === 0}
+            onClick={() => createSymbolFromSelection()}
+          >
+            <Package size={13} /> From selection
+          </Button>
+          <Button
+            disabled={Boolean(editingSymbolId)}
+            onClick={() => setNewSymbolOpen(true)}
+          >
+            <Plus size={13} /> New
+          </Button>
+        </div>
+        <div className="symbols-list">
+          {symbols.length === 0 ? (
+            <p>No symbols yet. Create one from selected artwork or start blank.</p>
+          ) : (
+            symbols.map((symbol) => {
+              const uses = symbolUsage.get(symbol.id) ?? 0
+              return (
+                <div
+                  key={symbol.id}
+                  className={`symbol-library-row${editingSymbolId === symbol.id ? ' is-active' : ''}`}
+                >
+                  <button
+                    type="button"
+                    className="symbol-library-main"
+                    disabled={Boolean(editingSymbolId)}
+                    onClick={() => addSymbolInstance(symbol.id)}
+                    title="Add instance to scene"
+                  >
+                    <Package size={15} />
+                    <span>
+                      <strong>{symbol.name}</strong>
+                      <small>{symbol.width} × {symbol.height} · {uses} {uses === 1 ? 'instance' : 'instances'}</small>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="layer-row-action"
+                    disabled={Boolean(editingSymbolId)}
+                    onClick={() => enterSymbol(symbol.id)}
+                    title="Edit symbol"
+                    aria-label={`Edit ${symbol.name}`}
+                  >
+                    <Pencil size={12} />
+                  </button>
+                  <button
+                    type="button"
+                    className="layer-row-action"
+                    disabled={uses > 0}
+                    onClick={() => removeUnusedSymbol(symbol.id)}
+                    title={uses > 0 ? 'Remove all instances first' : 'Delete symbol'}
+                    aria-label={`Delete ${symbol.name}`}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              )
+            })
+          )}
+        </div>
       </section>
+      {newSymbolOpen && (
+        <NewSymbolModal
+          onCreate={({ name, width, height, duration }) => {
+            const symbolId = createBlankSymbol(name, width, height, duration)
+            if (symbolId) enterSymbol(symbolId)
+          }}
+          onClose={() => setNewSymbolOpen(false)}
+        />
+      )}
     </footer>
   )
 }
@@ -161,7 +261,9 @@ function LayerRow({
               ? Type
               : node.type === 'image'
                 ? ImageIcon
-              : Circle
+                : node.type === 'symbol'
+                  ? Package
+                  : Circle
 
   const commitRename = () => {
     if (!cancelRename.current) {

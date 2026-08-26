@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { Download, FileUp, Redo2, Save, Undo2 } from 'lucide-react'
+import { ArrowLeft, Download, FileUp, Redo2, Save, Undo2 } from 'lucide-react'
 import { importSvgText } from '../model/svgImport'
 import { useEditorStore } from '../store/editorStore'
 import type { EditorMode } from '../model/types'
@@ -25,6 +25,12 @@ export function Header({ onExport }: { onExport: () => void }) {
   const canRedo = useEditorStore((state) => state.canRedo)
   const undo = useEditorStore((state) => state.undo)
   const redo = useEditorStore((state) => state.redo)
+  const editingSymbolId = useEditorStore((state) => state.editingSymbolId)
+  const exitSymbol = useEditorStore((state) => state.exitSymbol)
+  const editingSymbol =
+    document.version === 2
+      ? document.symbols.find((symbol) => symbol.id === editingSymbolId)
+      : undefined
 
   const sizeValue = `${document.artboard.width}x${document.artboard.height}`
 
@@ -32,7 +38,21 @@ export function Header({ onExport }: { onExport: () => void }) {
     <header className="app-header">
       <div className="brand">
         <div className="brand-mark">V</div>
-        <span>{document.name}</span>
+        {editingSymbol ? (
+          <button
+            type="button"
+            className="symbol-breadcrumb"
+            onClick={exitSymbol}
+            title="Back to scene"
+          >
+            <ArrowLeft size={13} />
+            <span>{document.name}</span>
+            <b>/</b>
+            <strong>{editingSymbol.name}</strong>
+          </button>
+        ) : (
+          <span>{document.name}</span>
+        )}
       </div>
 
       <nav className="mode-switcher" aria-label="Workspace mode">
@@ -53,6 +73,7 @@ export function Header({ onExport }: { onExport: () => void }) {
         <Select
           aria-label="Canvas size"
           value={sizeValue}
+          disabled={Boolean(editingSymbol)}
           onChange={(event) => {
             const [width, height] = event.target.value.split('x').map(Number)
             setArtboardSize(width, height)

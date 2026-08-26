@@ -171,6 +171,13 @@ body.is-resizing-bottom {
   will-change: transform;
 }
 
+/* A symbol canvas is transparent, so it reads as a checkerboard rather than a page. */
+.artboard.is-symbol {
+  background:
+    repeating-conic-gradient(#e9ebf0 0% 25%, #f7f8fa 0% 50%) 0 0 / 16px 16px;
+  outline: 1px solid var(--accent);
+}
+
 .artboard svg { display: block; overflow: visible; }
 .workspace.is-pan-tool { cursor: grab; }
 .workspace.is-panning { cursor: grabbing; }
@@ -839,19 +846,146 @@ body.is-scrubbing { cursor: ew-resize; user-select: none; }
   font: 10px Inter, sans-serif;
 }
 
-.symbols-panel { min-width: 0; }
-.create-symbol {
-  display: block;
-  width: calc(100% - 16px);
-  margin: 9px 8px 6px;
-  height: 25px;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  background: var(--control);
-  color: var(--text-muted);
-  font: 10px Inter, sans-serif;
+.symbols-panel {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
-.symbols-panel p { margin: 0 8px; color: var(--text-faint); font-size: 9px; }
+
+.symbols-actions {
+  display: flex;
+  gap: 4px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.symbols-list {
+  min-height: 0;
+  padding: 5px;
+  overflow-y: auto;
+}
+
+.symbols-panel p {
+  margin: 8px;
+  color: var(--text-faint);
+  font-size: 9px;
+}
+
+.symbol-library-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20px 20px;
+  align-items: center;
+  gap: 2px;
+  border-radius: 4px;
+}
+
+.symbol-library-row:hover,
+.symbol-library-row.is-active {
+  background: rgb(74 114 255 / 12%);
+}
+
+.symbol-library-main {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 7px;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.symbol-library-main > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.symbol-library-main strong,
+.symbol-library-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.symbol-library-main strong { color: var(--text); font-size: 10px; font-weight: 500; }
+.symbol-library-main small { color: var(--text-faint); font-size: 8px; }
+
+.symbol-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  background: rgb(8 10 15 / 78%);
+  backdrop-filter: blur(4px);
+}
+
+.symbol-modal {
+  width: min(380px, calc(100vw - 32px));
+  overflow: hidden;
+  border: 1px solid #353a48;
+  border-radius: 9px;
+  background: var(--panel);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 55%);
+}
+
+.symbol-modal > header,
+.symbol-modal > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--panel-raised);
+}
+
+.symbol-modal > header { border-bottom: 1px solid var(--border); }
+.symbol-modal > footer {
+  justify-content: flex-end;
+  border-top: 1px solid var(--border);
+}
+
+.symbol-modal h2 { margin: 0; color: var(--text); font-size: 13px; }
+.symbol-modal p { margin: 3px 0 0; color: var(--text-muted); font-size: 9px; }
+.symbol-modal-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px; }
+.symbol-modal-fields label { display: grid; gap: 5px; }
+.symbol-modal-fields label:first-child { grid-column: 1 / -1; }
+.symbol-modal-fields label > span { color: var(--text-muted); font-size: 9px; }
+.symbol-modal-fields input {
+  min-width: 0;
+  height: 27px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  background: var(--control);
+}
+
+.symbol-breadcrumb {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  color: var(--text-muted);
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.symbol-breadcrumb span,
+.symbol-breadcrumb strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.symbol-breadcrumb strong { color: var(--text); font-weight: 600; }
+.symbol-breadcrumb:hover { color: var(--text); }
 
 :is(.brush-tool-title, .pencil-tool-title) {
   border-right: 1px solid var(--border);

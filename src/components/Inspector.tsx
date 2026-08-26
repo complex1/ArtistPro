@@ -19,6 +19,7 @@ import type {
   AnimatableProperty,
   GridSettings,
   ImageNode,
+  EditorNode,
   PivotPreset,
   Vec2,
 } from '../model/types'
@@ -118,7 +119,13 @@ function createGridSettings(
 
 export function Inspector() {
   const document = useEditorStore((state) => state.document)
-  const nodes = document.children
+  const editingSymbolId = useEditorStore((state) => state.editingSymbolId)
+  const editingSymbol =
+    document.version === 2
+      ? document.symbols.find((symbol) => symbol.id === editingSymbolId)
+      : undefined
+  const nodes = (editingSymbol?.children ?? document.children) as EditorNode[]
+  const animation = editingSymbol?.animation ?? document.animation
   const selectedIds = useEditorStore((state) => state.selectedIds)
   const updateNode = useEditorStore((state) => state.updateNode)
   const editTransform = useEditorStore((state) => state.editTransform)
@@ -132,6 +139,12 @@ export function Inspector() {
   const updateArtboard = useEditorStore((state) => state.updateArtboard)
   const setDocumentName = useEditorStore((state) => state.setDocumentName)
   const setViewport = useEditorStore((state) => state.setViewport)
+  const setDuration = useEditorStore((state) => state.setDuration)
+  const renameSymbol = useEditorStore((state) => state.renameSymbol)
+  const exitSymbol = useEditorStore((state) => state.exitSymbol)
+  const updateSymbolInstancePlayback = useEditorStore(
+    (state) => state.updateSymbolInstancePlayback,
+  )
   const duplicateSelected = useEditorStore((state) => state.duplicateSelected)
   const removeSelected = useEditorStore((state) => state.removeSelected)
   const groupSelected = useEditorStore((state) => state.groupSelected)
@@ -170,6 +183,41 @@ export function Inspector() {
             <Button onClick={removeSelected} aria-label="Delete layers">
               <Trash2 size={13} />
             </Button>
+          </div>
+        </CollapsibleSection>
+      </aside>
+    )
+  }
+
+  if (!node && editingSymbol) {
+    return (
+      <aside className="inspector">
+        <CollapsibleSection title="Symbol">
+          <PropertyRow label="Name">
+            <TextField
+              label="Symbol name"
+              value={editingSymbol.name}
+              onValue={(name) => renameSymbol(editingSymbol.id, name)}
+            />
+          </PropertyRow>
+          <PropertyRow label="Size">
+            <span className="geometry-value">
+              {editingSymbol.width} × {editingSymbol.height}
+            </span>
+          </PropertyRow>
+          <PropertyRow label="Duration">
+            <ScrubField
+              label="SEC"
+              value={editingSymbol.animation.duration}
+              min={0.1}
+              max={60}
+              step={0.1}
+              precision={2}
+              onValue={setDuration}
+            />
+          </PropertyRow>
+          <div className="row-actions">
+            <Button onClick={exitSymbol}>Back to scene</Button>
           </div>
         </CollapsibleSection>
       </aside>
@@ -340,13 +388,13 @@ export function Inspector() {
   const { transform } = node
   const view =
     mode === 'animate'
-      ? evaluateNodeAtTime(node, document.animation, playhead)
+      ? evaluateNodeAtTime(node, animation, playhead)
       : node
   const display =
     mode === 'animate'
       ? evaluateTransform(
           transform,
-          document.animation,
+          animation,
           node.id,
           playhead,
         )
@@ -387,7 +435,7 @@ export function Inspector() {
       <KeyframeButton
         nodeId={node.id}
         property={property}
-        armed={isArmed(document.animation, node.id, property)}
+        armed={isArmed(animation, node.id, property)}
         onToggle={togglePropertyArm}
       />
     ) : undefined
@@ -416,6 +464,37 @@ export function Inspector() {
           </Button>
         </div>
       </CollapsibleSection>
+
+      {node.type === 'symbol' && (
+        <CollapsibleSection title="Symbol playback">
+          <PropertyRow label="Start">
+            <ScrubField
+              label="SEC"
+              value={node.playback.startTime}
+              min={0}
+              step={0.1}
+              precision={2}
+              onValue={(startTime) =>
+                updateSymbolInstancePlayback(node.id, { startTime })
+              }
+            />
+          </PropertyRow>
+          <PropertyRow label="Mode">
+            <Select
+              aria-label="Symbol playback mode"
+              value={node.playback.mode}
+              onChange={(event) =>
+                updateSymbolInstancePlayback(node.id, {
+                  mode: event.target.value as 'once' | 'loop',
+                })
+              }
+            >
+              <option value="once">Play once</option>
+              <option value="loop">Loop</option>
+            </Select>
+          </PropertyRow>
+        </CollapsibleSection>
+      )}
 
       <CollapsibleSection title="Transform">
         {mode === 'animate' && (
@@ -601,7 +680,7 @@ export function Inspector() {
       </CollapsibleSection>
       )}
 
-      {node.type !== 'group' && (
+      {node.type !== 'group' && node.type !== 'symbol' && (
         <CollapsibleSection title="Geometry">
           {view.type === 'rect' ? (
             <>
@@ -890,7 +969,10 @@ export function Inspector() {
         />
       )}
 
-      {view.type !== 'group' && view.type !== 'brush' && view.type !== 'image' && (
+      {view.type !== 'group' &&
+        view.type !== 'symbol' &&
+        view.type !== 'brush' &&
+        view.type !== 'image' && (
         <CollapsibleSection title="Appearance">
           {view.type !== 'path' && (
             <PropertyRow label="Fill">
@@ -936,7 +1018,7 @@ export function Inspector() {
     {presetOpen && (
       <AnimationPresetModal
         node={node}
-        animation={document.animation}
+        animation={animation}
         startTime={playhead}
         onApply={(presetId, config) =>
           applyAnimationPreset(node.id, presetId, config)

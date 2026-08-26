@@ -1,8 +1,10 @@
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -27,6 +29,7 @@ import {
 } from '../model/path'
 import { brushPathData, createBrushStroke } from '../model/brush'
 import { fitFreehandPath } from '../model/freehandPath'
+import { evaluateSymbolInstance } from '../model/symbols'
 import { createText, naturalTextWidth } from '../model/text'
 import { applyMotionPaths, evaluateChannels } from '../model/animation'
 import {
@@ -63,6 +66,19 @@ import { dragRoots, useEditorStore } from '../store/editorStore'
 import { IconButton } from '../ui/controls'
 
 type SvgParent = Svg | G
+
+function activeSceneFromState(state: ReturnType<typeof useEditorStore.getState>) {
+  const definition =
+    state.document.version === 2
+      ? state.document.symbols.find(
+          (symbol) => symbol.id === state.editingSymbolId,
+        )
+      : undefined
+  return {
+    children: (definition?.children ?? state.document.children) as EditorNode[],
+    animation: definition?.animation ?? state.document.animation,
+  }
+}
 
 function pathTrimAttributes(node: PathNode) {
   const start = Math.max(0, Math.min(1, node.trimStart ?? 0))
@@ -109,6 +125,30 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
   const [isPanning, setIsPanning] = useState(false)
   const [snapHint, setSnapHint] = useState<Vec2 | null>(null)
   const document = useEditorStore((state) => state.document)
+  const editingSymbolId = useEditorStore((state) => state.editingSymbolId)
+  const enterSymbol = useEditorStore((state) => state.enterSymbol)
+  const symbols = useMemo(
+    () => (document.version === 2 ? document.symbols : []),
+    [document],
+  )
+  const editingSymbol = useMemo(
+    () => symbols.find((symbol) => symbol.id === editingSymbolId),
+    [editingSymbolId, symbols],
+  )
+  const activeChildren = (editingSymbol?.children ?? document.children) as EditorNode[]
+  const activeAnimation = editingSymbol?.animation ?? document.animation
+  const activeArtboard = useMemo(
+    () =>
+      editingSymbol
+        ? {
+            ...document.artboard,
+            width: editingSymbol.width,
+            height: editingSymbol.height,
+            background: 'transparent',
+          }
+        : document.artboard,
+    [document.artboard, editingSymbol],
+  )
   const mode = useEditorStore((state) => state.mode)
   const playhead = useEditorStore((state) => state.playhead)
   const selectedIds = useEditorStore((state) => state.selectedIds)
@@ -135,7 +175,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
   // stroke, so switching tools or selecting elsewhere puts them away.
   const focused =
     selectedIds.length === 1
-      ? findNode(document.children, selectedIds[0])
+      ? findNode(activeChildren, selectedIds[0])
       : undefined
   const editingPathId =
     draftPathId ??
@@ -202,7 +242,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
     return () => workspace.removeEventListener('wheel', onWheel)
   }, [])
 
-  const fitCanvas = () => {
+  const fitCanvas = useCallback(() => {
     const bounds = workspaceRef.current?.getBoundingClientRect()
     if (!bounds) return
     const nextZoom = Math.min(
@@ -210,13 +250,22 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
       Math.max(
         0.1,
         Math.min(
-          (bounds.width - 96) / document.artboard.width,
-          (bounds.height - 96) / document.artboard.height,
+          (bounds.width - 96) / activeArtboard.width,
+          (bounds.height - 96) / activeArtboard.height,
         ),
       ),
     )
     setViewport(nextZoom, { x: 0, y: 0 })
-  }
+  }, [activeArtboard.height, activeArtboard.width, setViewport])
+
+  // Opening or leaving a symbol swaps the canvas underneath the viewport, so
+  // frame the one that just became active instead of keeping the old scale.
+  const framedSymbolId = useRef(editingSymbolId)
+  useEffect(() => {
+    if (framedSymbolId.current === editingSymbolId) return
+    framedSymbolId.current = editingSymbolId
+    fitCanvas()
+  }, [editingSymbolId, fitCanvas])
 
   useImperativeHandle(ref, () => ({
     exportSvg: () => {
@@ -239,7 +288,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
         (event.key === 'Enter' || event.key === 'Escape')
       ) {
         const node = findNode(
-          useEditorStore.getState().document.children,
+          activeSceneFromState(useEditorStore.getState()).children,
           draftPathId,
         )
         setDraftPathId(null)
@@ -266,18 +315,18 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
 
   useEffect(() => {
     if (!draftPathId || tool === 'pen') return
-    const node = findNode(document.children, draftPathId)
+    const node = findNode(activeChildren, draftPathId)
     if (node?.type === 'path' && node.points.length < 2) removeNode(node.id)
     const timeout = window.setTimeout(() => setDraftPathId(null), 0)
     return () => window.clearTimeout(timeout)
-  }, [document.children, draftPathId, removeNode, tool])
+  }, [activeChildren, draftPathId, removeNode, tool])
 
   useLayoutEffect(() => {
     if (!hostRef.current) return
     const draw = drawRef.current ?? SVG().addTo(hostRef.current).size('100%', '100%')
     drawRef.current = draw
     draw.clear()
-    draw.viewbox(0, 0, document.artboard.width, document.artboard.height)
+    draw.viewbox(0, 0, activeArtboard.width, activeArtboard.height)
     draw.attr({ 'aria-label': `${document.name} artboard` })
 
     const motion = mode === 'animate' || mode === 'preview'
@@ -288,8 +337,8 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
     // paths too, at their rest progress, so a follower sits in the same place
     // in both modes.
     const channelScene = motion
-      ? evaluateChannels(document.children, document.animation, playhead)
-      : document.children
+      ? evaluateChannels(activeChildren, activeAnimation, playhead)
+      : activeChildren
     const scene = applyMotionPaths(channelScene)
 
     const channelTransform = (id: string, rendered: Transform): Transform =>
@@ -313,12 +362,12 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
       }
     }
 
-    const grid = document.artboard.grid
+    const grid = activeArtboard.grid
     const gridPrimitives = grid.enabled
       ? generateGridPrimitives(
           grid,
-          document.artboard.width,
-          document.artboard.height,
+          activeArtboard.width,
+          activeArtboard.height,
         )
       : []
     // The threshold is a screen distance, so it shrinks in artboard units as the
@@ -354,7 +403,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
       setPointMenu(null)
       const canvasPoint = snapPoint(draw.point(event.clientX, event.clientY))
       setSnapHint(null)
-      const liveNodes = useEditorStore.getState().document.children
+      const liveNodes = activeSceneFromState(useEditorStore.getState()).children
       const draft = draftPathId ? findNode(liveNodes, draftPathId) : undefined
 
       if (draft?.type !== 'path') {
@@ -371,7 +420,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
             y: current.y - canvasPoint.y,
           }
           const live = findNode(
-            useEditorStore.getState().document.children,
+            activeSceneFromState(useEditorStore.getState()).children,
             path.id,
           )
           if (live?.type !== 'path') return
@@ -436,7 +485,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
           y: current.y - origin.y,
         }
         const live = findNode(
-          useEditorStore.getState().document.children,
+          activeSceneFromState(useEditorStore.getState()).children,
           draft.id,
         )
         if (live?.type !== 'path') return
@@ -484,7 +533,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
 
       const move = (moveEvent: PointerEvent) => {
         const live = findNode(
-          useEditorStore.getState().document.children,
+          activeSceneFromState(useEditorStore.getState()).children,
           stroke.id,
         )
         if (live?.type !== 'brush') return
@@ -511,7 +560,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
       }
       const stop = () => {
         const live = findNode(
-          useEditorStore.getState().document.children,
+          activeSceneFromState(useEditorStore.getState()).children,
           stroke.id,
         )
         if (live?.type === 'brush') updateNode(live.id, { complete: true })
@@ -607,13 +656,14 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
         }
         const state = useEditorStore.getState()
         const liveMotion = state.mode === 'animate' || state.mode === 'preview'
+        const liveActiveScene = activeSceneFromState(state)
         const liveChannels = liveMotion
           ? evaluateChannels(
-              state.document.children,
-              state.document.animation,
+              liveActiveScene.children,
+              liveActiveScene.animation,
               state.playhead,
             )
-          : state.document.children
+          : liveActiveScene.children
         const liveScene = applyMotionPaths(liveChannels)
         const liveRoots = dragRoots(liveChannels, nextIds)
         for (const origin of origins) {
@@ -789,7 +839,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
       })
     }
 
-    const paint = (parent: SvgParent, node: EditorNode) => {
+    const paint = (parent: SvgParent, node: EditorNode, interactive = true) => {
       if (!node.visible) return
 
       const onDown = (event: Event) => {
@@ -806,7 +856,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
           return
         }
         const targetId = selectionTarget(scene, node.id, selectedIds)
-        const target = findNode(document.children, targetId) ?? node
+        const target = findNode(activeChildren, targetId) ?? node
         const additive = pointer.shiftKey || pointer.metaKey || pointer.ctrlKey
         const already = selectedIds.includes(target.id)
         const nextIds = additive
@@ -823,6 +873,10 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
 
       const onDoubleClick = (event: Event) => {
         event.stopPropagation()
+        if (node.type === 'symbol') {
+          enterSymbol(node.symbolId)
+          return
+        }
         select(node.id)
         if (node.type === 'path') {
           setSelectedPointId(node.points[0]?.id ?? null)
@@ -840,12 +894,37 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
           opacity: node.transform.opacity,
           cursor: shapeCursor(tool, node.locked),
         })
-        group.on('pointerdown', onDown)
+        if (interactive) group.on('pointerdown', onDown)
         const content = group.group()
         applyEffects(draw, content, node)
-        node.children.forEach((child) => paint(content, child))
-        if (selectedIds.includes(node.id) && showOutline) {
+        node.children.forEach((child) => paint(content, child, interactive))
+        if (interactive && selectedIds.includes(node.id) && showOutline) {
           drawOutline(group, node, zoom, true, {
+            interactive:
+              selectedIds.length === 1 && tool === 'select' && !node.locked,
+            onResize: (handle, event) => beginResize(node, handle, event),
+            onRotate: (event) => beginRotate(node, event),
+          })
+        }
+        return
+      }
+
+      if (node.type === 'symbol') {
+        const group = parent.group().attr({
+          id: node.id,
+          transform: composeTransform(node.transform),
+          opacity: node.transform.opacity,
+          cursor: shapeCursor(tool, node.locked),
+        })
+        if (interactive) {
+          group.on('pointerdown', onDown).on('dblclick', onDoubleClick)
+        }
+        const content = group.group()
+        applyEffects(draw, content, node)
+        const evaluated = evaluateSymbolInstance(node, symbols, playhead)
+        evaluated?.children.forEach((child) => paint(content, child, false))
+        if (interactive && selectedIds.includes(node.id) && showOutline) {
+          drawOutline(parent, node, zoom, false, {
             interactive:
               selectedIds.length === 1 && tool === 'select' && !node.locked,
             onResize: (handle, event) => beginResize(node, handle, event),
@@ -862,7 +941,9 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
           opacity: node.transform.opacity,
           cursor: shapeCursor(tool, node.locked),
         })
-        group.on('pointerdown', onDown).on('dblclick', onDoubleClick)
+        if (interactive) {
+          group.on('pointerdown', onDown).on('dblclick', onDoubleClick)
+        }
         const content = group.group()
         applyEffects(draw, content, node)
         const scaleX = node.width / Math.max(1, node.crop.width)
@@ -875,7 +956,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
           .attr({ preserveAspectRatio: 'none' })
           .clipWith(clip)
         applyImageAdjustments(draw, image, node)
-        if (selectedIds.includes(node.id) && showOutline) {
+        if (interactive && selectedIds.includes(node.id) && showOutline) {
           drawOutline(parent, node, zoom, false, {
             interactive:
               selectedIds.length === 1 && tool === 'select' && !node.locked,
@@ -932,14 +1013,16 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
               }
             : {}),
         })
-        .on('pointerdown', onDown)
-        .on('dblclick', onDoubleClick)
+      if (interactive) {
+        element.on('pointerdown', onDown).on('dblclick', onDoubleClick)
+      }
       applyEffects(draw, element, node)
       if (node.type === 'text' && editingTextId === node.id) {
         drawTextEditor(parent, node)
       }
 
       if (
+        interactive &&
         selectedIds.includes(node.id) &&
         editingPathId !== node.id &&
         editingTextId !== node.id &&
@@ -955,8 +1038,8 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
     }
 
     draw
-      .rect(document.artboard.width, document.artboard.height)
-      .fill(document.artboard.background)
+      .rect(activeArtboard.width, activeArtboard.height)
+      .fill(activeArtboard.background)
       .attr({
         cursor:
           tool === 'pen' || tool === 'brush' || tool === 'pencil' || tool === 'text'
@@ -1040,7 +1123,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
     // outside the artboard, so artwork gets its own clip to the page bounds.
     const artwork = draw.group().clipWith(
       draw.clip().add(
-        draw.rect(document.artboard.width, document.artboard.height).move(0, 0),
+        draw.rect(activeArtboard.width, activeArtboard.height).move(0, 0),
       ),
     )
     scene.forEach((node) => paint(artwork, node))
@@ -1064,7 +1147,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
         draw,
         grid,
         gridPrimitives,
-        document.artboard,
+        activeArtboard,
         zoom,
         view,
         (update) => updateArtboard({ grid: { ...grid, ...update } as typeof grid }),
@@ -1102,7 +1185,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
       })
       if (draftPathId === editingNode.id) {
         const matrix = multiplyAffine(
-          parentAffine(document.children, editingNode.id),
+          parentAffine(activeChildren, editingNode.id),
           transformToAffine(editingNode.transform),
         )
         const last = editingNode.points.at(-1)
@@ -1147,12 +1230,16 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
     }
   }, [
     addNode,
+    activeAnimation,
+    activeArtboard,
+    activeChildren,
     beginHistoryGroup,
     document,
     draftPathId,
     editingPathId,
     editingTextId,
     endHistoryGroup,
+    enterSymbol,
     editTransform,
     mode,
     brushSettings,
@@ -1164,6 +1251,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
     selectedPointId,
     setTool,
     snapHint,
+    symbols,
     tool,
     updateArtboard,
     updateNode,
@@ -1172,8 +1260,8 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
 
   const menuScene =
     mode === 'animate' || mode === 'preview'
-      ? evaluateChannels(document.children, document.animation, playhead)
-      : document.children
+      ? evaluateChannels(activeChildren, activeAnimation, playhead)
+      : activeChildren
   const menuPath =
     pointMenu && pointMenu.pathId === editingPathId
       ? findNode(menuScene, pointMenu.pathId)
@@ -1216,11 +1304,11 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
       onPointerDown={() => setPointMenu(null)}
     >
       <div
-        className="artboard"
+        className={`artboard${editingSymbol ? ' is-symbol' : ''}`}
         ref={hostRef}
         style={{
-          width: document.artboard.width,
-          height: document.artboard.height,
+          width: activeArtboard.width,
+          height: activeArtboard.height,
           transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom})`,
         }}
       />

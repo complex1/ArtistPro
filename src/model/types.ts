@@ -227,6 +227,19 @@ export type GroupNode = NodeBase & {
   children: EditorNode[]
 }
 
+export type SymbolPlayback = {
+  startTime: number
+  mode: 'once' | 'loop'
+}
+
+export type SymbolInstanceNode = NodeBase & {
+  type: 'symbol'
+  symbolId: string
+  width: number
+  height: number
+  playback: SymbolPlayback
+}
+
 export type EditorNode =
   | RectNode
   | EllipseNode
@@ -235,6 +248,7 @@ export type EditorNode =
   | TextNode
   | ImageNode
   | GroupNode
+  | SymbolInstanceNode
 export type ShapeType = 'rect' | 'ellipse'
 
 export type AnimatableProperty =
@@ -301,8 +315,7 @@ export type DocumentAnimation = {
   tracks: AnimationTrack[]
 }
 
-export type EditorDocument = {
-  version: 1
+type DocumentBase = {
   name: string
   artboard: {
     width: number
@@ -313,6 +326,34 @@ export type EditorDocument = {
   children: EditorNode[]
   animation: DocumentAnimation
 }
+
+export type SymbolDefinitionNode =
+  | Exclude<EditorNode, GroupNode | SymbolInstanceNode>
+  | (Omit<GroupNode, 'children'> & { children: SymbolDefinitionNode[] })
+
+export type SymbolDefinition = {
+  id: string
+  name: string
+  width: number
+  height: number
+  children: SymbolDefinitionNode[]
+  animation: DocumentAnimation
+}
+
+/**
+ * Kept in the model union so the model-only symbols slice can load and upgrade
+ * existing documents. New documents should always use EditorDocumentV2.
+ */
+export type EditorDocumentV1 = DocumentBase & {
+  version: 1
+}
+
+export type EditorDocumentV2 = DocumentBase & {
+  version: 2
+  symbols: SymbolDefinition[]
+}
+
+export type EditorDocument = EditorDocumentV1 | EditorDocumentV2
 
 export type EditorMode = 'draw' | 'animate' | 'preview' | 'export'
 export type Tool =

@@ -35,6 +35,12 @@ import {
 import { createShape } from '../model/nodes'
 import { defaultBrushSettings } from '../model/brush'
 import {
+  convertSelectionToSymbol,
+  createSymbolInstance,
+} from '../model/symbols'
+import { nanoid } from 'nanoid'
+import {
+  boundsOf,
   canGroup,
   canUngroup,
   clearMissingMotionPaths,
@@ -63,6 +69,7 @@ import type {
   Tool,
   Transform,
   Vec2,
+  SymbolPlayback,
 } from '../model/types'
 
 const firstShape = createShape('rect')
@@ -92,8 +99,9 @@ const syncFirstFrameKey = (
     ? upsertKeyframe(animation, id, property, 0, copyKeyframeValue(value))
     : animation
 
-type EditorStore = {
+export type EditorStore = {
   document: EditorDocument
+  editingSymbolId: string | null
   canUndo: boolean
   canRedo: boolean
   mode: EditorMode
@@ -160,9 +168,109 @@ type EditorStore = {
     update: Partial<Pick<Keyframe, 'value' | 'easing'>>,
   ) => void
   retimeKey: (keyId: string, time: number) => void
+  createSymbolFromSelection: (name?: string) => string | null
+  createBlankSymbol: (
+    name: string,
+    width: number,
+    height: number,
+    duration: number,
+  ) => string | null
+  addSymbolInstance: (symbolId: string) => string | null
+  enterSymbol: (symbolId: string) => void
+  exitSymbol: () => void
+  renameSymbol: (symbolId: string, name: string) => void
+  removeUnusedSymbol: (symbolId: string) => void
+  updateSymbolInstancePlayback: (
+    id: string,
+    patch: Partial<SymbolPlayback>,
+  ) => void
 }
 
 const recordingModes: EditorMode[] = ['animate']
+
+type EditableTarget = {
+  children: EditorNode[]
+  animation: DocumentAnimation
+}
+
+const activeTarget = (state: Pick<EditorStore, 'document' | 'editingSymbolId'>): EditableTarget => {
+  if (state.editingSymbolId && state.document.version === 2) {
+    const definition = state.document.symbols.find(
+      (symbol) => symbol.id === state.editingSymbolId,
+    )
+    if (definition) return definition as EditableTarget
+  }
+  return state.document
+}
+
+export const activeChildren = (
+  state: Pick<EditorStore, 'document' | 'editingSymbolId'>,
+): EditorNode[] => activeTarget(state).children
+
+export const activeAnimation = (
+  state: Pick<EditorStore, 'document' | 'editingSymbolId'>,
+): DocumentAnimation => activeTarget(state).animation
+
+export const activeWidth = (
+  state: Pick<EditorStore, 'document' | 'editingSymbolId'>,
+): number => {
+  if (state.editingSymbolId && state.document.version === 2) {
+    return state.document.symbols.find(
+      (symbol) => symbol.id === state.editingSymbolId,
+    )?.width ?? state.document.artboard.width
+  }
+  return state.document.artboard.width
+}
+
+export const activeHeight = (
+  state: Pick<EditorStore, 'document' | 'editingSymbolId'>,
+): number => {
+  if (state.editingSymbolId && state.document.version === 2) {
+    return state.document.symbols.find(
+      (symbol) => symbol.id === state.editingSymbolId,
+    )?.height ?? state.document.artboard.height
+  }
+  return state.document.artboard.height
+}
+
+/**
+ * New artwork starts centered on whichever canvas is open and cascades toward
+ * the far corner, wrapping back to the middle so a symbol canvas smaller than
+ * the scene never receives shapes outside its own bounds.
+ */
+const cascadeStart = (extent: number, size: number, step: number): number => {
+  const room = Math.max(0, extent - size)
+  const start = room / 2
+  return Math.round(start + (step % Math.max(1, room - start)))
+}
+
+const hasSymbolReference = (nodes: readonly EditorNode[], symbolId: string): boolean =>
+  nodes.some(
+    (node) =>
+      (node.type === 'symbol' && node.symbolId === symbolId) ||
+      (node.type === 'group' && hasSymbolReference(node.children, symbolId)),
+  )
+
+const editingSymbolExists = (
+  document: EditorDocument,
+  symbolId: string | null,
+): boolean =>
+  !symbolId ||
+  (document.version === 2 &&
+    document.symbols.some((symbol) => symbol.id === symbolId))
+
+const animationDurationFor = (
+  document: EditorDocument,
+  symbolId: string | null,
+): number => {
+  if (symbolId && document.version === 2) {
+    return (
+      document.symbols.find((symbol) => symbol.id === symbolId)?.animation
+        .duration ?? document.animation.duration
+    )
+  }
+  return document.animation.duration
+}
 
 type EditorSnapshot = Pick<
   EditorStore,
@@ -186,7 +294,7 @@ const snapshot = (state: EditorStore): EditorSnapshot => ({
 export const useEditorStore = create<EditorStore>()(
   immer((set) => ({
     document: {
-      version: 1,
+      version: 2,
       name: 'Untitled',
       artboard: {
         width: 800,
@@ -206,7 +314,9 @@ export const useEditorStore = create<EditorStore>()(
       },
       children: [firstShape],
       animation: defaultAnimation(),
+      symbols: [],
     },
+    editingSymbolId: null,
     canUndo: false,
     canRedo: false,
     mode: 'draw',
@@ -223,15 +333,23 @@ export const useEditorStore = create<EditorStore>()(
     undo: () => {
       const previous = undoStack.pop()
       if (!previous) return
-      const current = snapshot(useEditorStore.getState())
+      const state = useEditorStore.getState()
+      const current = snapshot(state)
+      const editingSymbolId = editingSymbolExists(
+        previous.document,
+        state.editingSymbolId,
+      )
+        ? state.editingSymbolId
+        : null
       const playhead = Math.min(
-        useEditorStore.getState().playhead,
-        previous.document.animation.duration,
+        state.playhead,
+        animationDurationFor(previous.document, editingSymbolId),
       )
       redoStack.push(current)
       restoringHistory = true
       useEditorStore.setState({
         ...previous,
+        editingSymbolId,
         playhead,
         canUndo: undoStack.length > 0,
         canRedo: true,
@@ -242,15 +360,23 @@ export const useEditorStore = create<EditorStore>()(
     redo: () => {
       const next = redoStack.pop()
       if (!next) return
-      const current = snapshot(useEditorStore.getState())
+      const state = useEditorStore.getState()
+      const current = snapshot(state)
+      const editingSymbolId = editingSymbolExists(
+        next.document,
+        state.editingSymbolId,
+      )
+        ? state.editingSymbolId
+        : null
       const playhead = Math.min(
-        useEditorStore.getState().playhead,
-        next.document.animation.duration,
+        state.playhead,
+        animationDurationFor(next.document, editingSymbolId),
       )
       undoStack.push(current)
       restoringHistory = true
       useEditorStore.setState({
         ...next,
+        editingSymbolId,
         playhead,
         canUndo: true,
         canRedo: redoStack.length > 0,
@@ -323,56 +449,61 @@ export const useEditorStore = create<EditorStore>()(
     selectMany: (ids) => set({ selectedIds: ids }),
     addShape: (type) =>
       set((state) => {
-        const offset = state.document.children.length * 18
-        const node = createShape(type, { x: 300 + offset, y: 210 + offset })
-        node.name = `${node.name} ${state.document.children.length + 1}`
-        state.document.children.push(node)
+        const target = activeTarget(state)
+        const probe = createShape(type, { x: 0, y: 0 })
+        const size = boundsOf([probe])
+        const step = target.children.length * 18
+        const node = createShape(type, {
+          x: cascadeStart(activeWidth(state), size.width, step),
+          y: cascadeStart(activeHeight(state), size.height, step),
+        })
+        node.name = `${node.name} ${target.children.length + 1}`
+        target.children.push(node)
         state.selectedIds = [node.id]
         state.tool = 'select'
       }),
     addNode: (node) =>
       set((state) => {
-        state.document.children.push(node)
+        activeTarget(state).children.push(node)
         state.selectedIds = [node.id]
       }),
     addNodes: (nodes) =>
       set((state) => {
         if (nodes.length === 0) return
-        state.document.children.push(...nodes)
+        activeTarget(state).children.push(...nodes)
         state.selectedIds = nodes.map((node) => node.id)
         state.tool = 'select'
       }),
     removeNode: (id) =>
       set((state) => {
-        state.document.children = removeNodes(state.document.children, [id])
-        state.document.children = clearMissingMotionPaths(state.document.children)
+        const target = activeTarget(state)
+        target.children = removeNodes(target.children, [id])
+        target.children = clearMissingMotionPaths(target.children)
         state.selectedIds = state.selectedIds.filter((selectedId) =>
-          Boolean(findNode(state.document.children, selectedId)),
+          Boolean(findNode(target.children, selectedId)),
         )
-        state.document.animation = pruneAnimation(
-          state.document.animation,
-          state.document.children,
-        )
+        target.animation = pruneAnimation(target.animation, target.children)
       }),
     updateNode: (id, update) =>
       set((state) => {
-        const node = findNode(state.document.children, id)
+        const target = activeTarget(state)
+        const node = findNode(target.children, id)
         if (!node) return
         if (state.mode !== 'animate') {
-          let animation = state.document.animation
+          let animation = target.animation
           for (const edit of animatedEditsFromPatch(update as Record<string, unknown>)) {
             if (readChannel(node, edit.property) === edit.value) continue
             animation = syncFirstFrameKey(animation, id, edit.property, edit.value)
           }
-          updateNodeById(state.document.children, id, update)
-          state.document.animation = animation
+          updateNodeById(target.children, id, update)
+          target.animation = animation
           return
         }
 
         // Inspector fields render the evaluated pose, so a patch echoes that
         // pose back for every channel it carries, not just the edited one. Read
         // both poses before the patch lands: the draft is the same object.
-        let animation = state.document.animation
+        let animation = target.animation
         const shown = evaluateNodeAtTime(node, animation, state.playhead)
         const restores: { property: AnimatableProperty; value: KeyframeValue }[] = []
 
@@ -412,35 +543,36 @@ export const useEditorStore = create<EditorStore>()(
           }
         }
 
-        updateNodeById(state.document.children, id, update)
-        state.document.animation = animation
+        updateNodeById(target.children, id, update)
+        target.animation = animation
         if (restores.length === 0) return
-        let live = findNode(state.document.children, id)
+        let live = findNode(target.children, id)
         if (!live) return
         for (const restore of restores) {
           live = writeChannel(live, restore.property, restore.value)
         }
-        updateNodeById(state.document.children, id, live)
+        updateNodeById(target.children, id, live)
       }),
     editTransform: (id, transform) =>
       set((state) => {
-        const node = findNode(state.document.children, id)
+        const target = activeTarget(state)
+        const node = findNode(target.children, id)
         if (!node) return
         const recording = recordingModes.includes(state.mode)
         if (!recording) {
-          let animation = state.document.animation
+          let animation = target.animation
           for (const property of ANIMATABLE_PROPERTIES) {
             const nextValue = restValue(transform, property)
             if (restValue(node.transform, property) === nextValue) continue
             animation = syncFirstFrameKey(animation, id, property, nextValue)
           }
-          updateNodeById(state.document.children, id, { transform })
-          state.document.animation = animation
+          updateNodeById(target.children, id, { transform })
+          target.animation = animation
           return
         }
 
         let rest = node.transform
-        let animation = state.document.animation
+        let animation = target.animation
         for (const property of ANIMATABLE_PROPERTIES) {
           const nextValue = restValue(transform, property)
           if (isArmed(animation, id, property)) {
@@ -458,12 +590,13 @@ export const useEditorStore = create<EditorStore>()(
             rest = setRestValue(rest, property, nextValue)
           }
         }
-        state.document.animation = animation
-        updateNodeById(state.document.children, id, { transform: rest })
+        target.animation = animation
+        updateNodeById(target.children, id, { transform: rest })
       }),
     setMotionPath: (id, pathId) =>
       set((state) => {
-        const node = findNode(state.document.children, id)
+        const target = activeTarget(state)
+        const node = findNode(target.children, id)
         if (!node) return
         const current = node.motionPath
         const position = {
@@ -475,7 +608,7 @@ export const useEditorStore = create<EditorStore>()(
           if (current) {
             // Swapping targets keeps an offset that already reads as a delta
             // from a path, so only the reference changes.
-            updateNodeById(state.document.children, id, {
+            updateNodeById(target.children, id, {
               motionPath: { ...current, pathId },
             })
             return
@@ -485,12 +618,12 @@ export const useEditorStore = create<EditorStore>()(
           // wherever it happened to sit", so rebase it to a zero offset and let
           // the path place it. Keys move by the same amount to keep any
           // position animation intact, now relative to the path.
-          state.document.animation = offsetPositionTracks(
-            state.document.animation,
+          target.animation = offsetPositionTracks(
+            target.animation,
             id,
             { x: -position.x, y: -position.y },
           )
-          updateNodeById(state.document.children, id, {
+          updateNodeById(target.children, id, {
             motionPath: { pathId, progress: 0, autoRotate: false },
             transform: { ...node.transform, position: { x: 0, y: 0 } },
           })
@@ -501,21 +634,21 @@ export const useEditorStore = create<EditorStore>()(
         // Detaching removes the layer that was doing the placing, so bake the
         // sample at the playhead into position and the box stays put.
         const channels = evaluateChannels(
-          state.document.children,
-          state.document.animation,
+          target.children,
+          target.animation,
           state.playhead,
         )
         const live = findNode(channels, id)
         const motion = live ? motionPathOffset(channels, live) : null
         const delta = motion?.offset ?? { x: 0, y: 0 }
         let animation = dropArmedProperty(
-          state.document.animation,
+          target.animation,
           id,
           'motionPath.progress',
         )
         animation = offsetPositionTracks(animation, id, delta)
-        state.document.animation = animation
-        updateNodeById(state.document.children, id, {
+        target.animation = animation
+        updateNodeById(target.children, id, {
           motionPath: undefined,
           transform: {
             ...node.transform,
@@ -528,65 +661,63 @@ export const useEditorStore = create<EditorStore>()(
       }),
     moveLayer: (sourceId, targetId, position) =>
       set((state) => {
-        moveLayerInScene(state.document.children, sourceId, targetId, position)
+        moveLayerInScene(activeTarget(state).children, sourceId, targetId, position)
       }),
     removeSelected: () =>
       set((state) => {
+        const target = activeTarget(state)
         if (state.mode === 'animate' && state.selectedKeyIds.length > 0) {
-          state.document.animation = removeKeys(
-            state.document.animation,
+          target.animation = removeKeys(
+            target.animation,
             state.selectedKeyIds,
           )
           state.selectedKeyIds = []
           return
         }
-        state.document.children = removeNodes(
-          state.document.children,
+        target.children = removeNodes(
+          target.children,
           state.selectedIds,
         )
-        state.document.children = clearMissingMotionPaths(state.document.children)
+        target.children = clearMissingMotionPaths(target.children)
         state.selectedIds = []
-        state.document.animation = pruneAnimation(
-          state.document.animation,
-          state.document.children,
-        )
+        target.animation = pruneAnimation(target.animation, target.children)
       }),
     duplicateSelected: () =>
       set((state) => {
+        const target = activeTarget(state)
         const idMap = new Map<string, string>()
         const copies = remapMotionPaths(
-          dragRoots(state.document.children, state.selectedIds).map((node) =>
+          dragRoots(target.children, state.selectedIds).map((node) =>
             cloneNode(node, true, idMap),
           ),
           idMap,
         )
         if (copies.length === 0) return
-        state.document.children.push(...copies)
+        target.children.push(...copies)
         state.selectedIds = copies.map((node) => node.id)
-        state.document.animation.tracks.push(
-          ...remapAnimation(state.document.animation, idMap),
+        target.animation.tracks.push(
+          ...remapAnimation(target.animation, idMap),
         )
       }),
     groupSelected: () =>
       set((state) => {
+        const target = activeTarget(state)
         const result = groupNodes(
-          state.document.children,
+          target.children,
           state.selectedIds,
         )
         if (result) state.selectedIds = [result.groupId]
       }),
     ungroupSelected: () =>
       set((state) => {
-        if (!canUngroup(state.document.children, state.selectedIds)) return
-        const group = findNode(state.document.children, state.selectedIds[0])
+        const target = activeTarget(state)
+        if (!canUngroup(target.children, state.selectedIds)) return
+        const group = findNode(target.children, state.selectedIds[0])
         if (group?.type !== 'group') return
         const childIds = group.children.map((child) => child.id)
-        ungroupNode(state.document.children, group.id)
+        ungroupNode(target.children, group.id)
         state.selectedIds = childIds
-        state.document.animation = pruneAnimation(
-          state.document.animation,
-          state.document.children,
-        )
+        target.animation = pruneAnimation(target.animation, target.children)
       }),
     setArtboardSize: (width, height) =>
       set((state) => {
@@ -610,18 +741,20 @@ export const useEditorStore = create<EditorStore>()(
       }),
     setPlayhead: (time, pause = false) =>
       set((state) => {
+        const animation = activeTarget(state).animation
         state.playhead = Math.min(
           Math.max(time, 0),
-          state.document.animation.duration,
+          animation.duration,
         )
         if (pause) state.playing = false
       }),
     setPlaying: (playing) =>
       set((state) => {
+        const animation = activeTarget(state).animation
         state.playing = playing
         if (
           playing &&
-          state.playhead >= state.document.animation.duration - 1e-4
+          state.playhead >= animation.duration - 1e-4
         ) {
           state.playhead = 0
         }
@@ -629,25 +762,24 @@ export const useEditorStore = create<EditorStore>()(
     setLooping: (looping) => set({ looping }),
     setDuration: (duration) =>
       set((state) => {
-        state.document.animation = setAnimationDuration(
-          state.document.animation,
-          duration,
-        )
-        state.playhead = Math.min(state.playhead, state.document.animation.duration)
+        const target = activeTarget(state)
+        target.animation = setAnimationDuration(target.animation, duration)
+        state.playhead = Math.min(state.playhead, target.animation.duration)
       }),
     armProperty: (nodeId, property) =>
       set((state) => {
-        const node = findNode(state.document.children, nodeId)
+        const target = activeTarget(state)
+        const node = findNode(target.children, nodeId)
         if (!node) return
         const current = evaluateNodeAtTime(
           node,
-          state.document.animation,
+          target.animation,
           state.playhead,
         )
         const value = readChannel(current, property)
         if (value === undefined) return
-        state.document.animation = seedArmedProperty(
-          state.document.animation,
+        target.animation = seedArmedProperty(
+          target.animation,
           nodeId,
           property,
           value,
@@ -656,33 +788,35 @@ export const useEditorStore = create<EditorStore>()(
       }),
     disarmProperty: (nodeId, property) =>
       set((state) => {
-        state.document.animation = dropArmedProperty(
-          state.document.animation,
+        const target = activeTarget(state)
+        target.animation = dropArmedProperty(
+          target.animation,
           nodeId,
           property,
         )
       }),
     togglePropertyArm: (nodeId, property) =>
       set((state) => {
-        if (isArmed(state.document.animation, nodeId, property)) {
-          state.document.animation = dropArmedProperty(
-            state.document.animation,
+        const target = activeTarget(state)
+        if (isArmed(target.animation, nodeId, property)) {
+          target.animation = dropArmedProperty(
+            target.animation,
             nodeId,
             property,
           )
           return
         }
-        const node = findNode(state.document.children, nodeId)
+        const node = findNode(target.children, nodeId)
         if (!node) return
         const current = evaluateNodeAtTime(
           node,
-          state.document.animation,
+          target.animation,
           state.playhead,
         )
         const value = readChannel(current, property)
         if (value === undefined) return
-        state.document.animation = seedArmedProperty(
-          state.document.animation,
+        target.animation = seedArmedProperty(
+          target.animation,
           nodeId,
           property,
           value,
@@ -691,10 +825,11 @@ export const useEditorStore = create<EditorStore>()(
       }),
     applyAnimationPreset: (nodeId, presetId, config) =>
       set((state) => {
-        const node = findNode(state.document.children, nodeId)
+        const target = activeTarget(state)
+        const node = findNode(target.children, nodeId)
         if (!node) return
-        state.document.animation = applyPreset(
-          state.document.animation,
+        target.animation = applyPreset(
+          target.animation,
           node,
           presetId,
           config,
@@ -714,23 +849,25 @@ export const useEditorStore = create<EditorStore>()(
       }),
     removeSelectedKeys: () =>
       set((state) => {
-        state.document.animation = removeKeys(
-          state.document.animation,
+        const target = activeTarget(state)
+        target.animation = removeKeys(
+          target.animation,
           state.selectedKeyIds,
         )
         state.selectedKeyIds = []
       }),
     duplicateSelectedKeys: () =>
       set((state) => {
+        const target = activeTarget(state)
         const duplicated = duplicateKeys(
-          state.document.animation,
+          target.animation,
           state.selectedKeyIds,
         )
-        state.document.animation = duplicated.animation
+        target.animation = duplicated.animation
         state.selectedKeyIds = duplicated.keyIds
         const selected = duplicated.keyIds[0]
         if (!selected) return
-        for (const track of state.document.animation.tracks) {
+        for (const track of target.animation.tracks) {
           const key = track.keys.find((item) => item.id === selected)
           if (key) {
             state.playhead = key.time
@@ -740,12 +877,13 @@ export const useEditorStore = create<EditorStore>()(
       }),
     updateKey: (keyId, update) =>
       set((state) => {
-        const track = state.document.animation.tracks.find((item) =>
+        const target = activeTarget(state)
+        const track = target.animation.tracks.find((item) =>
           item.keys.some((key) => key.id === keyId),
         )
         const key = track?.keys.find((item) => item.id === keyId)
-        state.document.animation = patchKeyframe(
-          state.document.animation,
+        target.animation = patchKeyframe(
+          target.animation,
           keyId,
           update,
         )
@@ -757,21 +895,140 @@ export const useEditorStore = create<EditorStore>()(
         ) {
           return
         }
-        const node = findNode(state.document.children, track.nodeId)
+        const node = findNode(target.children, track.nodeId)
         if (!node) return
         updateNodeById(
-          state.document.children,
+          target.children,
           node.id,
           writeChannel(node, track.property, update.value),
         )
       }),
     retimeKey: (keyId, time) =>
       set((state) => {
-        state.document.animation = moveKeyframe(
-          state.document.animation,
+        const target = activeTarget(state)
+        target.animation = moveKeyframe(
+          target.animation,
           keyId,
           time,
         )
+      }),
+    createSymbolFromSelection: (name = 'Symbol') => {
+      if (useEditorStore.getState().editingSymbolId) return null
+      let symbolId: string | null = null
+      set((state) => {
+        const result = convertSelectionToSymbol(
+          state.document,
+          state.selectedIds,
+          name,
+        )
+        if (!result) return
+        state.document = result.document
+        state.selectedIds = [result.instanceId]
+        state.selectedKeyIds = []
+        symbolId = result.symbolId
+      })
+      return symbolId
+    },
+    createBlankSymbol: (name, width, height, duration) => {
+      if (useEditorStore.getState().editingSymbolId) return null
+      const symbolId = nanoid()
+      set((state) => {
+        if (state.document.version !== 2) return
+        state.document.symbols.push({
+          id: symbolId,
+          name,
+          width,
+          height,
+          children: [],
+          animation: {
+            duration: Math.max(0, duration),
+            tracks: [],
+          },
+        })
+      })
+      return symbolId
+    },
+    addSymbolInstance: (symbolId) => {
+      if (useEditorStore.getState().editingSymbolId) return null
+      let instanceId: string | null = null
+      set((state) => {
+        if (state.document.version !== 2) return
+        const definition = state.document.symbols.find(
+          (symbol) => symbol.id === symbolId,
+        )
+        if (!definition) return
+        const instance = createSymbolInstance(definition)
+        state.document.children.push(instance)
+        state.selectedIds = [instance.id]
+        state.selectedKeyIds = []
+        instanceId = instance.id
+      })
+      return instanceId
+    },
+    enterSymbol: (symbolId) =>
+      set((state) => {
+        if (
+          state.editingSymbolId ||
+          state.document.version !== 2 ||
+          !state.document.symbols.some((symbol) => symbol.id === symbolId)
+        ) {
+          return
+        }
+        state.editingSymbolId = symbolId
+        state.selectedIds = []
+        state.selectedKeyIds = []
+        state.playhead = Math.min(
+          state.playhead,
+          activeTarget(state).animation.duration,
+        )
+        state.playing = false
+      }),
+    exitSymbol: () =>
+      set((state) => {
+        if (!state.editingSymbolId) return
+        state.editingSymbolId = null
+        state.selectedIds = []
+        state.selectedKeyIds = []
+        state.playhead = Math.min(
+          state.playhead,
+          state.document.animation.duration,
+        )
+        state.playing = false
+      }),
+    renameSymbol: (symbolId, name) =>
+      set((state) => {
+        if (state.document.version !== 2) return
+        const definition = state.document.symbols.find(
+          (symbol) => symbol.id === symbolId,
+        )
+        if (definition) definition.name = name
+      }),
+    removeUnusedSymbol: (symbolId) =>
+      set((state) => {
+        if (
+          state.document.version !== 2 ||
+          hasSymbolReference(state.document.children, symbolId)
+        ) {
+          return
+        }
+        const index = state.document.symbols.findIndex(
+          (symbol) => symbol.id === symbolId,
+        )
+        if (index < 0) return
+        state.document.symbols.splice(index, 1)
+        if (state.editingSymbolId === symbolId) {
+          state.editingSymbolId = null
+          state.selectedIds = []
+          state.selectedKeyIds = []
+        }
+      }),
+    updateSymbolInstancePlayback: (id, patch) =>
+      set((state) => {
+        const node = findNode(state.document.children, id)
+        if (!node || node.type !== 'symbol') return
+        updateNodeById(state.document.children, id, {
+          playback: { ...node.playback, ...patch },
+        })
       }),
   })),
 )

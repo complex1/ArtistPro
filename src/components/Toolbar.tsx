@@ -12,7 +12,7 @@ import {
   Type,
 } from 'lucide-react'
 import { createImageNode } from '../model/image'
-import { useEditorStore } from '../store/editorStore'
+import { activeHeight, activeWidth, useEditorStore } from '../store/editorStore'
 import type { Tool } from '../model/types'
 import { IconButton } from '../ui/controls'
 
@@ -34,7 +34,8 @@ const motionTools: Tool[] = ['select', 'node', 'pan']
 export function Toolbar() {
   const imageInput = useRef<HTMLInputElement>(null)
   const mode = useEditorStore((state) => state.mode)
-  const artboard = useEditorStore((state) => state.document.artboard)
+  const canvasWidth = useEditorStore(activeWidth)
+  const canvasHeight = useEditorStore(activeHeight)
   const tool = useEditorStore((state) => state.tool)
   const setTool = useEditorStore((state) => state.setTool)
   const addShape = useEditorStore((state) => state.addShape)
@@ -62,7 +63,12 @@ export function Toolbar() {
           event.target.value = ''
           if (!file) return
           try {
-            addNode(await createImageNode(file, artboard))
+            addNode(
+              await createImageNode(file, {
+                width: canvasWidth,
+                height: canvasHeight,
+              }),
+            )
             setTool('select')
           } catch (error) {
             window.alert(error instanceof Error ? error.message : 'Could not add image.')
