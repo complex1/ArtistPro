@@ -102,10 +102,33 @@ describe('symbol instances', () => {
       name: 'Badge',
       width: 110,
       height: 140,
-      playback: { startTime: 0, mode: 'once' },
+      playback: { startTime: 0, mode: 'loop' },
     })
     expect(instance.transform.position).toEqual({ x: 25, y: 40 })
     expect(instance.transform.pivot).toEqual({ x: 55, y: 70 })
+  })
+
+  it('repeats a short looping clip across a longer scene', () => {
+    const item = definition()
+    item.animation.duration = 1
+    item.animation = upsertKeyframe(
+      item.animation,
+      'internal',
+      'position.x',
+      1,
+      100,
+      'linear',
+    )
+    const instance = createSymbolInstance(item)
+    const xAt = (time: number) =>
+      evaluateSymbolInstance(instance, [item], time)?.children[0].transform
+        .position.x
+
+    expect(instance.playback.mode).toBe('loop')
+    expect(xAt(0.5)).toBeCloseTo(50)
+    expect(xAt(1.5)).toBeCloseTo(50)
+    expect(xAt(2.5)).toBeCloseTo(50)
+    expect(xAt(2.75)).toBeCloseTo(75)
   })
 
   it('evaluates internals separately while leaving the instance a leaf', () => {

@@ -50,10 +50,14 @@ export function symbolLocalTime(
   return elapsed % duration
 }
 
+/**
+ * New instances loop because a definition is usually shorter than the scene it
+ * sits in, and a clip that stops on its final frame reads as a broken symbol.
+ */
 export function createSymbolInstance(
   definition: SymbolDefinition,
   position: Vec2 = { x: 0, y: 0 },
-  playback: SymbolPlayback = { startTime: 0, mode: 'once' },
+  playback: SymbolPlayback = { startTime: 0, mode: 'loop' },
 ): SymbolInstanceNode {
   return {
     id: nanoid(),

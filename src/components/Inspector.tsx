@@ -386,6 +386,10 @@ export function Inspector() {
   }
 
   const { transform } = node
+  const instanceDefinition =
+    node.type === 'symbol' && document.version === 2
+      ? document.symbols.find((symbol) => symbol.id === node.symbolId)
+      : undefined
   const view =
     mode === 'animate'
       ? evaluateNodeAtTime(node, animation, playhead)
@@ -489,10 +493,17 @@ export function Inspector() {
                 })
               }
             >
-              <option value="once">Play once</option>
               <option value="loop">Loop</option>
+              <option value="once">Play once</option>
             </Select>
           </PropertyRow>
+          <p className="section-note">
+            {instanceDefinition
+              ? `This clip is ${instanceDefinition.animation.duration}s long. `
+              : ''}
+            Loop repeats it for the rest of the scene; Play once holds its final
+            frame.
+          </p>
         </CollapsibleSection>
       )}
 
