@@ -1120,12 +1120,17 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
     }
 
     // The SVG viewport is allowed to overflow so guide handles stay reachable
-    // outside the artboard, so artwork gets its own clip to the page bounds.
-    const artwork = draw.group().clipWith(
-      draw.clip().add(
-        draw.rect(activeArtboard.width, activeArtboard.height).move(0, 0),
-      ),
-    )
+    // outside the artboard. While editing, artwork overflows with it so a layer
+    // dragged past the page edge stays visible and selectable on the pasteboard;
+    // the modes that stand in for the delivered file clip to the page instead.
+    const framed = mode === 'preview' || mode === 'export'
+    const artwork = framed
+      ? draw.group().clipWith(
+          draw.clip().add(
+            draw.rect(activeArtboard.width, activeArtboard.height).move(0, 0),
+          ),
+        )
+      : draw.group()
     scene.forEach((node) => paint(artwork, node))
 
     // Handles paint last so they stay on top of the artwork they guide.
