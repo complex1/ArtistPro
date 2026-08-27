@@ -1,8 +1,7 @@
-import { PenTool } from 'lucide-react'
+import { Paintbrush, PenTool } from 'lucide-react'
 import { navigate } from '../app/routes'
 
 const upcoming = [
-  { id: 'paint', name: 'Paint', blurb: 'Raster brushes and compositing' },
   { id: 'type', name: 'Type', blurb: 'Layout-driven typography' },
 ]
 
@@ -39,6 +38,21 @@ export function ArtistHome() {
             <span className="tool-card-copy">
               <strong>SVG</strong>
               <small>Draw, animate, and export vector motion</small>
+            </span>
+            <span className="tool-card-cta">Open</span>
+          </button>
+
+          <button
+            type="button"
+            className="tool-card is-ready"
+            onClick={() => navigate({ page: 'paint-home' })}
+          >
+            <span className="tool-card-icon">
+              <Paintbrush size={22} />
+            </span>
+            <span className="tool-card-copy">
+              <strong>Paint</strong>
+              <small>Draw with living procedural brushes</small>
             </span>
             <span className="tool-card-cta">Open</span>
           </button>

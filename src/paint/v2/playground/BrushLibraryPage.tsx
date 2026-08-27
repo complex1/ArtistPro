@@ -1,0 +1,242 @@
+import { useEffect, useRef, useState } from 'react'
+import {
+  ArrowLeft,
+  Copy,
+  Edit3,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+  Upload,
+} from 'lucide-react'
+import { navigate } from '../../../app/routes'
+import { Button } from '../../../ui/controls'
+import { lastPaintProjectV2 } from '../library'
+import {
+  deleteCustomBrush,
+  duplicateBrush,
+  listAllBrushes,
+  saveCustomBrush,
+} from '../brushLibrary'
+import { importBrushJson } from '../brushTransfer'
+import { createBrushV2, createDocumentV2, emptyPoint } from '../core/defaults'
+import type { BrushV2 } from '../core/types'
+import { snapshotStroke } from '../input/sampler'
+import { renderDocumentV2 } from '../render/engine'
+
+const PREVIEW_WIDTH = 240
+const PREVIEW_HEIGHT = 128
+
+function BrushCardPreview({ brush }: { brush: BrushV2 }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    const document = createDocumentV2('Preview', PREVIEW_WIDTH, PREVIEW_HEIGHT)
+    document.background = '#ffffff'
+    document.layers[0].strokes = [
+      snapshotStroke(
+        brush,
+        [
+          emptyPoint(28, 78),
+          emptyPoint(62, 48),
+          emptyPoint(104, 82),
+          emptyPoint(150, 44),
+          emptyPoint(212, 70),
+        ],
+        document.layers[0].id,
+      ),
+    ]
+    let frame = 0
+    const paint = (time: number) => {
+      const context = canvasRef.current?.getContext('2d')
+      if (context) renderDocumentV2(context, document, time, new Map())
+      frame = window.requestAnimationFrame(paint)
+    }
+    frame = window.requestAnimationFrame(paint)
+    return () => window.cancelAnimationFrame(frame)
+  }, [brush])
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={PREVIEW_WIDTH}
+      height={PREVIEW_HEIGHT}
+      aria-hidden="true"
+    />
+  )
+}
+
+export function BrushLibraryPage() {
+  const importRef = useRef<HTMLInputElement>(null)
+  const [brushes, setBrushes] = useState(listAllBrushes)
+  const [openMenu, setOpenMenu] = useState<string | null>(null)
+  const [lastProject] = useState(lastPaintProjectV2)
+
+  const refresh = () => {
+    setBrushes(listAllBrushes())
+    setOpenMenu(null)
+  }
+
+  const edit = (brush: BrushV2) =>
+    navigate({ page: 'paint-playground', brushId: brush.id })
+
+  const createBlank = () => {
+    const brush = saveCustomBrush(
+      createBrushV2({ name: 'Untitled brush', category: 'Custom' }),
+    )
+    edit(brush)
+  }
+
+  const rename = (brush: BrushV2) => {
+    const name = window.prompt('Rename brush', brush.name)?.trim()
+    if (!name || name === brush.name) return
+    saveCustomBrush({ ...brush, name })
+    refresh()
+  }
+
+  const duplicate = (brush: BrushV2) => {
+    const copy = duplicateBrush(brush)
+    refresh()
+    edit(copy)
+  }
+
+  const remove = (brush: BrushV2) => {
+    if (!window.confirm(`Delete “${brush.name}”?`)) return
+    deleteCustomBrush(brush.id)
+    refresh()
+  }
+
+  const importBrush = async (file: File) => {
+    const brush = importBrushJson(await file.text())
+    if (!brush) {
+      window.alert('That file is not a valid brush config.')
+      return
+    }
+    saveCustomBrush(brush)
+    edit(brush)
+  }
+
+  return (
+    <div className="brush-library-page">
+      <header className="app-header brush-library-header">
+        <div className="brand">
+          <button
+            type="button"
+            className="studio-crumb"
+            onClick={() => navigate({ page: 'home' })}
+          >
+            Artist Pro
+          </button>
+          <b>/</b>
+          <button
+            type="button"
+            className="studio-crumb"
+            onClick={() => navigate({ page: 'paint-home' })}
+          >
+            Paint
+          </button>
+          <b>/</b>
+          <strong>Brushes</strong>
+        </div>
+        <div className="header-actions">
+          {lastProject ? (
+            <Button
+              title={`Back to ${lastProject.name}`}
+              aria-label={`Back to ${lastProject.name}`}
+              onClick={() =>
+                navigate({ page: 'paint-editor', projectId: lastProject.id })
+              }
+            >
+              <ArrowLeft size={14} /> Back to {lastProject.name}
+            </Button>
+          ) : null}
+          <Button onClick={() => importRef.current?.click()}>
+            <Upload size={14} /> Import brush
+          </Button>
+          <input
+            ref={importRef}
+            type="file"
+            accept=".json,application/json"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0]
+              if (file) void importBrush(file)
+              event.currentTarget.value = ''
+            }}
+          />
+        </div>
+      </header>
+
+      <main className="brush-library-content">
+        <div className="brush-library-heading">
+          <div>
+            <p className="studio-kicker">Brush library</p>
+            <h1>Build and manage brushes</h1>
+            <p>Open a brush to tune its mark and animation code.</p>
+          </div>
+          <span>{brushes.length} brushes</span>
+        </div>
+
+        <div className="brush-card-grid">
+          <button
+            type="button"
+            className="brush-card brush-card-blank"
+            onClick={createBlank}
+          >
+            <span><Plus size={24} /></span>
+            <strong>New brush</strong>
+            <small>Start from a blank brush</small>
+          </button>
+
+          {brushes.map((brush) => (
+            <article className="brush-card" key={brush.id}>
+              <button
+                type="button"
+                className="brush-card-preview"
+                onClick={() => edit(brush)}
+                aria-label={`Edit ${brush.name}`}
+              >
+                <BrushCardPreview brush={brush} />
+              </button>
+              <div className="brush-card-meta">
+                <div>
+                  <strong>{brush.name}</strong>
+                  <small>{brush.category} · {brush.renderer}</small>
+                </div>
+                <button
+                  type="button"
+                  className="brush-card-menu-button"
+                  aria-label={`Actions for ${brush.name}`}
+                  aria-expanded={openMenu === brush.id}
+                  onClick={() =>
+                    setOpenMenu((current) =>
+                      current === brush.id ? null : brush.id,
+                    )
+                  }
+                >
+                  <MoreHorizontal size={18} />
+                </button>
+                {openMenu === brush.id ? (
+                  <div className="brush-card-menu">
+                    <button type="button" onClick={() => edit(brush)}>
+                      <Edit3 size={14} /> Edit
+                    </button>
+                    <button type="button" onClick={() => rename(brush)}>
+                      <Pencil size={14} /> Rename
+                    </button>
+                    <button type="button" onClick={() => duplicate(brush)}>
+                      <Copy size={14} /> Duplicate
+                    </button>
+                    <button type="button" onClick={() => remove(brush)}>
+                      <Trash2 size={14} /> Delete
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </article>
+          ))}
+        </div>
+      </main>
+    </div>
+  )
+}

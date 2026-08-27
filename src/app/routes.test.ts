@@ -17,11 +17,30 @@ describe('app routes', () => {
     })
   })
 
+  it('opens the Paint tool hub and a project editor', () => {
+    expect(parseHash('#/paint')).toEqual({ page: 'paint-home' })
+    expect(parseHash('#/paint/playground')).toEqual({
+      page: 'paint-playground',
+    })
+    expect(parseHash('#/paint/playground/custom%20brush')).toEqual({
+      page: 'paint-playground',
+      brushId: 'custom brush',
+    })
+    expect(parseHash('#/paint/brush-project')).toEqual({
+      page: 'paint-editor',
+      projectId: 'brush-project',
+    })
+  })
+
   it('round-trips hashes', () => {
     const routes: AppRoute[] = [
       { page: 'home' },
       { page: 'svg-home' },
       { page: 'svg-editor', projectId: 'p1' },
+      { page: 'paint-home' },
+      { page: 'paint-playground' },
+      { page: 'paint-playground', brushId: 'custom brush' },
+      { page: 'paint-editor', projectId: 'p2' },
     ]
     for (const route of routes) {
       expect(parseHash(toHash(route))).toEqual(route)

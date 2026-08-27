@@ -22,6 +22,7 @@ import { PlaybackClock } from './components/PlaybackClock'
 import { SvgToolHome } from './components/SvgToolHome'
 import { Timeline } from './components/Timeline'
 import { Toolbar } from './components/Toolbar'
+import { PaintHome } from './paint/PaintHome'
 import { getProject, saveProject } from './projects/library'
 import { activeChildren, findNode, useEditorStore } from './store/editorStore'
 import { renderDocumentSvg } from './render/svgFrame'
@@ -34,6 +35,16 @@ const ANIMATE_BOTTOM_HEIGHT = 240
 const PreviewStudio = lazy(() =>
   import('./components/PreviewStudio').then((module) => ({
     default: module.PreviewStudio,
+  })),
+)
+const PaintEditor = lazy(() =>
+  import('./paint/PaintStudio').then((module) => ({
+    default: module.PaintEditor,
+  })),
+)
+const BrushPlayground = lazy(() =>
+  import('./paint/v2/playground/BrushPlayground').then((module) => ({
+    default: module.BrushPlayground,
   })),
 )
 
@@ -310,12 +321,28 @@ function App() {
   useEffect(() => {
     if (route.page === 'home') document.title = 'Artist Pro'
     else if (route.page === 'svg-home') document.title = 'SVG — Artist Pro'
-    else document.title = 'SVG — Artist Pro'
+    else if (route.page === 'svg-editor') document.title = 'SVG — Artist Pro'
+    else document.title = 'Paint — Artist Pro'
   }, [route])
 
   if (route.page === 'home') return <ArtistHome />
   if (route.page === 'svg-home') return <SvgToolHome />
-  return <EditorApp projectId={route.projectId} />
+  if (route.page === 'svg-editor') {
+    return <EditorApp projectId={route.projectId} />
+  }
+  if (route.page === 'paint-home') return <PaintHome />
+  if (route.page === 'paint-playground') {
+    return (
+      <Suspense fallback={<div className="studio-loading">Opening playground…</div>}>
+        <BrushPlayground brushId={route.brushId} />
+      </Suspense>
+    )
+  }
+  return (
+    <Suspense fallback={<div className="studio-loading">Opening Paint…</div>}>
+      <PaintEditor projectId={route.projectId} />
+    </Suspense>
+  )
 }
 
 export default App
