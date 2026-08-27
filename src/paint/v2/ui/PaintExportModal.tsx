@@ -11,7 +11,7 @@ import {
 } from '../../../render/types'
 import { Button, IconButton, Select } from '../../../ui/controls'
 import type { PaintDocumentV2 } from '../core/types'
-import { renderDocumentV2 } from '../render/engine'
+import { renderDocumentV2, type LayerSurfaces } from '../render/engine'
 import {
   renderPaintDocument,
   type PaintExportSettings,
@@ -42,11 +42,11 @@ function progressLabel(progress: RenderProgress | null): string {
 
 export function PaintExportModal({
   document: paintDocument,
-  rasters,
+  surfaces,
   onClose,
 }: {
   document: PaintDocumentV2
-  rasters: Map<string, HTMLCanvasElement>
+  surfaces: LayerSurfaces
   onClose: () => void
 }) {
   const modalRef = useRef<HTMLElement>(null)
@@ -89,13 +89,19 @@ export function PaintExportModal({
       if (canvas && context) {
         if (startedAt === null) startedAt = now
         const timeMs = (now - startedAt) % (duration * 1000)
-        renderDocumentV2(context, paintDocument, timeMs, rasters)
+        renderDocumentV2(
+          context,
+          paintDocument,
+          timeMs,
+          surfaces.rasters,
+          surfaces.masks,
+        )
       }
       frame = window.requestAnimationFrame(paint)
     }
     frame = window.requestAnimationFrame(paint)
     return () => window.cancelAnimationFrame(frame)
-  }, [duration, paintDocument, rasters])
+  }, [duration, paintDocument, surfaces])
 
   useEffect(
     () => () => {
@@ -114,7 +120,7 @@ export function PaintExportModal({
     try {
       const artifact = await renderPaintDocument(
         paintDocument,
-        rasters,
+        surfaces,
         settings,
         {
           signal: controller.signal,

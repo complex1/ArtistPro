@@ -49,7 +49,7 @@ import {
   type PaintProjectRecordV2,
 } from './v2/library'
 import { importAllV1Projects } from './v2/migrate/importProjects'
-import { renderDocumentV2 } from './v2/render/engine'
+import { renderDocumentV2, type LayerSurfaces } from './v2/render/engine'
 import { paintStorage } from './v2/library'
 
 type Tool = 'brush' | 'eraser' | 'hand' | 'select'
@@ -143,7 +143,7 @@ export function PaintEditor({ projectId }: { projectId: string }) {
   }, [initialProject])
 
   if (!initialProject) {
-    return <div className="studio-loading">Opening Paint project…</div>
+    return <div className="studio-loading">Opening Animated Paint project…</div>
   }
 
   return <PaintWorkspace key={initialProject.id} project={initialProject} />
@@ -154,6 +154,7 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
   const stageRef = useRef<HTMLElement>(null)
   const documentRef = useRef<PaintDocumentV2>(project.document)
   const rasterLayers = useRef(new Map<string, HTMLCanvasElement>())
+  const eraseMasks = useRef(new Map<string, HTMLCanvasElement>())
   const currentStroke = useRef<StrokeV2 | null>(null)
   const drawing = useRef(false)
   const lastPoint = useRef<StrokePointV2 | null>(null)
@@ -185,8 +186,9 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
   )
   const [historyState, setHistoryState] = useState({ undo: 0, redo: 0 })
   const [saveError, setSaveError] = useState('')
-  const [exportRasters, setExportRasters] =
-    useState<Map<string, HTMLCanvasElement> | null>(null)
+  const [exportSurfaces, setExportSurfaces] = useState<LayerSurfaces | null>(
+    null,
+  )
 
   const activeLayer = document.layers.find(
     (layer) => layer.id === document.activeLayerId,
@@ -210,12 +212,19 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
 
   const rebuildRasters = useCallback(async (next: PaintDocumentV2) => {
     const rasters = new Map<string, HTMLCanvasElement>()
+    const masks = new Map<string, HTMLCanvasElement>()
     for (const layer of next.layers) {
       const raster = makeRaster(next.width, next.height)
       if (layer.rasterDataUrl) await loadRaster(layer.rasterDataUrl, raster)
       rasters.set(layer.id, raster)
+      if (layer.eraseMaskDataUrl) {
+        const mask = makeRaster(next.width, next.height)
+        await loadRaster(layer.eraseMaskDataUrl, mask)
+        masks.set(layer.id, mask)
+      }
     }
     rasterLayers.current = rasters
+    eraseMasks.current = masks
   }, [])
 
   useEffect(() => {
@@ -251,6 +260,7 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
           documentRef.current,
           time,
           rasterLayers.current,
+          eraseMasks.current,
         )
         paintSelectionOutline(
           context,
@@ -365,20 +375,38 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
     )
   }
 
+  const eraseMaskContext = (layerId: string): CanvasRenderingContext2D | null => {
+    let mask = eraseMasks.current.get(layerId)
+    if (!mask) {
+      mask = makeRaster(documentRef.current.width, documentRef.current.height)
+      eraseMasks.current.set(layerId, mask)
+    }
+    return mask.getContext('2d')
+  }
+
   const drawEraserSegment = (from: StrokePointV2, to: StrokePointV2) => {
     const layer = currentActiveLayer()
     if (!layer) return
-    const context = rasterLayers.current.get(layer.id)?.getContext('2d')
+    const context = eraseMaskContext(layer.id)
     if (!context) return
+    const radius = Math.max(0.5, draftBrush.size / 2)
     context.save()
-    context.globalCompositeOperation = 'destination-out'
+    context.fillStyle = '#000'
+    context.strokeStyle = '#000'
     context.lineCap = 'round'
     context.lineJoin = 'round'
-    context.lineWidth = draftBrush.size
+    context.lineWidth = radius * 2
     context.beginPath()
-    context.moveTo(from.x, from.y)
-    context.lineTo(to.x, to.y)
-    context.stroke()
+    if (from.x === to.x && from.y === to.y) {
+      // A zero-length line is not guaranteed to paint its round cap, so a tap
+      // erases through an explicit dot instead.
+      context.arc(from.x, from.y, radius, 0, Math.PI * 2)
+      context.fill()
+    } else {
+      context.moveTo(from.x, from.y)
+      context.lineTo(to.x, to.y)
+      context.stroke()
+    }
     context.restore()
   }
 
@@ -478,13 +506,13 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
       lastPoint.current = null
       if (tool === 'eraser') {
         const layer = currentActiveLayer()
-        const raster = layer && rasterLayers.current.get(layer.id)
-        if (layer && raster) {
+        const mask = layer && eraseMasks.current.get(layer.id)
+        if (layer && mask) {
           setDocument((current) => ({
             ...current,
             layers: current.layers.map((item) =>
               item.id === layer.id
-                ? { ...item, rasterDataUrl: raster.toDataURL('image/png') }
+                ? { ...item, eraseMaskDataUrl: mask.toDataURL('image/png') }
                 : item,
             ),
           }))
@@ -577,6 +605,12 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
       const source = rasterLayers.current.get(layer.id)
       if (source) raster.getContext('2d')?.drawImage(source, 0, 0)
       rasterLayers.current.set(id, raster)
+      const sourceMask = eraseMasks.current.get(layer.id)
+      if (sourceMask) {
+        const mask = makeRaster(document.width, document.height)
+        mask.getContext('2d')?.drawImage(sourceMask, 0, 0)
+        eraseMasks.current.set(id, mask)
+      }
       copies.push({
         ...structuredClone(layer),
         id,
@@ -697,7 +731,7 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
             className="studio-crumb"
             onClick={() => navigate({ page: 'paint-home' })}
           >
-            Paint
+            Animated Paint
           </button>
           <b>/</b>
           <strong>{document.name}</strong>
@@ -729,7 +763,14 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
           >
             <Redo2 size={14} /> Redo
           </Button>
-          <Button onClick={() => setExportRasters(rasterLayers.current)}>
+          <Button
+            onClick={() =>
+              setExportSurfaces({
+                rasters: rasterLayers.current,
+                masks: eraseMasks.current,
+              })
+            }
+          >
             <Download size={14} /> Export
           </Button>
         </div>
@@ -837,7 +878,7 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
           <strong>Tool settings</strong>
           <small>{inspectorBrush.name}</small>
         </div>
-        <nav className="mode-switcher paint-v2-tool-switcher" aria-label="Paint tool">
+        <nav className="mode-switcher paint-v2-tool-switcher" aria-label="Animated Paint tool">
           <button
             type="button"
             className={tool === 'brush' ? 'is-active' : ''}
@@ -1012,11 +1053,11 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
           </div>
         </section>
       </footer>
-      {exportRasters ? (
+      {exportSurfaces ? (
         <PaintExportModal
           document={document}
-          rasters={exportRasters}
-          onClose={() => setExportRasters(null)}
+          surfaces={exportSurfaces}
+          onClose={() => setExportSurfaces(null)}
         />
       ) : null}
     </div>

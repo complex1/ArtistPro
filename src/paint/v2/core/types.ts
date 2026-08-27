@@ -93,6 +93,9 @@ export type LayerV2 = {
   blendMode: BlendModeV2
   groupId?: string
   rasterDataUrl: string | null
+  // Strokes stay vector so they can keep animating, so the eraser records the
+  // pixels it removed instead of editing the strokes themselves.
+  eraseMaskDataUrl: string | null
   strokes: StrokeV2[]
 }
 

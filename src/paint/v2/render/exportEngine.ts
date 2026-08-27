@@ -15,7 +15,7 @@ import type {
 import { RenderError } from '../../../render/types'
 import { VideoFrameEncoder } from '../../../render/videoEncoder'
 import type { PaintDocumentV2 } from '../core/types'
-import { renderDocumentV2 } from './engine'
+import { renderDocumentV2, type LayerSurfaces } from './engine'
 
 export type PaintExportSettings = {
   fps: RenderFps
@@ -58,7 +58,7 @@ function report(
 
 export async function renderPaintDocument(
   sourceDocument: PaintDocumentV2,
-  rasters: Map<string, HTMLCanvasElement>,
+  surfaces: LayerSurfaces,
   settings: PaintExportSettings,
   options: PaintExportOptions = {},
 ): Promise<RenderArtifact> {
@@ -105,7 +105,8 @@ export async function renderPaintDocument(
         context,
         documentSnapshot,
         frame.sourceTime * 1000,
-        rasters,
+        surfaces.rasters,
+        surfaces.masks,
       )
 
       throwIfAborted(options.signal)

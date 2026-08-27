@@ -322,7 +322,7 @@ function App() {
     if (route.page === 'home') document.title = 'Artist Pro'
     else if (route.page === 'svg-home') document.title = 'SVG — Artist Pro'
     else if (route.page === 'svg-editor') document.title = 'SVG — Artist Pro'
-    else document.title = 'Paint — Artist Pro'
+    else document.title = 'Animated Paint — Artist Pro'
   }, [route])
 
   if (route.page === 'home') return <ArtistHome />
@@ -339,7 +339,7 @@ function App() {
     )
   }
   return (
-    <Suspense fallback={<div className="studio-loading">Opening Paint…</div>}>
+    <Suspense fallback={<div className="studio-loading">Opening Animated Paint…</div>}>
       <PaintEditor projectId={route.projectId} />
     </Suspense>
   )

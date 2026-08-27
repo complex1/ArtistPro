@@ -148,6 +148,8 @@ export function parseLayer(value: unknown): LayerV2 | null {
   layer.groupId = typeof value.groupId === 'string' ? value.groupId : undefined
   layer.rasterDataUrl =
     typeof value.rasterDataUrl === 'string' ? value.rasterDataUrl : null
+  layer.eraseMaskDataUrl =
+    typeof value.eraseMaskDataUrl === 'string' ? value.eraseMaskDataUrl : null
   layer.strokes = Array.isArray(value.strokes)
     ? value.strokes
         .map(parseStroke)

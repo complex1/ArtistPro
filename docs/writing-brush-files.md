@@ -4,7 +4,7 @@ A brush file is a JSON snapshot of one brush: mark settings plus optional animat
 
 ## Export and import in the app
 
-Open **Paint → Playground** (`#/paint/playground`).
+Open **Animated Paint → Playground** (`#/paint/playground`).
 
 **From the library (gallery)**
 
@@ -259,7 +259,7 @@ So a file can animate in JS **and** still use speed / drift / distortion sliders
 3. Recipient: Playground → **Import brush** (or editor **Import**).
 4. They get a Custom copy; they can rename and save.
 
-Imported brushes live in the same local brush library as editor-created ones (`localStorage`). They are available in the main Paint canvas brush list after save.
+Imported brushes live in the same local brush library as editor-created ones (`localStorage`). They are available in the main Animated Paint canvas brush list after save.
 
 ## Related code
 

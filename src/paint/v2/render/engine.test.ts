@@ -1,12 +1,38 @@
 import { describe, expect, it } from 'vitest'
-import { createBrushV2 } from '../core/defaults'
+import { createBrushV2, createDocumentV2 } from '../core/defaults'
 import { emptyPoint } from '../core/defaults'
 import { snapshotStroke } from '../input/sampler'
 import { packDrawList } from '../core/pack'
 import { staticDrawList } from '../animation/staticDrawList'
-import { strokeFrame } from './engine'
+import { renderDocumentV2, strokeFrame } from './engine'
 import type { DrawItem } from '../core/types'
 import { canvas2dRenderer } from './canvas2d'
+
+function contextStub() {
+  const composites: string[] = []
+  const drawn: unknown[] = []
+  return {
+    canvas: { tag: 'scratch' },
+    composites,
+    drawn,
+    globalAlpha: 1,
+    fillStyle: '',
+    get globalCompositeOperation() {
+      return composites[composites.length - 1] ?? 'source-over'
+    },
+    set globalCompositeOperation(value: string) {
+      composites.push(value)
+    },
+    save() {},
+    restore() {},
+    setTransform() {},
+    fillRect() {},
+    clearRect() {},
+    drawImage(source: unknown) {
+      drawn.push(source)
+    },
+  }
+}
 
 describe('v2 canvas renderer contracts', () => {
   it('emits packed draw commands for a static stroke', () => {
@@ -125,6 +151,50 @@ describe('v2 canvas renderer contracts', () => {
     })
     const stroke = snapshotStroke(brush, [emptyPoint(0, 0), emptyPoint(20, 0)], 'layer', 1)
     expect(strokeFrame(stroke, 0).items[0]?.kind).toBe('segment')
+  })
+
+  it('erases vector strokes through the layer mask', () => {
+    const document = createDocumentV2('Erase', 20, 20)
+    const layer = document.layers[0]
+    layer.strokes = [
+      snapshotStroke(
+        createBrushV2({ renderer: 'line' }),
+        [emptyPoint(0, 0), emptyPoint(10, 0)],
+        layer.id,
+        1,
+      ),
+    ]
+
+    const page = contextStub()
+    const scratch = contextStub()
+    const mask = { tag: 'mask' } as unknown as HTMLCanvasElement
+    const painted: unknown[] = []
+
+    const originalDocument = globalThis.document
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: { createElement: () => ({ getContext: () => scratch }) },
+    })
+    try {
+      renderDocumentV2(
+        page as unknown as CanvasRenderingContext2D,
+        document,
+        0,
+        new Map(),
+        new Map([[layer.id, mask]]),
+        { paint: (context) => painted.push(context) },
+      )
+    } finally {
+      Object.defineProperty(globalThis, 'document', {
+        configurable: true,
+        value: originalDocument,
+      })
+    }
+
+    expect(painted).toEqual([scratch])
+    expect(scratch.composites).toContain('destination-out')
+    expect(scratch.drawn).toContain(mask)
+    expect(page.drawn).toContain(scratch.canvas)
   })
 
   it('does not update old strokes when the library brush changes', () => {

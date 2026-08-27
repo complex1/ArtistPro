@@ -51,7 +51,7 @@ export function ArtistHome() {
               <Paintbrush size={22} />
             </span>
             <span className="tool-card-copy">
-              <strong>Paint</strong>
+              <strong>Animated Paint</strong>
               <small>Draw with living procedural brushes</small>
             </span>
             <span className="tool-card-cta">Open</span>

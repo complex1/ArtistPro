@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createDocumentV2 } from '../core/defaults'
 import { isRenderError } from '../../../render/types'
+import { emptySurfaces } from './engine'
 import { renderPaintDocument } from './exportEngine'
 
 describe('paint export engine', () => {
@@ -10,8 +11,8 @@ describe('paint export engine', () => {
 
     try {
       await renderPaintDocument(
-        createDocumentV2('Cancelled', 100, 100),
-        new Map(),
+          createDocumentV2('Cancelled', 100, 100),
+          emptySurfaces(),
         { fps: 30, duration: 2, format: 'video' },
         { signal: controller.signal },
       )

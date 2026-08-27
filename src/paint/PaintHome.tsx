@@ -57,7 +57,7 @@ export function PaintHome() {
         <div className="studio-brand">
           <div className="brand-mark paint-brand-mark">P</div>
           <div>
-            <strong>Paint</strong>
+            <strong>Animated Paint</strong>
             <span>Living brush studio</span>
           </div>
         </div>
@@ -104,7 +104,7 @@ export function PaintHome() {
           </div>
           {v1Count > 0 ? (
             <p className="studio-lede">
-              {v1Count} older Paint project{v1Count === 1 ? '' : 's'} found.{' '}
+              {v1Count} older Animated Paint project{v1Count === 1 ? '' : 's'} found.{' '}
               <button
                 type="button"
                 className="studio-crumb"
@@ -120,10 +120,10 @@ export function PaintHome() {
         </section>
 
         <section>
-          <p className="studio-kicker">Paint projects</p>
+          <p className="studio-kicker">Animated Paint projects</p>
           {projects.length === 0 ? (
             <p className="studio-empty">
-              Nothing here yet. Create a project to open Paint.
+              Nothing here yet. Create a project to open Animated Paint.
             </p>
           ) : (
             <ul className="project-list">

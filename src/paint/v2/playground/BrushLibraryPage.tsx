@@ -133,7 +133,7 @@ export function BrushLibraryPage() {
             className="studio-crumb"
             onClick={() => navigate({ page: 'paint-home' })}
           >
-            Paint
+            Animated Paint
           </button>
           <b>/</b>
           <strong>Brushes</strong>

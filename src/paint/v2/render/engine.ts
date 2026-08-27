@@ -115,11 +115,51 @@ export type FrameStats = {
   diagnostics: EngineDiagnostic[]
 }
 
+/** Off-document pixels a layer needs at paint time. */
+export type LayerSurfaces = {
+  rasters: Map<string, HTMLCanvasElement>
+  masks: Map<string, HTMLCanvasElement>
+}
+
+export function emptySurfaces(): LayerSurfaces {
+  return { rasters: new Map(), masks: new Map() }
+}
+
+const NO_MASKS: Map<string, HTMLCanvasElement> = new Map()
+
+// Masked layers composite through a scratch canvas so the mask can punch
+// through the vector strokes as well as the raster. One canvas is reused
+// because a render pass never interleaves with another.
+let scratch: HTMLCanvasElement | null = null
+
+function scratchContext(
+  width: number,
+  height: number,
+): CanvasRenderingContext2D | null {
+  if (typeof globalThis.document === 'undefined') return null
+  if (!scratch) scratch = globalThis.document.createElement('canvas')
+  const resized = scratch.width !== width || scratch.height !== height
+  if (resized) {
+    // Resizing already clears the canvas, so skip the redundant clear.
+    scratch.width = width
+    scratch.height = height
+  }
+  const context = scratch.getContext('2d')
+  if (context && !resized) {
+    context.setTransform(1, 0, 0, 1, 0, 0)
+    context.globalCompositeOperation = 'source-over'
+    context.globalAlpha = 1
+    context.clearRect(0, 0, width, height)
+  }
+  return context
+}
+
 export function renderDocumentV2(
   context: CanvasRenderingContext2D,
   document: PaintDocumentV2,
   timeMs: number,
   rasters: Map<string, HTMLCanvasElement>,
+  masks: Map<string, HTMLCanvasElement> = NO_MASKS,
   renderer: PaintRenderer = canvas2dRenderer,
 ): FrameStats {
   paintDocumentBackground(context, document.width, document.height, document.background)
@@ -132,25 +172,45 @@ export function renderDocumentV2(
 
   for (const layer of document.layers) {
     if (!layer.visible) continue
-    context.save()
-    context.globalAlpha = layer.opacity
-    context.globalCompositeOperation = layer.blendMode
+    const mask = masks.get(layer.id)
+    const masked = mask
+      ? scratchContext(document.width, document.height)
+      : null
+    const target = masked ?? context
+
+    target.save()
+    if (!masked) {
+      target.globalAlpha = layer.opacity
+      target.globalCompositeOperation = layer.blendMode
+    }
     const raster = rasters.get(layer.id)
-    if (raster) context.drawImage(raster, 0, 0)
+    if (raster) target.drawImage(raster, 0, 0)
     for (const stroke of layer.strokes) {
       const frame = strokeFrame(stroke, timeMs)
       stats.strokeCount += 1
       stats.itemCount += frame.items.length
       stats.animationMs += frame.durationMs
       stats.diagnostics.push(...frame.diagnostics)
-      context.save()
+      target.save()
       if (stroke.brushSnapshot.blendMode !== 'source-over') {
-        context.globalCompositeOperation = stroke.brushSnapshot.blendMode
+        target.globalCompositeOperation = stroke.brushSnapshot.blendMode
       }
-      renderer.paint(context, frame.items, stroke.brushSnapshot.stamps)
+      renderer.paint(target, frame.items, stroke.brushSnapshot.stamps)
+      target.restore()
+    }
+    target.restore()
+
+    if (masked && mask) {
+      masked.save()
+      masked.globalCompositeOperation = 'destination-out'
+      masked.drawImage(mask, 0, 0)
+      masked.restore()
+      context.save()
+      context.globalAlpha = layer.opacity
+      context.globalCompositeOperation = layer.blendMode
+      context.drawImage(masked.canvas, 0, 0)
       context.restore()
     }
-    context.restore()
   }
 
   return stats

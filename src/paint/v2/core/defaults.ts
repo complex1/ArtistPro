@@ -126,6 +126,7 @@ export function createLayerV2(name = 'Layer 1'): LayerV2 {
     opacity: 1,
     blendMode: 'source-over',
     rasterDataUrl: null,
+    eraseMaskDataUrl: null,
     strokes: [],
   }
 }

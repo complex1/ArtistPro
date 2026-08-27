@@ -17,7 +17,7 @@ describe('app routes', () => {
     })
   })
 
-  it('opens the Paint tool hub and a project editor', () => {
+  it('opens the Animated Paint tool hub and a project editor', () => {
     expect(parseHash('#/paint')).toEqual({ page: 'paint-home' })
     expect(parseHash('#/paint/playground')).toEqual({
       page: 'paint-playground',
