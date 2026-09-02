@@ -150,7 +150,9 @@ Values below are **as stored in the file** (not the 0–100 labels in some slide
 
 **Image stamps** are treated as images if the string starts with `data:`, `http`, `blob:`, or `/`. Prefer a **PNG or JPEG data URL** in the file so the brush is self-contained. Remote `http` URLs depend on network and CORS.
 
-In the editor, **Upload stamp** downscales the longest edge to 256px and stores a PNG data URL. That keeps local storage small: every stroke copies the whole brush, including stamps.
+**Shape stamps** are image stamps prefixed with `shape:`. The editor converts the art to a grayscale coverage mask (optional invert) and the renderer tints that mask with the brush color.
+
+In the editor, **Upload** or **Draw stamp** opens a config modal. Images are downscaled so the longest edge is 256px and stored as a PNG data URL. A brush can keep several stamps; the left sidebar lists all of them. That keeps local storage small: every stroke copies the whole brush, including stamps.
 
 For stamp-looking marks, set `"renderer": "stamp"` (or `"particle"`). If animation returns `kind: "segment"` on a stamp brush, the engine still converts those items to stamps.
 

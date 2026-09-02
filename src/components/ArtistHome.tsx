@@ -1,4 +1,4 @@
-import { Paintbrush, PenTool } from 'lucide-react'
+import { Layers, Paintbrush, PenTool, Sparkles } from 'lucide-react'
 import { navigate } from '../app/routes'
 
 const upcoming = [
@@ -53,6 +53,36 @@ export function ArtistHome() {
             <span className="tool-card-copy">
               <strong>Animated Paint</strong>
               <small>Draw with living procedural brushes</small>
+            </span>
+            <span className="tool-card-cta">Open</span>
+          </button>
+
+          <button
+            type="button"
+            className="tool-card is-ready"
+            onClick={() => navigate({ page: 'cel' })}
+          >
+            <span className="tool-card-icon">
+              <Sparkles size={22} />
+            </span>
+            <span className="tool-card-copy">
+              <strong>Cel</strong>
+              <small>Restore cartoons and export SVG</small>
+            </span>
+            <span className="tool-card-cta">Open</span>
+          </button>
+
+          <button
+            type="button"
+            className="tool-card is-ready"
+            onClick={() => navigate({ page: 'draw' })}
+          >
+            <span className="tool-card-icon">
+              <Layers size={22} />
+            </span>
+            <span className="tool-card-copy">
+              <strong>Draw</strong>
+              <small>Layer-based raster drawing engine</small>
             </span>
             <span className="tool-card-cta">Open</span>
           </button>

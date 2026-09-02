@@ -32,6 +32,16 @@ describe('app routes', () => {
     })
   })
 
+  it('opens the Cel converter', () => {
+    expect(parseHash('#/cel')).toEqual({ page: 'cel' })
+    expect(parseHash('#/cel/')).toEqual({ page: 'cel' })
+  })
+
+  it('opens the raster Draw engine host', () => {
+    expect(parseHash('#/draw')).toEqual({ page: 'draw' })
+    expect(parseHash('#/draw/')).toEqual({ page: 'draw' })
+  })
+
   it('round-trips hashes', () => {
     const routes: AppRoute[] = [
       { page: 'home' },
@@ -41,6 +51,8 @@ describe('app routes', () => {
       { page: 'paint-playground' },
       { page: 'paint-playground', brushId: 'custom brush' },
       { page: 'paint-editor', projectId: 'p2' },
+      { page: 'cel' },
+      { page: 'draw' },
     ]
     for (const route of routes) {
       expect(parseHash(toHash(route))).toEqual(route)

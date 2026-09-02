@@ -117,6 +117,30 @@ describe('canvas2d renderer', () => {
     }
   })
 
+  it('draws a shape stamp from a prefixed data URL', () => {
+    class FakeImage {
+      complete = true
+      naturalWidth = 100
+      naturalHeight = 100
+      decoding = 'auto'
+      src = ''
+    }
+    const original = globalThis.Image
+    globalThis.Image = FakeImage as unknown as typeof Image
+    try {
+      const context = stubContext()
+      canvas2dRenderer.paint(
+        context as unknown as CanvasRenderingContext2D,
+        [item({ kind: 'stamp', size: 8 })],
+        ['shape:data:image/png;base64,mask'],
+      )
+      const call = context.calls.find((entry) => entry.op === 'drawImage')
+      expect(call?.args.slice(1)).toEqual([-4, -4, 8, 8])
+    } finally {
+      globalThis.Image = original
+    }
+  })
+
   it('skips an image stamp that has not decoded yet', () => {
     class PendingImage {
       complete = false

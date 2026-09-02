@@ -1,3 +1,9 @@
+import {
+  applyShapeMask,
+  encodeShapeStamp,
+  type StampUseMode,
+} from '../core/stamp'
+
 // Every stroke keeps its own copy of the brush snapshot, so a full-resolution
 // photo would be duplicated across the document and overrun local storage.
 // Stamps are capped to a size that still looks sharp at any usable brush size.
@@ -24,8 +30,7 @@ function decode(src: string): Promise<HTMLImageElement> {
   })
 }
 
-export async function readStampFile(file: File): Promise<string> {
-  const dataUrl = await readAsDataUrl(file)
+async function resizeDataUrl(dataUrl: string): Promise<string> {
   if (typeof Image === 'undefined' || typeof document === 'undefined') {
     return dataUrl
   }
@@ -42,4 +47,31 @@ export async function readStampFile(file: File): Promise<string> {
   if (!context) return dataUrl
   context.drawImage(image, 0, 0, canvas.width, canvas.height)
   return canvas.toDataURL('image/png')
+}
+
+export async function readStampFile(file: File): Promise<string> {
+  return resizeDataUrl(await readAsDataUrl(file))
+}
+
+export async function finalizeStamp(
+  sourceUrl: string,
+  options: { mode: StampUseMode; invert?: boolean },
+): Promise<string> {
+  const sized = await resizeDataUrl(sourceUrl)
+  if (options.mode === 'image') return sized
+  if (typeof Image === 'undefined' || typeof document === 'undefined') {
+    return encodeShapeStamp(sized)
+  }
+
+  const image = await decode(sized)
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, image.naturalWidth)
+  canvas.height = Math.max(1, image.naturalHeight)
+  const context = canvas.getContext('2d')
+  if (!context) return encodeShapeStamp(sized)
+  context.drawImage(image, 0, 0)
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height)
+  applyShapeMask(pixels.data, options.invert === true)
+  context.putImageData(pixels, 0, 0)
+  return encodeShapeStamp(canvas.toDataURL('image/png'))
 }

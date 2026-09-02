@@ -47,6 +47,16 @@ const BrushPlayground = lazy(() =>
     default: module.BrushPlayground,
   })),
 )
+const CelStudio = lazy(() =>
+  import('./cel/CelStudio').then((module) => ({
+    default: module.CelStudio,
+  })),
+)
+const DrawStudio = lazy(() =>
+  import('./draw-engine/DrawStudio').then((module) => ({
+    default: module.DrawStudio,
+  })),
+)
 
 function clampBottomHeight(height: number, minHeight = MIN_BOTTOM_HEIGHT) {
   const max = Math.max(
@@ -322,6 +332,8 @@ function App() {
     if (route.page === 'home') document.title = 'Artist Pro'
     else if (route.page === 'svg-home') document.title = 'SVG — Artist Pro'
     else if (route.page === 'svg-editor') document.title = 'SVG — Artist Pro'
+    else if (route.page === 'cel') document.title = 'Cel — Artist Pro'
+    else if (route.page === 'draw') document.title = 'Draw — Artist Pro'
     else document.title = 'Animated Paint — Artist Pro'
   }, [route])
 
@@ -335,6 +347,20 @@ function App() {
     return (
       <Suspense fallback={<div className="studio-loading">Opening playground…</div>}>
         <BrushPlayground brushId={route.brushId} />
+      </Suspense>
+    )
+  }
+  if (route.page === 'cel') {
+    return (
+      <Suspense fallback={<div className="studio-loading">Opening Cel…</div>}>
+        <CelStudio />
+      </Suspense>
+    )
+  }
+  if (route.page === 'draw') {
+    return (
+      <Suspense fallback={<div className="studio-loading">Opening Draw…</div>}>
+        <DrawStudio />
       </Suspense>
     )
   }

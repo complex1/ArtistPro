@@ -5,12 +5,16 @@ export type AppRoute =
   | { page: 'paint-home' }
   | { page: 'paint-playground'; brushId?: string }
   | { page: 'paint-editor'; projectId: string }
+  | { page: 'cel' }
+  | { page: 'draw' }
 
 export function parseHash(hash: string): AppRoute {
   const path = hash.replace(/^#/, '').replace(/^\/+|\/+$/g, '')
   if (!path) return { page: 'home' }
 
   const parts = path.split('/').filter(Boolean)
+  if (parts[0] === 'cel') return { page: 'cel' }
+  if (parts[0] === 'draw') return { page: 'draw' }
   if (parts[0] !== 'svg' && parts[0] !== 'paint') return { page: 'home' }
   const tool = parts[0]
   if (parts.length === 1) {
@@ -45,6 +49,8 @@ export function toHash(route: AppRoute): string {
       ? `#/paint/playground/${encodeURIComponent(route.brushId)}`
       : '#/paint/playground'
   }
+  if (route.page === 'cel') return '#/cel'
+  if (route.page === 'draw') return '#/draw'
   return `#/paint/${encodeURIComponent(route.projectId)}`
 }
 

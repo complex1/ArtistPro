@@ -1,4 +1,11 @@
+import {
+  isImageStamp,
+  isShapeStamp,
+  stampPaintSrc,
+} from '../core/stamp'
 import type { DrawItem } from '../core/types'
+
+export { isImageStamp, isShapeStamp, stampPaintSrc }
 
 export type PaintRenderer = {
   paint(
@@ -59,13 +66,31 @@ function stampImage(src: string): HTMLImageElement | null {
   return image.complete && image.naturalWidth > 0 ? image : null
 }
 
-export function isImageStamp(stamp: string): boolean {
-  return (
-    stamp.startsWith('data:') ||
-    stamp.startsWith('http') ||
-    stamp.startsWith('blob:') ||
-    stamp.startsWith('/')
-  )
+let tintCanvas: HTMLCanvasElement | null = null
+
+function tintedStampImage(
+  image: HTMLImageElement,
+  color: string,
+  width: number,
+  height: number,
+): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null
+  if (!tintCanvas) tintCanvas = document.createElement('canvas')
+  const canvas = tintCanvas
+  const pixelWidth = Math.max(1, Math.round(width))
+  const pixelHeight = Math.max(1, Math.round(height))
+  canvas.width = pixelWidth
+  canvas.height = pixelHeight
+  const context = canvas.getContext('2d')
+  if (!context) return null
+  context.clearRect(0, 0, pixelWidth, pixelHeight)
+  context.globalCompositeOperation = 'source-over'
+  context.drawImage(image, 0, 0, pixelWidth, pixelHeight)
+  context.globalCompositeOperation = 'source-in'
+  context.fillStyle = color
+  context.fillRect(0, 0, pixelWidth, pixelHeight)
+  context.globalCompositeOperation = 'source-over'
+  return canvas
 }
 
 function applyEffects(context: CanvasRenderingContext2D, item: DrawItem): void {
@@ -100,13 +125,22 @@ function paintStamp(
   applyEffects(context, item)
   const stamp = stamps[item.stampIndex] ?? stamps[0] ?? 'dot'
   if (isImageStamp(stamp)) {
-    const image = stampImage(stamp)
+    const image = stampImage(stampPaintSrc(stamp))
     if (image) {
       // Fit the longest edge to the mark size so tall or wide art is not squashed.
       const ratio = image.naturalWidth / image.naturalHeight
       const width = ratio >= 1 ? item.size : item.size * ratio
       const height = ratio >= 1 ? item.size / ratio : item.size
-      context.drawImage(image, -width / 2, -height / 2, width, height)
+      const tinted = isShapeStamp(stamp)
+        ? tintedStampImage(image, parseColor(item.color, 1), width, height)
+        : null
+      context.drawImage(
+        tinted ?? image,
+        -width / 2,
+        -height / 2,
+        width,
+        height,
+      )
     }
   } else {
     drawNamedStamp(context, stamp, item.size)

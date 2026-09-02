@@ -1,13 +1,36 @@
-import { Select } from '../../../ui/controls'
+import { useRef, useState } from 'react'
+import { Pencil, Plus } from 'lucide-react'
+import { Button, Select } from '../../../ui/controls'
 import { ColorField, PropertyRow, SliderField, TextField } from '../../../ui/fields'
+import {
+  appendStamp,
+  isImageStamp,
+  isShapeStamp,
+  removeStampAt,
+  stampPreviewSrc,
+} from '../core/stamp'
 import type {
   BlendModeV2,
   BrushV2,
   RendererIdV2,
   RotationMode,
 } from '../core/types'
-import { isImageStamp } from '../render/canvas2d'
+import { StampConfigModal, type StampDraft } from './StampConfigModal'
 import { readStampFile } from './stampFile'
+
+function StampThumb({ stamp }: { stamp: string }) {
+  const preview = stampPreviewSrc(stamp)
+  if (preview) {
+    return (
+      <img
+        src={preview}
+        alt=""
+        className={isShapeStamp(stamp) ? 'is-shape' : undefined}
+      />
+    )
+  }
+  return <span className={`paint-stamp-named is-${stamp}`}>{stamp}</span>
+}
 
 export function BrushInspector({
   brush,
@@ -20,13 +43,89 @@ export function BrushInspector({
   showAnimationEditor?: boolean
   mode?: 'authoring' | 'runtime'
 }) {
-  const imageStamp = brush.stamps.find(isImageStamp) ?? null
   const authoring = mode === 'authoring'
+  const uploadRef = useRef<HTMLInputElement>(null)
+  const [stampDraft, setStampDraft] = useState<StampDraft | null>(null)
+
+  const addStamp = (stamp: string) => {
+    onChange({
+      stamps: appendStamp(brush.stamps, stamp),
+      renderer: 'stamp',
+      spacing: Math.max(brush.spacing, brush.size * 0.75),
+    })
+  }
 
   return (
     <div className="paint-brush-inspector">
       {authoring ? (
         <>
+          <div className="paint-stamp-library">
+            <div className="paint-stamp-library-header">
+              <span>Stamps</span>
+              <div>
+                <Button onClick={() => setStampDraft({ source: 'draw' })}>
+                  <Pencil size={12} /> Draw
+                </Button>
+                <Button onClick={() => uploadRef.current?.click()}>
+                  <Plus size={12} /> Upload
+                </Button>
+                <input
+                  ref={uploadRef}
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    event.currentTarget.value = ''
+                    if (!file) return
+                    void readStampFile(file).then((imageUrl) => {
+                      setStampDraft({ source: 'upload', imageUrl })
+                    })
+                  }}
+                />
+              </div>
+            </div>
+            <ul className="paint-stamp-list">
+              {brush.stamps.map((stamp, index) => (
+                <li key={`${index}-${stamp.slice(0, 24)}`}>
+                  <div
+                    className="paint-stamp-tile"
+                    title={
+                      isImageStamp(stamp)
+                        ? isShapeStamp(stamp)
+                          ? 'Shape stamp'
+                          : 'Image stamp'
+                        : stamp
+                    }
+                  >
+                    <StampThumb stamp={stamp} />
+                    <span>
+                      {isImageStamp(stamp)
+                        ? isShapeStamp(stamp)
+                          ? 'Shape'
+                          : 'Image'
+                        : stamp}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChange({ stamps: removeStampAt(brush.stamps, index) })
+                      }
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+          {stampDraft ? (
+            <StampConfigModal
+              draft={stampDraft}
+              onSave={addStamp}
+              onClose={() => setStampDraft(null)}
+            />
+          ) : null}
           <PropertyRow label="Name">
             <TextField
               label="Name"
@@ -436,37 +535,6 @@ export function BrushInspector({
           />
         </label>
       ) : null}
-      {authoring ? <label className="paint-stamp-upload">
-        Upload stamp
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(event) => {
-            const file = event.target.files?.[0]
-            if (!file) return
-            void readStampFile(file).then((stamp) => {
-              onChange({
-                stamps: [stamp],
-                renderer: 'stamp',
-                // Line spacing smears overlapping copies of the art into a blob,
-                // so open it up enough that individual stamps read.
-                spacing: Math.max(brush.spacing, brush.size * 0.75),
-              })
-            })
-          }}
-        />
-        {imageStamp ? (
-          <span className="paint-stamp-preview">
-            <img src={imageStamp} alt="Current stamp" />
-            <button
-              type="button"
-              onClick={() => onChange({ stamps: ['dot'] })}
-            >
-              Remove
-            </button>
-          </span>
-        ) : null}
-      </label> : null}
     </div>
   )
 }
