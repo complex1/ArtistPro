@@ -3,7 +3,6 @@ import {
   ChevronRight,
   CircleQuestionMark,
   FolderOpen,
-  Layers,
   Moon,
   Paintbrush,
   PenTool,
@@ -34,7 +33,6 @@ const icons: Record<string, LucideIcon> = {
   'animated-paint': Paintbrush,
   cel: Sparkles,
   tappilot: Smartphone,
-  draw: Layers,
 }
 
 const modules = import.meta.glob('../../*/tool.json', {

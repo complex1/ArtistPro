@@ -8,14 +8,12 @@ export type AppRoute =
   | { page: 'cel-home' }
   | { page: 'cel-editor'; projectId: string }
   | { page: 'tappilot' }
-  | { page: 'draw' }
 
 export function parseHash(hash: string): AppRoute {
   const path = hash.replace(/^#/, '').replace(/^\/+|\/+$/g, '')
   if (!path) return { page: 'home' }
 
   const parts = path.split('/').filter(Boolean)
-  if (parts[0] === 'draw') return { page: 'draw' }
   if (parts[0] === 'tappilot') return { page: 'tappilot' }
   if (parts[0] !== 'svg' && parts[0] !== 'paint' && parts[0] !== 'cel') {
     return { page: 'home' }
@@ -62,7 +60,6 @@ export function toHash(route: AppRoute): string {
     return `#/cel/${encodeURIComponent(route.projectId)}`
   }
   if (route.page === 'tappilot') return '#/tappilot'
-  if (route.page === 'draw') return '#/draw'
   return `#/paint/${encodeURIComponent(route.projectId)}`
 }
 

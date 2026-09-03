@@ -38,5 +38,5 @@
       "@artist-studio/svg-tool": ["./apps/svg-tool/web/index.ts"]
     }
   },
-  "include": ["src", "apps", "common"]
+  "include": ["apps", "common"]
 }

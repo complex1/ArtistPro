@@ -28,10 +28,10 @@ const tools: ToolManifest[] = [
     apiPrefix: '/v1/apps/cel',
   },
   {
-    id: 'draw',
-    title: 'Draw',
-    blurb: 'Raster drawing',
-    route: '/draw',
+    id: 'future',
+    title: 'Future',
+    blurb: 'Not shipped yet',
+    route: '/future',
     status: 'coming-soon',
   },
 ]
@@ -111,6 +111,6 @@ describe('loadRecentProjects', () => {
 
     const requested = fetchStub.mock.calls.map(([url]) => url)
     expect(requested).toHaveLength(3)
-    expect(requested.some((url) => url.includes('draw'))).toBe(false)
+    expect(requested.some((url) => url.includes('future'))).toBe(false)
   })
 })

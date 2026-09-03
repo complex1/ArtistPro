@@ -157,56 +157,6 @@ function CelArt() {
   )
 }
 
-function Fir({
-  x,
-  base,
-  height,
-}: {
-  x: number
-  base: number
-  height: number
-}) {
-  const width = height * 0.42
-  const tier = (top: number, spread: number) =>
-    `M${x} ${base - height * top}L${x + width * spread} ${
-      base - height * (top - 0.28)
-    }H${x - width * spread}Z`
-  return (
-    <g>
-      <path d={tier(1, 0.5)} />
-      <path d={tier(0.78, 0.72)} />
-      <path d={tier(0.54, 0.95)} />
-      <path d={`M${x} ${base}v${-height * 0.34}`} />
-    </g>
-  )
-}
-
-function DrawArt() {
-  return (
-    <Art>
-      <rect width="240" height="132" fill="#e9e6dd" />
-      <g stroke="#9a9ca3" strokeWidth="1.2" fill="none" strokeLinecap="round">
-        <path d="M150 28c8-7 19-3 21 5 8-2 14 3 14 9h-47c0-9 5-14 12-14z" />
-        <path d="M190 46c6-5 14-2 16 4h-29c1-3 5-6 13-4" />
-      </g>
-      <g stroke="#6a6e78" strokeWidth="1.5" fill="none" strokeLinejoin="round">
-        <path d="M4 92l40-46 24 28 15-17 32 35" />
-        <path d="M104 92l36-42 32 42" />
-        <path d="M30 56l14 12M128 62l12 10" />
-      </g>
-      <g stroke="#4d525c" strokeWidth="1.4" fill="none" strokeLinejoin="round">
-        <Fir x={52} base={122} height={54} />
-        <Fir x={88} base={124} height={38} />
-        <Fir x={196} base={124} height={46} />
-      </g>
-      <g stroke="#82868f" strokeWidth="1.2" fill="none" strokeLinecap="round">
-        <path d="M0 112h30M106 116h58M164 110h76" />
-        <path d="M140 126h100M0 126h34" />
-      </g>
-    </Art>
-  )
-}
-
 function SvgArt() {
   return (
     <Art>
@@ -256,7 +206,6 @@ function SvgArt() {
 const ART: Record<string, () => ReactNode> = {
   'animated-paint': PaintArt,
   cel: CelArt,
-  draw: DrawArt,
   'svg-tool': SvgArt,
 }
 

@@ -12,6 +12,7 @@ describe('app routes', () => {
     expect(parseHash('')).toEqual({ page: 'home' })
     expect(parseHash('#/')).toEqual({ page: 'home' })
     expect(parseHash('#/unknown')).toEqual({ page: 'home' })
+    expect(parseHash('#/draw')).toEqual({ page: 'home' })
   })
 
   it('opens the SVG tool hub and a project editor', () => {
@@ -47,11 +48,6 @@ describe('app routes', () => {
     })
   })
 
-  it('opens the raster Draw engine host', () => {
-    expect(parseHash('#/draw')).toEqual({ page: 'draw' })
-    expect(parseHash('#/draw/')).toEqual({ page: 'draw' })
-  })
-
   it('opens TapPilot', () => {
     expect(parseHash('#/tappilot')).toEqual({ page: 'tappilot' })
   })
@@ -68,7 +64,6 @@ describe('app routes', () => {
       { page: 'cel-home' },
       { page: 'cel-editor', projectId: 'still' },
       { page: 'tappilot' },
-      { page: 'draw' },
     ]
     for (const route of routes) {
       expect(parseHash(toHash(route))).toEqual(route)
@@ -94,8 +89,8 @@ describe('app routes', () => {
     })
   })
 
-  it('has no destination for tools without a screen yet', () => {
-    expect(toolHomeRoute('/draw')).toBeUndefined()
-    expect(projectRoute('/draw', 'p3')).toBeUndefined()
+  it('has no destination for unknown tool routes', () => {
+    expect(toolHomeRoute('/missing')).toBeUndefined()
+    expect(projectRoute('/missing', 'p3')).toBeUndefined()
   })
 })

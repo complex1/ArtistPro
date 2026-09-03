@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react'
 import './App.css'
-import { navigate } from './app/routes'
 import { useHashRoute } from './app/useHashRoute'
 import { ArtistHome } from './ArtistHome'
 import { SvgEditor, SvgToolHome } from '@artist-studio/svg-tool'
@@ -45,12 +44,6 @@ export default function App() {
     } else if (route.page === 'tappilot') {
       document.title = 'TapPilot — Artist Pro'
     } else document.title = 'Artist Pro'
-  }, [route])
-
-  useEffect(() => {
-    if (route.page === 'draw') {
-      navigate({ page: 'home' })
-    }
   }, [route])
 
   if (route.page === 'svg-home') return <SvgToolHome />
