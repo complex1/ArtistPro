@@ -7,7 +7,7 @@ const executor = require("./executor.cjs");
 const { createLanServer } = require("./server.cjs");
 
 let isDev = false;
-let getMainWindow = () => null;
+let getWindows = () => [];
 let phoneOutputPath = null;
 let lanServer = null;
 let serverInfo = {
@@ -20,18 +20,20 @@ let starting = false;
 let stopping = false;
 let initialized = false;
 
-function broadcastLog(payload) {
-  const mainWindow = getMainWindow();
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("logs:entry", payload);
+// TapPilot can be open in any window, so every window hears the update and the
+// ones without a TapPilot view simply ignore it.
+function broadcast(channel, payload) {
+  for (const win of getWindows()) {
+    if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
   }
 }
 
+function broadcastLog(payload) {
+  broadcast("logs:entry", payload);
+}
+
 function broadcastServerStatus() {
-  const mainWindow = getMainWindow();
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("server:status", withPhoneUrl(serverInfo));
-  }
+  broadcast("server:status", withPhoneUrl(serverInfo));
 }
 
 function withPhoneUrl(info) {
@@ -304,8 +306,8 @@ async function initialize(options = {}) {
   if (initialized) return withPhoneUrl(serverInfo);
   initialized = true;
   isDev = Boolean(options.isDev);
-  getMainWindow =
-    typeof options.getMainWindow === "function" ? options.getMainWindow : getMainWindow;
+  getWindows =
+    typeof options.getWindows === "function" ? options.getWindows : getWindows;
   phoneOutputPath = options.phoneDistPath || null;
   logger.setOnAppend((payload) => broadcastLog(payload));
   logger.startPruneLoop();

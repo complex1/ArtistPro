@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('artistStudio', {
   getApiBase: () => ipcRenderer.invoke('artist:get-api-base'),
+  openToolWindow: (hash) => ipcRenderer.invoke('artist:open-window', hash),
 })
 
 contextBridge.exposeInMainWorld('tapPilot', {

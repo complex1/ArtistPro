@@ -14,6 +14,8 @@ const tapPilot = require('../../tappilot/electron/runtime.cjs')
 let sidecar = null
 let apiBase = 'http://127.0.0.1:8765'
 let mainWindow = null
+/** Tool windows keyed by route hash, so a second click focuses the open one. */
+const toolWindows = new Map()
 
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -86,7 +88,7 @@ function stopSidecar() {
   sidecar = null
 }
 
-function createWindow() {
+function createWindow(hash = '#/') {
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -101,11 +103,17 @@ function createWindow() {
   if (devUrl) {
     const url = new URL(devUrl)
     url.searchParams.set('apiBase', apiBase)
+    url.hash = hash
     void win.loadURL(url.toString())
   } else {
     const index = path.join(repoRoot, 'dist/index.html')
-    void win.loadFile(index, { query: { apiBase } })
+    void win.loadFile(index, { query: { apiBase }, hash })
   }
+  return win
+}
+
+function createHomeWindow() {
+  const win = createWindow()
   mainWindow = win
   win.on('closed', () => {
     if (mainWindow === win) mainWindow = null
@@ -113,16 +121,39 @@ function createWindow() {
   return win
 }
 
+function openToolWindow(hash) {
+  // Only in-app routes may be opened; anything else falls back to home.
+  const target = typeof hash === 'string' && hash.startsWith('#/') ? hash : '#/'
+  const open = toolWindows.get(target)
+  if (open && !open.isDestroyed()) {
+    if (open.isMinimized()) open.restore()
+    open.focus()
+    // The window may have navigated elsewhere since it opened, so send it back.
+    const route = JSON.stringify(target)
+    void open.webContents.executeJavaScript(
+      `if (location.hash !== ${route}) location.hash = ${route}`,
+    )
+    return true
+  }
+  const win = createWindow(target)
+  toolWindows.set(target, win)
+  win.on('closed', () => {
+    if (toolWindows.get(target) === win) toolWindows.delete(target)
+  })
+  return true
+}
+
 ipcMain.handle('artist:get-api-base', () => apiBase)
+ipcMain.handle('artist:open-window', (_event, hash) => openToolWindow(hash))
 
 app.whenReady().then(async () => {
   await startSidecar()
   await tapPilot.initialize({
     isDev: Boolean(process.env.VITE_DEV_SERVER_URL),
-    getMainWindow: () => mainWindow,
+    getWindows: () => BrowserWindow.getAllWindows(),
     phoneDistPath: path.join(repoRoot, 'dist-tappilot-phone'),
   })
-  createWindow()
+  createHomeWindow()
 })
 
 app.on('window-all-closed', async () => {

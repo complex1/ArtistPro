@@ -2172,44 +2172,9 @@ body.is-scrubbing { cursor: ew-resize; user-select: none; }
   overflow-y: auto;
 }
 
-.home-hero,
 .home-section {
   max-width: 1240px;
   margin: 0 auto;
-}
-
-.home-hero h1 {
-  margin: 0 0 8px;
-  font-size: 34px;
-  font-weight: 600;
-  letter-spacing: -0.035em;
-}
-
-.home-hero p {
-  margin: 0 0 22px;
-  color: var(--text-muted);
-  font-size: 14px;
-}
-
-.home-hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 34px;
-}
-
-.home-hero-actions .button {
-  min-height: 44px;
-  gap: 8px;
-  padding: 0 20px;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.home-hero-actions .button.outline:hover:not(:disabled) {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .home-section + .home-section { margin-top: 34px; }
@@ -2555,7 +2520,6 @@ body.is-scrubbing { cursor: ew-resize; user-select: none; }
   }
 
   .home-main { padding: 28px 16px 48px; }
-  .home-hero h1 { font-size: 26px; }
 }
 
 .svg-home {

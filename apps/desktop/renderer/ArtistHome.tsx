@@ -2,11 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ChevronRight,
   CircleQuestionMark,
-  FolderOpen,
   Moon,
   Paintbrush,
   PenTool,
-  Plus,
   Search,
   Settings,
   Sparkles,
@@ -16,9 +14,9 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { parseToolManifests, type ToolManifest } from '@artist-studio/tool-registry'
-import { getConfig, setConfig } from '@artist-studio/idb-config'
-import { Button, IconButton } from '@artist-studio/ui-component'
-import { navigate, projectRoute, toolHomeRoute } from './app/routes'
+import { IconButton } from '@artist-studio/ui-component'
+import { projectRoute, toolHomeRoute } from './app/routes'
+import { openInWindow } from './app/windows'
 import { useTheme } from './app/useTheme'
 import { RecentProjectCard } from './home/RecentProjectCard'
 import { ToolPreview } from './home/ToolPreview'
@@ -58,15 +56,13 @@ function isOpenable(tool: ToolManifest): boolean {
 function openTool(tool: ToolManifest) {
   const route = toolHomeRoute(tool.route)
   if (!isOpenable(tool) || !route) return
-  void setConfig('last-tool', tool.id)
-  navigate(route)
+  openInWindow(route)
 }
 
 function openProject(project: RecentProject) {
   const route = projectRoute(project.toolRoute, project.id)
   if (!route) return
-  void setConfig('last-tool', project.toolId)
-  navigate(route)
+  openInWindow(route)
 }
 
 export function ArtistHome() {
@@ -115,14 +111,6 @@ export function ArtistHome() {
       ? matchedProjects
       : matchedProjects.slice(0, COLLAPSED_PROJECTS)
 
-  const startNewProject = () => {
-    const ready = tools.filter(isOpenable)
-    void getConfig<string>('last-tool').then((lastId) => {
-      const tool = ready.find((item) => item.id === lastId) ?? ready[0]
-      if (tool) openTool(tool)
-    })
-  }
-
   const removeProject = (project: RecentProject) => {
     if (!window.confirm(`Delete “${project.name}”? This cannot be undone.`)) {
       return
@@ -131,8 +119,6 @@ export function ArtistHome() {
       .then(loadProjects)
       .catch(() => setProjectsError(`Could not delete “${project.name}”.`))
   }
-
-  const latestProject = projects[0]
 
   return (
     <div className="home-shell">
@@ -194,28 +180,6 @@ export function ArtistHome() {
       </header>
 
       <main className="home-main">
-        <section className="home-hero">
-          <h1>What will you create today?</h1>
-          <p>Choose a creative tool or continue a recent project.</p>
-          <div className="home-hero-actions">
-            <Button variant="primary" onClick={startNewProject}>
-              <Plus size={16} /> New Project
-            </Button>
-            <Button
-              variant="outline"
-              disabled={!latestProject}
-              title={
-                latestProject
-                  ? `Open ${latestProject.name}`
-                  : 'No projects to open yet'
-              }
-              onClick={() => latestProject && openProject(latestProject)}
-            >
-              <FolderOpen size={16} /> Open Project
-            </Button>
-          </div>
-        </section>
-
         <section className="home-section" aria-label="Tools">
           <div className="home-section-head">
             <h2 className="home-kicker">Tools</h2>

@@ -4,6 +4,7 @@ declare global {
   interface Window {
     artistStudio?: {
       getApiBase?: () => Promise<string>
+      openToolWindow?: (hash: string) => Promise<boolean>
     }
     __ARTIST_API_BASE__?: string
   }
