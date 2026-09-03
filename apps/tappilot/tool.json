@@ -1,0 +1,7 @@
+{
+  "id": "tappilot",
+  "title": "TapPilot",
+  "blurb": "Control desktop shortcuts from your phone",
+  "route": "/tappilot",
+  "status": "ready"
+}

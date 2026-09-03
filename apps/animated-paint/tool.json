@@ -1,0 +1,8 @@
+{
+  "id": "animated-paint",
+  "title": "Animated Paint",
+  "blurb": "Living procedural brushes",
+  "route": "/paint",
+  "status": "ready",
+  "apiPrefix": "/v1/apps/animated-paint"
+}

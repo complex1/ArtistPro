@@ -4,6 +4,7 @@ export { createDocument, createLayer } from './document'
 export { createBrush, builtinBrushes } from './presets'
 export { parseBrush, importBrushFile } from './schema'
 export { createCelDrawEngine, stampStroke } from './celAdapter'
+export { createPaperHost } from './vector/paperHost'
 export type {
   BlendMode,
   BrushConfig,

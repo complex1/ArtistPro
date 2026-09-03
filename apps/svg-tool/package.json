@@ -1,0 +1,8 @@
+{
+  "name": "@artist-studio/svg-tool",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./web/index.ts"
+  }
+}

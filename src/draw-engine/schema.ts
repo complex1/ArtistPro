@@ -1,4 +1,9 @@
-import { applyShapeMask, isImageStamp, isShapeStamp, stampPaintSrc } from '../paint/v2/core/stamp'
+import {
+  applyShapeMask,
+  isImageStamp,
+  isShapeStamp,
+  stampPaintSrc,
+} from '@artist-studio/utils'
 import { createBrush } from './presets'
 import { isBlendMode } from './document'
 import type { BlendMode, BrushConfig, RotationMode, StampImage, TipKind } from './types'

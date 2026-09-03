@@ -522,7 +522,7 @@ const catalog = {
 }
 
 writeFileSync(
-  new URL('../src/model/animationPresets.json', import.meta.url),
+  new URL('../apps/svg-tool/web/model/animationPresets.json', import.meta.url),
   `${JSON.stringify(catalog, null, 2)}\n`,
 )
 console.log(`wrote ${presets.length} presets`)

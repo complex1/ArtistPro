@@ -1,13 +1,32 @@
 {
-  "name": "svg-tool",
+  "name": "artist-studio",
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "apps/desktop/electron/main.mjs",
+  "workspaces": [
+    "apps/desktop",
+    "apps/svg-tool",
+    "apps/animated-paint",
+    "apps/cel",
+    "apps/tappilot",
+    "common/ui-component",
+    "common/utils",
+    "common/packages/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "start": "node scripts/start.mjs",
+    "dev": "concurrently -k -n web,phone,desktop -c cyan,yellow,magenta \"npm run dev:web\" \"npm run dev:tappilot-phone\" \"npm run dev:electron\"",
+    "dev:web": "vite",
+    "dev:tappilot-phone": "vite --config apps/tappilot/vite.phone.config.ts",
+    "dev:api": "PYTHONPATH=. .venv/bin/python -m uvicorn backend.host.main:app --host 127.0.0.1 --port 8765",
+    "dev:electron": "wait-on http://127.0.0.1:5173 && VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
+    "build": "tsc -b && vite build && vite build --config apps/tappilot/vite.phone.config.ts",
     "lint": "oxlint",
-    "test": "vitest run",
+    "test": "vitest run && npm run test:tappilot && npm run test:api",
+    "test:tappilot": "npm test --workspace=@artist-studio/tappilot",
+    "test:api": "PYTHONPATH=. .venv/bin/python -m pytest",
+    "setup:api": "python3 -m venv .venv && .venv/bin/pip install fastapi 'uvicorn[standard]' pytest httpx",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -23,12 +42,14 @@
     "imagetracerjs": "^1.2.6",
     "immer": "^11.1.18",
     "jsep": "^1.4.0",
+    "konva": "^10.3.2",
     "lucide-react": "^1.33.0",
     "mediabunny": "^1.55.2",
     "nanoid": "^6.0.1",
     "perfect-freehand": "^1.2.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-konva": "^19.2.5",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
@@ -37,9 +58,12 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "@xmldom/xmldom": "^0.9.12",
+    "concurrently": "^9.2.1",
+    "electron": "^39.5.2",
     "oxlint": "^1.75.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.0",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "wait-on": "^9.0.3"
   }
 }

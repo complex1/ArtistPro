@@ -1,0 +1,8 @@
+{
+  "id": "cel",
+  "title": "Cel Restoration",
+  "blurb": "Restore artwork and export SVG",
+  "route": "/cel",
+  "status": "ready",
+  "apiPrefix": "/v1/apps/cel"
+}

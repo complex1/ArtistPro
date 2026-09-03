@@ -1,0 +1,8 @@
+{
+  "name": "@artist-studio/ui-component",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

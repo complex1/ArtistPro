@@ -1,0 +1,6 @@
+{
+  "name": "@artist-studio/desktop",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.mjs"
+}

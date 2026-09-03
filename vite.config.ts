@@ -1,7 +1,55 @@
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
+const root = path.dirname(fileURLToPath(import.meta.url))
+
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@artist-studio/ui-component': path.resolve(
+        root,
+        'common/ui-component/src/index.ts',
+      ),
+      '@artist-studio/utils': path.resolve(root, 'common/utils/src/index.ts'),
+      '@artist-studio/api-client': path.resolve(
+        root,
+        'common/packages/api-client/src/index.ts',
+      ),
+      '@artist-studio/idb-config': path.resolve(
+        root,
+        'common/packages/idb-config/src/index.ts',
+      ),
+      '@artist-studio/render': path.resolve(
+        root,
+        'common/packages/render/src',
+      ),
+      '@artist-studio/tool-registry': path.resolve(
+        root,
+        'common/packages/tool-registry/src/index.ts',
+      ),
+      '@artist-studio/svg-tool': path.resolve(
+        root,
+        'apps/svg-tool/web/index.ts',
+      ),
+      '@artist-studio/animated-paint': path.resolve(
+        root,
+        'apps/animated-paint/web/index.ts',
+      ),
+      '@artist-studio/cel': path.resolve(root, 'apps/cel/web/index.ts'),
+      '@artist-studio/tappilot': path.resolve(
+        root,
+        'apps/tappilot/src/index.ts',
+      ),
+    },
+  },
+  server: {
+    // Electron waits on 127.0.0.1, so bind IPv4 explicitly instead of letting
+    // "localhost" resolve to ::1 only.
+    host: '127.0.0.1',
+    port: 5173,
+    strictPort: true,
+  },
 })

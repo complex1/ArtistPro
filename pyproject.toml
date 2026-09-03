@@ -1,0 +1,23 @@
+[project]
+name = "artist-studio-backend"
+version = "0.0.0"
+description = "Local FastAPI sidecar for Artist Studio"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.32",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.28",
+  "pytest>=8.3",
+]
+
+[tool.fastapi]
+entrypoint = "backend.host.main:app"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["backend", "apps"]
+addopts = ["--import-mode=importlib"]

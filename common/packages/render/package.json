@@ -1,0 +1,14 @@
+{
+  "name": "@artist-studio/render",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./frameSchedule": "./src/frameSchedule.ts",
+    "./gifEncoder": "./src/gifEncoder.ts",
+    "./imageSequence": "./src/imageSequence.ts",
+    "./rasterize": "./src/rasterize.ts",
+    "./types": "./src/types.ts",
+    "./videoEncoder": "./src/videoEncoder.ts"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "@artist-studio/animated-paint",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./web/index.ts"
+  }
+}

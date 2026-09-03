@@ -1,0 +1,8 @@
+{
+  "id": "svg-tool",
+  "title": "SVG Studio",
+  "blurb": "Draw, animate and export vector motion",
+  "route": "/svg",
+  "status": "ready",
+  "apiPrefix": "/v1/apps/svg-tool"
+}

@@ -1,0 +1,423 @@
+:root {
+  color-scheme: dark;
+  --bg: #05070d;
+  --bg-2: #080c14;
+  --panel: rgba(12, 18, 28, 0.9);
+  --border: #17263a;
+  --text: #e6f0ff;
+  --muted: #7d8ea8;
+  --cyan: #22d3ee;
+  --purple: #a855f7;
+  --green: #34ffb0;
+  --font: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  --glow-cyan: 0 0 0 1px rgba(34, 211, 238, 0.4), 0 0 16px rgba(34, 211, 238, 0.3);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  min-height: 100dvh;
+  background:
+    radial-gradient(700px 400px at 50% -15%, rgba(34, 211, 238, 0.12), transparent 60%),
+    radial-gradient(600px 400px at 100% 0%, rgba(168, 85, 247, 0.12), transparent 55%),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  /* Avoid rubber-banding chrome when installed as a standalone app. */
+  overscroll-behavior: none;
+}
+
+.phone-app {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 16px 14px 40px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+  padding-left: calc(14px + env(safe-area-inset-left, 0px));
+  padding-right: calc(14px + env(safe-area-inset-right, 0px));
+}
+
+.phone-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.phone-header h1 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: 0.04em;
+}
+
+.phone-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.phone-brand img {
+  width: 44px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.phone-header button {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 14px;
+}
+
+.phone-header button:active {
+  box-shadow: var(--glow-cyan);
+}
+
+.phone-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fs-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0 !important;
+}
+
+.card-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.card-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
+
+.card-thumb.sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+
+.card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 14px;
+  text-align: left;
+  color: inherit;
+  width: 100%;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.card:active {
+  border-color: var(--cyan);
+  box-shadow: var(--glow-cyan);
+}
+
+.card h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.status {
+  color: var(--muted);
+  text-align: center;
+  padding: 48px 12px;
+}
+
+.install-prompt {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 12px 12px 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  background: linear-gradient(
+    160deg,
+    rgba(14, 28, 42, 0.95),
+    rgba(8, 14, 24, 0.95)
+  );
+}
+
+.install-prompt-body {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.install-prompt-body strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.install-prompt-body p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.install-prompt-body .inline-icon {
+  display: inline;
+  vertical-align: -2px;
+}
+
+.install-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.install-btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: var(--cyan);
+  color: #041018;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.install-dismiss {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px;
+  border-radius: 8px;
+}
+
+.phone-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 50;
+  max-width: min(92vw, 360px);
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #1a2433;
+  border: 1px solid #3a4d66;
+  color: #f8d7da;
+  font-size: 13px;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* ---------- Control surface ---------- */
+.phone-deck-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 0 2px 10px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.phone-deck-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.phone-deck-tab {
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.phone-deck-tab.active {
+  border-color: var(--cyan);
+  color: var(--text);
+  background: rgba(34, 211, 238, 0.12);
+}
+
+.deck-pager {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.deck-pager::-webkit-scrollbar {
+  display: none;
+}
+
+.deck-page {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  min-width: 100%;
+}
+
+.surface-wrap {
+  width: 100%;
+  overflow: auto;
+  padding-bottom: 8px;
+}
+
+.surface {
+  display: grid;
+  margin: 0 auto;
+}
+
+/* Card look lives in shared/widgets.css (.wf-card) */
+
+/* ---- Style-driven press feedback (shared by all widget types) ---- */
+.kp::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 18px var(--k-press-glow, var(--cyan));
+  opacity: 0;
+  transition: opacity var(--k-press-dur, 120ms) ease;
+  pointer-events: none;
+}
+
+.kp:active {
+  border-color: var(--k-press-glow, var(--cyan));
+  box-shadow: var(--k-shadow-press, none);
+}
+
+.kp:active::after {
+  opacity: var(--k-press-glow-a, 0.6);
+}
+
+.kp-anim-none:active {
+  border-color: var(--k-border, var(--border));
+}
+
+.kp-anim-none:active::after {
+  opacity: 0;
+}
+
+.kp-anim-scale:active {
+  transform: scale(var(--k-press-scale, 0.97));
+}
+
+.kp-anim-pulse:active {
+  animation: kpPulse var(--k-press-dur, 300ms) ease infinite;
+}
+
+.kp-anim-ripple::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid var(--k-press-glow, var(--cyan));
+  opacity: 0;
+  pointer-events: none;
+}
+
+.kp-anim-ripple:active::before {
+  animation: kpRipple var(--k-press-dur, 400ms) ease infinite;
+}
+
+@keyframes kpPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(var(--k-press-scale, 0.97));
+  }
+}
+
+@keyframes kpRipple {
+  0% {
+    opacity: var(--k-press-glow-a, 0.6);
+    transform: scale(0.85);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+}
+
+.knob {
+  cursor: grab;
+}
+
+.knob:active {
+  cursor: grabbing;
+}
+
+/* ---------- Trackpad ---------- */
+.trackpad.fill {
+  flex: 1;
+  width: 100%;
+}
+
+.trackpad-launch {
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+.trackpad-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(3, 6, 12, 0.97);
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+}
+
+.trackpad-overlay-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 6px 12px;
+}
+
+.tp-close {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+}
+
+.tp-close:active {
+  box-shadow: var(--glow-cyan);
+}

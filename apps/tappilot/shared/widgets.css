@@ -1,0 +1,302 @@
+/*
+ * Shared deck widget design (editor canvas + phone remote).
+ * All colors come from key-style custom properties so per-widget styles apply.
+ */
+
+.wf-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 7px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  text-align: center;
+  color: var(--k-text, #e6f0ff);
+  border: var(--k-border-w, 1px) solid var(--k-border, #17263a);
+  border-radius: var(--k-radius, 16px);
+  background: linear-gradient(
+    160deg,
+    var(--k-bg1, #0e1826),
+    var(--k-bg2, #0a121d)
+  );
+  box-shadow: var(--k-shadow, none);
+  touch-action: none;
+  user-select: none;
+  transition: transform var(--k-press-dur, 120ms) ease, box-shadow 0.12s,
+    border-color 0.12s;
+}
+
+.wf-card svg,
+.wf-card .app-icon-mask {
+  color: var(--k-icon, var(--k-text, #e6f0ff));
+}
+
+/* ---------- Shared text ---------- */
+.wf-title {
+  flex: 0 0 auto;
+  max-width: 100%;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: var(--k-text, #e6f0ff);
+  opacity: 0.9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-title.start {
+  align-self: flex-start;
+  position: relative;
+  z-index: 2;
+}
+
+.wf-name {
+  max-width: 100%;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--k-text, #e6f0ff);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-badge {
+  max-width: 100%;
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  color: var(--k-text, #e6f0ff);
+  opacity: 0.55;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-value {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--k-text, #e6f0ff);
+  opacity: 0.75;
+}
+
+/* ---------- Button ---------- */
+.wf-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* ---------- Knob ---------- */
+.wf-knob {
+  position: relative;
+  flex: 1 1 auto;
+  align-self: center;
+  aspect-ratio: 1 / 1;
+  min-height: 0;
+  max-width: 100%;
+}
+
+.wf-knob-arc {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.wf-knob-track {
+  fill: none;
+  stroke: var(--knob-ring, #23364d);
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+
+.wf-knob-progress {
+  fill: none;
+  stroke: var(--knob-notch, #22d3ee);
+  stroke-width: 7;
+  stroke-linecap: round;
+  filter: drop-shadow(
+    0 0 calc(2.5px * var(--knob-glow, 1)) var(--knob-notch, #22d3ee)
+  );
+  transition: stroke-dasharray 60ms linear;
+}
+
+.wf-knob-dome {
+  position: absolute;
+  inset: 15%;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(
+    circle at 50% 28%,
+    var(--knob-dial, #16273a),
+    #080f19 78%
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -6px 14px rgba(0, 0, 0, 0.55), 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+.wf-knob-dome svg,
+.wf-knob-dome .app-icon-mask {
+  opacity: 0.65;
+}
+
+.wf-knob-pointer {
+  position: absolute;
+  inset: 15%;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.wf-knob-notch {
+  position: absolute;
+  top: 9%;
+  left: 50%;
+  width: 6%;
+  min-width: 3px;
+  height: 17%;
+  margin-left: -3%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+/* ---------- Slider ---------- */
+.wf-slider {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  padding: 4px 0;
+}
+
+.wf-slider-track {
+  position: relative;
+  border-radius: 999px;
+  background: var(--knob-ring, #23364d);
+}
+
+.wf-slider.vertical .wf-slider-track {
+  width: 4px;
+  height: 100%;
+  min-height: 24px;
+}
+
+.wf-slider.horizontal .wf-slider-track {
+  width: 100%;
+  height: 4px;
+}
+
+.wf-slider-fill {
+  position: absolute;
+  border-radius: 999px;
+  background: var(--k-glow, #22d3ee);
+}
+
+.wf-slider.vertical .wf-slider-fill {
+  left: 0;
+  bottom: 0;
+  width: 100%;
+}
+
+.wf-slider.horizontal .wf-slider-fill {
+  top: 0;
+  left: 0;
+  height: 100%;
+}
+
+.wf-slider-thumb {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--k-glow, #22d3ee);
+  box-shadow: 0 0 10px var(--k-glow, #22d3ee),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.wf-slider.vertical .wf-slider-thumb {
+  left: 50%;
+  transform: translate(-50%, 50%);
+}
+
+.wf-slider.horizontal .wf-slider-thumb {
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* ---------- Trackpad ---------- */
+.wf-card.wf-trackpad {
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 9px 10px;
+}
+
+.wf-tp-curve {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 68%;
+  pointer-events: none;
+}
+
+.wf-tp-curve path {
+  fill: none;
+  stroke: var(--k-text, #e6f0ff);
+  stroke-opacity: 0.22;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.wf-tp-curve path.ghost {
+  stroke-opacity: 0.1;
+}
+
+.wf-tp-dot {
+  position: absolute;
+  top: 16%;
+  right: 11%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--k-glow, #22d3ee);
+  box-shadow: 0 0 12px var(--k-glow, #22d3ee);
+  pointer-events: none;
+}
+
+.wf-tp-hint {
+  position: absolute;
+  z-index: 2;
+  left: 10px;
+  bottom: 8px;
+  line-height: 1.4;
+  max-width: calc(100% - 20px);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--k-text, #e6f0ff);
+  opacity: 0.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}

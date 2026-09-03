@@ -19,7 +19,7 @@ Open **Animated Paint → Playground** (`#/paint/playground`).
 
 **From code**
 
-- Export: `JSON.stringify` of a validated brush (see `src/paint/v2/brushTransfer.ts`).
+- Export: `JSON.stringify` of a validated brush (see `apps/animated-paint/web/paint/v2/brushTransfer.ts`).
 - Import: parse JSON → validate with `parseBrush` → assign a new `id` and `category: "Custom"`.
 - Invalid JSON, or a value that is not an object, is rejected (`That file is not a valid brush config.`).
 
@@ -267,9 +267,9 @@ Imported brushes live in the same local brush library as editor-created ones (`l
 
 | Piece | Path |
 | --- | --- |
-| Import / export | `src/paint/v2/brushTransfer.ts` |
-| Validation and clamps | `src/paint/v2/core/schema.ts` |
-| Defaults | `src/paint/v2/core/defaults.ts` |
-| Built-in animation examples | `src/paint/v2/presets.ts` |
-| Sandbox | `src/paint/v2/animation/evaluate.ts` |
-| Frame pipeline | `src/paint/v2/render/engine.ts` |
+| Import / export | `apps/animated-paint/web/paint/v2/brushTransfer.ts` |
+| Validation and clamps | `apps/animated-paint/web/paint/v2/core/schema.ts` |
+| Defaults | `apps/animated-paint/web/paint/v2/core/defaults.ts` |
+| Built-in animation examples | `apps/animated-paint/web/paint/v2/presets.ts` |
+| Sandbox | `apps/animated-paint/web/paint/v2/animation/evaluate.ts` |
+| Frame pipeline | `apps/animated-paint/web/paint/v2/render/engine.ts` |

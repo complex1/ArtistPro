@@ -7,6 +7,7 @@
     "types": ["vite/client"],
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,
+    "ignoreDeprecations": "6.0",
 
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -21,7 +22,21 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "baseUrl": ".",
+    "paths": {
+      "@artist-studio/ui-component": ["./common/ui-component/src/index.ts"],
+      "@artist-studio/utils": ["./common/utils/src/index.ts"],
+      "@artist-studio/api-client": ["./common/packages/api-client/src/index.ts"],
+      "@artist-studio/idb-config": ["./common/packages/idb-config/src/index.ts"],
+      "@artist-studio/render": ["./common/packages/render/src/index.ts"],
+      "@artist-studio/render/*": ["./common/packages/render/src/*"],
+      "@artist-studio/tool-registry": ["./common/packages/tool-registry/src/index.ts"],
+      "@artist-studio/animated-paint": ["./apps/animated-paint/web/index.ts"],
+      "@artist-studio/cel": ["./apps/cel/web/index.ts"],
+      "@artist-studio/tappilot": ["./apps/tappilot/src/index.ts"],
+      "@artist-studio/svg-tool": ["./apps/svg-tool/web/index.ts"]
+    }
   },
-  "include": ["src"]
+  "include": ["src", "apps", "common"]
 }
