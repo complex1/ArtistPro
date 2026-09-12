@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createBrushV2 } from '../core/defaults'
 import {
   fromPointer,
+  randomStrokeSeed,
   resampleStroke,
   sampleStroke,
   scatterPoints,
@@ -40,6 +41,15 @@ describe('v2 input sampler', () => {
     const scatteredB = scatterPoints(sampled, 0, 8, 7)
     expect(scatteredA).toEqual(scatteredB)
     expect(scatteredA[1].y).not.toBe(sampled[1].y)
+  })
+
+  it('draws a fresh seed per live stroke', () => {
+    const seeds = new Set(Array.from({ length: 50 }, randomStrokeSeed))
+    expect(seeds.size).toBeGreaterThan(40)
+    for (const seed of seeds) {
+      expect(Number.isInteger(seed)).toBe(true)
+      expect(seed).toBeGreaterThan(0)
+    }
   })
 
   it('snapshots the brush at draw time', () => {

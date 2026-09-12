@@ -25,7 +25,12 @@ import { brushFileName, exportBrushJson, importBrushJson } from '../brushTransfe
 import { createBrushV2, createDocumentV2, emptyPoint } from '../core/defaults'
 import { parseBrush } from '../core/schema'
 import type { BrushV2, StrokePointV2, StrokeV2 } from '../core/types'
-import { fromPointer, snapshotStroke, stabilizePoint } from '../input/sampler'
+import {
+  fromPointer,
+  randomStrokeSeed,
+  snapshotStroke,
+  stabilizePoint,
+} from '../input/sampler'
 import { BUILTIN_BRUSHES } from '../presets'
 import { renderDocumentV2 } from '../render/engine'
 import { BrushInspector } from '../ui/BrushInspector'
@@ -150,7 +155,7 @@ function BrushEditor({ brushId }: { brushId: string }) {
     const point = stabilizePoint(pointFromEvent(event), null, brush.stability)
     drawing.current = true
     lastPoint.current = point
-    const stroke = snapshotStroke(brush, [point], 'playground')
+    const stroke = snapshotStroke(brush, [point], 'playground', randomStrokeSeed())
     setStrokes((current) => [...current, stroke])
     try {
       event.currentTarget.setPointerCapture(event.pointerId)

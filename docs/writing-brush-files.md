@@ -186,8 +186,8 @@ The name **must** be `animate`. Arrow functions assigned to another name will fa
 
 Also in scope (not parameters):
 
-- `rng()` — seeded random in `[0, 1)`. Same seed + time → same result. Prefer this over `Math.random()`.
-- `seed` — numeric seed for this stroke.
+- `rng()` — seeded random in `[0, 1)`. Prefer this over `Math.random()`. It is reseeded from the stroke seed on every frame, so the *n*th call returns the same number every frame. That is what you want for randomness baked into the stroke; for randomness that changes over time, hash the frame number instead (see [Anime line boil](#patterns)).
+- `seed` — numeric seed for this stroke. Every stroke drawn on the canvas or in the playground gets its own random seed, saved with the stroke, so hashing `seed` is how a script varies one stroke from the next without ever changing what an existing stroke looks like. Previews and tests pass a fixed seed instead.
 - `Math` — standard Math.
 
 ### Sandbox
@@ -227,6 +227,46 @@ Copy `config.shadow` onto items if you want the brush shadow to show in animatio
 **Wiggle / wave** — offset `x`/`y` with `Math.sin(time * k + n * k2)`.
 
 **Color cycle** — `color: "hsl(" + ((i * 12 + time * 80) % 360) + " 90% 55%)"`.
+
+**Anime line boil** — the shaky, noisy hand-drawn line. Two things make it read as anime rather than as a smooth wave: the wobble snaps to a low frame rate, and neighbouring points move together.
+
+```js
+var frame = Math.floor(time * 12); // boil at 12 fps, not per render frame
+
+function noise(cell, salt) {
+  var value = Math.sin(cell * 127.1 + salt * 311.7 + frame * 74.7 + seed * 0.017) * 43758.5453;
+  return (value - Math.floor(value)) * 2 - 1;
+}
+
+// Value noise along the stroke: pick a random value per node, fade between them.
+function wobble(along, nodes, salt) {
+  var scaled = along * nodes;
+  var cell = Math.floor(scaled);
+  var fade = scaled - cell;
+  fade = fade * fade * (3 - 2 * fade);
+  return noise(cell, salt) * (1 - fade) + noise(cell + 1, salt) * fade;
+}
+```
+
+Push each point along its normal by `wobble(n, 5, 1) * config.size * 0.35`, add a second `wobble` at a higher node count for finer grain, and scale the result by `0.35 + 0.65 * Math.sin(Math.PI * n)` so the stroke ends stay near where they were drawn. Sampling the noise per point instead of per node — or per render frame instead of per boil frame — gives buzzing static, not ink.
+
+The `boil` built-in (**Line Boil**, Motion) is this script. `speed` scales the boil rate: `0.5` is a 6 fps shoot-on-twos feel, `2` is 24 fps.
+
+**One texture per stroke** — a worn tool leaves a different mark each time you pick it up. Hash the stroke seed *without* the frame number, and the choice is random per stroke but fixed for that stroke's life:
+
+```js
+function strokeNoise(salt) {
+  var value = Math.sin(seed * 12.9898 + salt * 78.233) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+var texture = Math.min(3, Math.floor(strokeNoise(1) * 4));
+var stampIndex = config.stamps.length > 0 ? texture % config.stamps.length : 0;
+```
+
+Use `texture` to index tables of grain settings, and `stampIndex` to choose among the brush's stamps — so a brush loaded with 3–4 texture PNGs (or `shape:` masks, which get tinted with the brush color) gives each stroke one of them. Roll the choice from `seed` only; rolling it from `time` makes the texture flip while the stroke sits on the canvas.
+
+The `textureBoil` built-in (**Textured Boil**, Texture) combines this with the boil above. It emits one always-present body grain per sampled point plus edge grain that drops out for dry-brush gaps, and carries four settings tables — chalk, dry brush, rough ink, stipple — that differ in grain count, how far grain spreads across the path, dropout rate, and minimum opacity. Swap its `stamps` for your own textures and each stroke picks one.
 
 **Particles** — `kind: "particle"`, fade with `life`, move with `config.particle.velocity` and `rng()`.
 

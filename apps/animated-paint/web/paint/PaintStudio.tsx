@@ -39,7 +39,12 @@ import type {
   StrokeV2,
 } from './v2/core/types'
 import { strokeAtPoint } from './v2/input/hitTest'
-import { fromPointer, snapshotStroke, stabilizePoint } from './v2/input/sampler'
+import {
+  fromPointer,
+  randomStrokeSeed,
+  snapshotStroke,
+  stabilizePoint,
+} from './v2/input/sampler'
 import { BrushInspector } from './v2/ui/BrushInspector'
 import { PaintExportModal } from './v2/ui/PaintExportModal'
 import {
@@ -462,7 +467,12 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
     if (tool === 'eraser') {
       drawEraserSegment(point, point)
     } else {
-      const stroke = snapshotStroke(liveBrush(), [point], layer.id)
+      const stroke = snapshotStroke(
+        liveBrush(),
+        [point],
+        layer.id,
+        randomStrokeSeed(),
+      )
       currentStroke.current = stroke
       setDocument((current) => ({
         ...current,

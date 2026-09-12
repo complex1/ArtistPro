@@ -135,6 +135,13 @@ export function sampleStroke(
   )
 }
 
+// Scatter, random rotation, and per-stroke animation variants all read the
+// stroke seed, so live marks draw their own instead of sharing the brush seed.
+// Previews and tests keep passing a fixed seed to stay reproducible.
+export function randomStrokeSeed(): number {
+  return Math.floor(Math.random() * 0x7fffffff) + 1
+}
+
 export function snapshotStroke(
   brush: BrushV2,
   points: StrokePointV2[],
