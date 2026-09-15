@@ -1,0 +1,9 @@
+{
+  "name": "@artist-studio/live-character",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./web/index.ts",
+    "./library": "./web/library.ts"
+  }
+}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ChevronRight,
   CircleQuestionMark,
+  Bone,
   Moon,
   Paintbrush,
   PenTool,
@@ -31,6 +32,7 @@ const icons: Record<string, LucideIcon> = {
   'animated-paint': Paintbrush,
   cel: Sparkles,
   tappilot: Smartphone,
+  'live-character': Bone,
 }
 
 const modules = import.meta.glob('../../*/tool.json', {

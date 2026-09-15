@@ -8,6 +8,8 @@ export type AppRoute =
   | { page: 'cel-home' }
   | { page: 'cel-editor'; projectId: string }
   | { page: 'tappilot' }
+  | { page: 'live-character-home' }
+  | { page: 'live-character-editor'; projectId: string }
 
 export function parseHash(hash: string): AppRoute {
   const path = hash.replace(/^#/, '').replace(/^\/+|\/+$/g, '')
@@ -15,6 +17,14 @@ export function parseHash(hash: string): AppRoute {
 
   const parts = path.split('/').filter(Boolean)
   if (parts[0] === 'tappilot') return { page: 'tappilot' }
+  if (parts[0] === 'live-character') {
+    if (!parts[1]) return { page: 'live-character-home' }
+    try {
+      return { page: 'live-character-editor', projectId: decodeURIComponent(parts[1]) }
+    } catch {
+      return { page: 'live-character-home' }
+    }
+  }
   if (parts[0] !== 'svg' && parts[0] !== 'paint' && parts[0] !== 'cel') {
     return { page: 'home' }
   }
@@ -60,6 +70,10 @@ export function toHash(route: AppRoute): string {
     return `#/cel/${encodeURIComponent(route.projectId)}`
   }
   if (route.page === 'tappilot') return '#/tappilot'
+  if (route.page === 'live-character-home') return '#/live-character'
+  if (route.page === 'live-character-editor') {
+    return `#/live-character/${encodeURIComponent(route.projectId)}`
+  }
   return `#/paint/${encodeURIComponent(route.projectId)}`
 }
 
@@ -68,6 +82,7 @@ export function toolHomeRoute(toolRoute: string): AppRoute | undefined {
   if (toolRoute === '/paint') return { page: 'paint-home' }
   if (toolRoute === '/cel') return { page: 'cel-home' }
   if (toolRoute === '/tappilot') return { page: 'tappilot' }
+  if (toolRoute === '/live-character') return { page: 'live-character-home' }
   return undefined
 }
 
@@ -78,6 +93,7 @@ export function projectRoute(
   if (toolRoute === '/svg') return { page: 'svg-editor', projectId }
   if (toolRoute === '/paint') return { page: 'paint-editor', projectId }
   if (toolRoute === '/cel') return { page: 'cel-editor', projectId }
+  if (toolRoute === '/live-character') return { page: 'live-character-editor', projectId }
   return undefined
 }
 

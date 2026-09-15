@@ -48,6 +48,13 @@ describe('app routes', () => {
     })
   })
 
+  it('opens Live Character and decodes project IDs without crashing on malformed links', () => {
+    expect(parseHash('#/live-character')).toEqual({ page: 'live-character-home' })
+    expect(parseHash('#/live-character/')).toEqual({ page: 'live-character-home' })
+    expect(parseHash('#/live-character/a%20character')).toEqual({ page: 'live-character-editor', projectId: 'a character' })
+    expect(parseHash('#/live-character/%E0%A4%A')).toEqual({ page: 'live-character-home' })
+  })
+
   it('opens TapPilot', () => {
     expect(parseHash('#/tappilot')).toEqual({ page: 'tappilot' })
   })
@@ -64,6 +71,8 @@ describe('app routes', () => {
       { page: 'cel-home' },
       { page: 'cel-editor', projectId: 'still' },
       { page: 'tappilot' },
+      { page: 'live-character-home' },
+      { page: 'live-character-editor', projectId: 'my character/1' },
     ]
     for (const route of routes) {
       expect(parseHash(toHash(route))).toEqual(route)
@@ -75,6 +84,8 @@ describe('app routes', () => {
     expect(toolHomeRoute('/paint')).toEqual({ page: 'paint-home' })
     expect(toolHomeRoute('/cel')).toEqual({ page: 'cel-home' })
     expect(toolHomeRoute('/tappilot')).toEqual({ page: 'tappilot' })
+    expect(toolHomeRoute('/live-character')).toEqual({ page: 'live-character-home' })
+    expect(projectRoute('/live-character', 'rig')).toEqual({ page: 'live-character-editor', projectId: 'rig' })
     expect(projectRoute('/svg', 'p1')).toEqual({
       page: 'svg-editor',
       projectId: 'p1',

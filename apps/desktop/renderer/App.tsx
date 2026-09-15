@@ -26,6 +26,17 @@ const TapPilotStudio = lazy(() =>
   })),
 )
 
+const LiveCharacterHome = lazy(() =>
+  import('@artist-studio/live-character').then((module) => ({
+    default: module.LiveCharacterHome,
+  })),
+)
+const LiveCharacterEditor = lazy(() =>
+  import('@artist-studio/live-character').then((module) => ({
+    default: module.LiveCharacterEditor,
+  })),
+)
+
 export default function App() {
   const route = useHashRoute()
 
@@ -41,6 +52,8 @@ export default function App() {
       document.title = 'Animated Paint — Artist Pro'
     } else if (route.page === 'cel-home' || route.page === 'cel-editor') {
       document.title = 'Cel — Artist Pro'
+    } else if (route.page === 'live-character-home' || route.page === 'live-character-editor') {
+      document.title = 'Live Character — Artist Pro'
     } else if (route.page === 'tappilot') {
       document.title = 'TapPilot — Artist Pro'
     } else document.title = 'Artist Pro'
@@ -74,6 +87,13 @@ export default function App() {
   if (route.page === 'cel-home') return <CelHome />
   if (route.page === 'cel-editor') {
     return <CelEditor projectId={route.projectId} />
+  }
+  if (route.page === 'live-character-home' || route.page === 'live-character-editor') {
+    return (
+      <Suspense fallback={<div className="studio-loading">Opening Live Character…</div>}>
+        {route.page === 'live-character-home' ? <LiveCharacterHome /> : <LiveCharacterEditor projectId={route.projectId} />}
+      </Suspense>
+    )
   }
   if (route.page === 'tappilot') {
     return (

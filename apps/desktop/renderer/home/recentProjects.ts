@@ -14,27 +14,27 @@ export type RecentProject = ProjectSummary & {
   toolId: string
   toolTitle: string
   toolRoute: string
-  apiPrefix: string
+  apiPrefix?: string
 }
 
 /**
- * Every tool stores its projects behind its own manifest apiPrefix, so the home
- * page merges the lists instead of owning a project store of its own.
+ * Merge tool-owned project stores. Live Character works offline in IndexedDB;
+ * existing tools continue using their manifest API endpoints.
  */
 export async function loadRecentProjects(
   tools: ToolManifest[],
 ): Promise<RecentProject[]> {
   const sources = tools.filter(
-    (tool) => tool.status === 'ready' && Boolean(tool.apiPrefix),
+    (tool) => tool.status === 'ready' && (Boolean(tool.apiPrefix) || tool.id === 'live-character'),
   )
 
   const batches = await Promise.all(
     sources.map(async (tool) => {
-      const apiPrefix = tool.apiPrefix as string
+      const apiPrefix = tool.apiPrefix
       try {
-        const summaries = await apiJson<ProjectSummary[]>(
-          `${apiPrefix}/projects`,
-        )
+        const summaries = tool.id === 'live-character'
+          ? await (await import('@artist-studio/live-character/library')).listProjects()
+          : await apiJson<ProjectSummary[]>(`${apiPrefix}/projects`)
         return summaries.map((summary) => ({
           ...summary,
           toolId: tool.id,
@@ -59,6 +59,10 @@ export async function loadRecentProjects(
 export async function deleteRecentProject(
   project: RecentProject,
 ): Promise<void> {
+  if (project.toolId === 'live-character') {
+    await (await import('@artist-studio/live-character/library')).deleteProject(project.id)
+    return
+  }
   await apiJson<void>(
     `${project.apiPrefix}/projects/${encodeURIComponent(project.id)}`,
     { method: 'DELETE' },

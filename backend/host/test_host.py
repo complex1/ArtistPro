@@ -21,9 +21,15 @@ def test_lists_tool_manifests() -> None:
     assert "svg-tool" in ids
     assert "animated-paint" in ids
     assert "cel" in ids
+    assert "live-character" in ids
     paint = next(tool for tool in tools if tool["id"] == "animated-paint")
     assert paint["status"] == "ready"
     assert paint["apiPrefix"] == "/v1/apps/animated-paint"
     cel = next(tool for tool in tools if tool["id"] == "cel")
     assert cel["status"] == "ready"
     assert cel["apiPrefix"] == "/v1/apps/cel"
+
+    character = next(tool for tool in tools if tool["id"] == "live-character")
+    assert character["status"] == "ready"
+    assert character["route"] == "/live-character"
+    assert "apiPrefix" not in character

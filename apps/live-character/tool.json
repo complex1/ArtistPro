@@ -1,0 +1,7 @@
+{
+  "id": "live-character",
+  "title": "Live Character",
+  "blurb": "Create, rig, and animate 2D characters",
+  "route": "/live-character",
+  "status": "ready"
+}

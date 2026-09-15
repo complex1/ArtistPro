@@ -1,6 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ToolManifest } from '@artist-studio/tool-registry'
-import { loadRecentProjects } from './recentProjects'
+import { deleteRecentProject, loadRecentProjects } from './recentProjects'
+
+const localProjects = vi.hoisted(() => ({ list: vi.fn(), remove: vi.fn() }))
+vi.mock('@artist-studio/live-character/library', () => ({
+  listProjects: localProjects.list,
+  deleteProject: localProjects.remove,
+}))
+
+const localTool: ToolManifest = {
+  id: 'live-character', title: 'Live Character', blurb: 'Character animation',
+  route: '/live-character', status: 'ready',
+}
 
 const tools: ToolManifest[] = [
   {
@@ -58,6 +69,7 @@ function stubFetch(byPrefix: Record<string, unknown[] | 'fail'>) {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.clearAllMocks()
 })
 
 describe('loadRecentProjects', () => {
@@ -112,5 +124,29 @@ describe('loadRecentProjects', () => {
     const requested = fetchStub.mock.calls.map(([url]) => url)
     expect(requested).toHaveLength(3)
     expect(requested.some((url) => url.includes('future'))).toBe(false)
+  })
+})
+
+
+describe('browser project integration', () => {
+  it('merges browser projects even when every API service is offline', async () => {
+    stubFetch({ 'apps/svg-tool': 'fail', 'apps/animated-paint': 'fail', 'apps/cel': 'fail' })
+    localProjects.list.mockResolvedValue([summary('local-rig', 500)])
+    const projects = await loadRecentProjects([...tools, localTool])
+    expect(projects).toMatchObject([{ id: 'local-rig', toolId: 'live-character', toolRoute: '/live-character' }])
+  })
+
+  it('deletes a local character through its store without making an API request', async () => {
+    const fetchStub = stubFetch({})
+    localProjects.remove.mockResolvedValue(undefined)
+    await deleteRecentProject({ ...summary('local-rig', 500), toolId: localTool.id, toolTitle: localTool.title, toolRoute: localTool.route })
+    expect(localProjects.remove).toHaveBeenCalledWith('local-rig')
+    expect(fetchStub).not.toHaveBeenCalled()
+  })
+
+  it('keeps available API projects when browser storage is unavailable', async () => {
+    stubFetch({ 'apps/svg-tool': [summary('vector', 100)] })
+    localProjects.list.mockRejectedValue(new Error('IndexedDB unavailable'))
+    expect((await loadRecentProjects([...tools, localTool])).map((project) => project.id)).toEqual(['vector'])
   })
 })
