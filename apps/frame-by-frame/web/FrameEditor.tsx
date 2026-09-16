@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { ArrowLeft, ArrowDown, ArrowUp, Brush, Check, ChevronLeft, ChevronRight, Circle, Clapperboard, Copy, Download, Eraser, Eye, Hand, ImagePlus, Lasso, Layers, Lock, Maximize, Minus, MousePointer2, PaintBucket, Pause, Pipette, Play, Plus, Redo2, Repeat2, Save, ScanLine, SkipBack, SkipForward, Square, Trash2, Undo2, X } from 'lucide-react'
 import { getProject, type ProjectRecord } from './library'
 import { AnimationSession } from './session'
@@ -12,6 +12,8 @@ import { dragSelection, hitSelectionHandle, type SelectionDrag } from './selecti
 import { SelectionOutline, SelectionOverlay } from './SelectionOverlay'
 import { Range, ToolProperties } from './ToolProperties'
 import './frame-by-frame.css'
+
+const InbetweenDialog = lazy(() => import('./inbetween/InbetweenDialog').then(module => ({ default: module.InbetweenDialog })))
 
 const message = (e: unknown) => e instanceof Error ? e.message : 'Something went wrong.'
 const tools = [
@@ -46,6 +48,7 @@ function AnimationDesk({ record }: { record: ProjectRecord }) {
   const [view, setView] = useState<View>({ x: 0, y: 0, zoom: 1 }), [gesture, setGesture] = useState<Gesture | null>(null), [selection, setSelection] = useState<Selection | null>(null)
   const [ready, setReady] = useState(''), [error, setError] = useState<string | null>(null), [exportOpen, setExportOpen] = useState(false), [exportProgress, setExportProgress] = useState<number | null>(null)
   const [timelineHeight, setTimelineHeight] = useState(234), [panel, setPanel] = useState<'brush' | 'shot'>('brush'), [inspectorOpen, setInspectorOpen] = useState(false)
+  const [inbetween, setInbetween] = useState<{ document: AnimationDocument; revision: number; layerId: string; fromCelId?: string } | null>(null)
   const [lockAspect, setLockAspect] = useState(false), [transformBounds, setTransformBounds] = useState<Bounds | null>(null), [transformCursor, setTransformCursor] = useState('crosshair')
   const viewport = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null), imageInput = useRef<HTMLInputElement>(null)
   const active = useRef<{ key: string; data: string | null; engine: DrawingEngine } | null>(null), gestureRef = useRef<Gesture | null>(null)
@@ -262,7 +265,7 @@ function AnimationDesk({ record }: { record: ProjectRecord }) {
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
-      if ((event.target as HTMLElement)?.closest('input, select, textarea, [contenteditable=true]') || exportAbort.current) return
+      if ((event.target as HTMLElement)?.closest('input, select, textarea, [contenteditable=true]') || exportAbort.current || inbetween) return
       const key = event.key.toLowerCase(), command = event.metaKey || event.ctrlKey
       if (command) {
         if (['z', 'y', 's', 'd'].includes(key)) event.preventDefault()
@@ -283,6 +286,16 @@ function AnimationDesk({ record }: { record: ProjectRecord }) {
     }
     window.addEventListener('keydown', keydown); return () => window.removeEventListener('keydown', keydown)
   })
+
+  function openInbetweens() {
+    cancelGesture(); setPlaying(false)
+    if (layer.locked) { setError('Unlock the layer before generating in-betweens.'); return }
+    setInbetween({ document: session.document, revision: session.revision, layerId: layer.id, fromCelId: cel?.id })
+  }
+  function applyInbetweens(next: AnimationDocument, firstFrame: number) {
+    if (!inbetween || session.revision !== inbetween.revision) throw new Error('The shot changed while the preview was open. Close this window and generate a new preview.')
+    session.commit(next); setInbetween(null); setFrame(firstFrame)
+  }
 
   async function importImages(files: FileList | null) {
     if (!files?.length || !mutable) return
@@ -349,7 +362,8 @@ function AnimationDesk({ record }: { record: ProjectRecord }) {
       </>}
       </div></aside></div>
     <div className="fbf-timeline-resize" role="separator" aria-label="Resize timeline" aria-orientation="horizontal" tabIndex={0} onKeyDown={event => { if (event.key === 'ArrowUp' || event.key === 'ArrowDown') setTimelineHeight(value => clamp(value + (event.key === 'ArrowUp' ? 20 : -20), 150, 440)) }} onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); const start = event.clientY, height = timelineHeight, target = event.currentTarget; const move = (event: PointerEvent) => setTimelineHeight(clamp(height + start - event.clientY, 150, Math.max(150, window.innerHeight - 330))); const end = () => { target.removeEventListener('pointermove', move); target.removeEventListener('pointerup', end); target.removeEventListener('pointercancel', end) }; target.addEventListener('pointermove', move); target.addEventListener('pointerup', end); target.addEventListener('pointercancel', end) }} />
-    <Timeline doc={doc} playing={playing} frame={frame} layerId={layer.id} onSelect={select} onChange={change} onError={setError} onNew={newDrawing} onSplit={() => run(() => change(splitCel(doc, layer.id, frame)))} onDelete={removeDrawing} onAddLayer={addLayer} onDeleteLayer={removeTrack} />
+    <Timeline doc={doc} playing={playing} frame={frame} layerId={layer.id} onSelect={select} onChange={change} onError={setError} onNew={newDrawing} onSplit={() => run(() => change(splitCel(doc, layer.id, frame)))} onDelete={removeDrawing} onAddLayer={addLayer} onDeleteLayer={removeTrack} onInbetween={openInbetweens} />
+    {inbetween && <Suspense fallback={<div className="fbf-progress-overlay" role="status">Opening in-between studio…</div>}><InbetweenDialog document={inbetween.document} layerId={inbetween.layerId} fromCelId={inbetween.fromCelId} onClose={() => setInbetween(null)} onApply={applyInbetweens} /></Suspense>}
     {error && <div className="fbf-toast" role="alert"><span>{error}</span><button aria-label="Dismiss error" onClick={() => setError(null)}><X size={14} /></button></div>}
     <input ref={imageInput} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={event => { const files = event.target.files; void importImages(files); event.target.value = '' }} />
     {exportProgress !== null && <div className="fbf-progress-overlay" role="dialog" aria-modal="true" aria-label="Processing animation"><div><Clapperboard size={29} /><h2>Preparing your animation</h2><progress value={exportProgress} max={1} /><p>{Math.round(exportProgress * 100)}%</p><button className="fbf-button" onClick={() => exportAbort.current?.abort()}>Cancel</button></div></div>}

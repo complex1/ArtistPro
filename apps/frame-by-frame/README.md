@@ -1,6 +1,6 @@
 # FrameByFrame Animation
 
-A manual raster animation workspace at `#/frame-by-frame`. The first release focuses on drawing poses and controlling their timing. Auto in-between generation is a later phase.
+A raster animation workspace at `#/frame-by-frame` for drawing poses, controlling their timing, and generating guided line-art in-betweens locally.
 
 ## Workflow
 
@@ -15,6 +15,20 @@ Create a shot with a canvas preset and frame rate, or open the editable bouncing
 - **Persistence:** local IndexedDB autosave, undo/redo for both artwork and timing, explicit save, portable project import/export, gallery search, and integration with the app's recent projects. Failed saves retain the editor and unsaved content when navigating away.
 
 The **Drawing** tab follows tool selection. The **Shot** tab contains frame rate, shot length, paper, onion-skin, exposure, and layer settings. For a selected region, drag inside to move it, drag handles to resize/rotate, or draw outside it to replace the selection. Hold Shift to lock resize proportions or snap rotation to 15°. Escape cancels an active gesture; pressing it again deselects.
+
+## Line-art in-betweens
+
+1. Draw or import two neighboring key drawings on the same unlocked layer. Select either key and click **In-between** in the timeline toolbar.
+2. Review the automatically matched motion guides. Select a guide to see its number on both keys, drag it to the same feature, or use **Add guide** and click first on the start pose, then the end pose. Arrow keys move a focused guide; Shift moves ten pixels. Delete removes it. Auto-match replaces edited guides.
+3. Choose 1–24 drawings, motion spacing, ink threshold, and speck removal. **Insert** keeps the endpoint holds and uses any empty gap before shifting the end key and later cels on this layer. **Fit** shortens the first key to one frame and distributes generated holds before the unchanged end key. Other tracks retain their timing.
+4. **Generate preview**, scrub or play the filmstrip, and adjust guides if needed. Changing settings or guides clears the preview. A remaining empty timeline gap is included in playback.
+5. **Insert drawings** commits the whole batch as one undoable change. Each result is an ordinary editable cel and is included in autosave and exports. Closing or cancelling a preview leaves the shot unchanged.
+
+Use dark outlines on transparent or white paper. Results are black ink on transparency; color and painted fills are not preserved. The generator handles modest motion and related poses best. Warping can change line thickness or soften corners. Crossed limbs, occlusions, and appearing/disappearing lines may need additional key poses or manual cleanup; unmatched details can switch around the midpoint.
+
+The browser worker extracts ink, skeletonizes a bounded analysis image, matches stroke endpoints and spread-out features using local stroke direction and a global pose estimate, and fits a thin-plate-spline deformation through editable correspondences. Both keys are warped toward each intermediate pose, with a local contour-alignment pass before raster synthesis. This is a classical guided implementation, not the learned matching/refinement/synthesis pipeline from [Thin-Plate Spline-based Interpolation for Animation Line Inbetweening](https://arxiv.org/abs/2408.09131). No model download, server, image upload, or external inference service is required.
+
+Generation is capped at 48 MiPixels per batch (12 drawings at 2048²), with up to 48 guides. Work runs in a dedicated worker that is terminated on cancellation or closing the studio. Preview output is validated against the shot's frame, cel, dimension, and image-data limits before insertion.
 
 ## Shortcuts
 
@@ -47,9 +61,9 @@ Limits: up to 2048 pixels per dimension, 1–60 FPS, 2,400 frames, 500 drawings,
 
 ## References and scope
 
-Reviewed Callipeg's official [timeline](https://callipeg.com/learn-timeline/), [drawing layer](https://callipeg.com/learn-drawing-layer/), and [onion skin](https://callipeg.com/learn-onion-skin/) documentation. The shared concepts are held drawings, per-layer timing, and neighboring-pose overlays. This implementation has its own interface and project format. Audio tracks, camera animation, advanced selection/brush editing, and automatic in-betweens are outside this first release.
+Reviewed Callipeg's official [timeline](https://callipeg.com/learn-timeline/), [drawing layer](https://callipeg.com/learn-drawing-layer/), and [onion skin](https://callipeg.com/learn-onion-skin/) documentation. The shared concepts are held drawings, per-layer timing, and neighboring-pose overlays. This implementation has its own interface and project format. Audio tracks, camera animation, and learned image synthesis are outside the current scope.
 
-For the later in-between flow, generated images can be inserted as ordinary independent cels through the existing validated timeline operations and committed as one undoable document change. Keep endpoint poses and layer timing explicit; the current release does not generate interpolated poses.
+The in-between studio follows the guided matching, bidirectional warping, preview, and correction workflow described in the [shared algorithm discussion](https://chatgpt.com/s/t_6aaa1e7e39748191bc4fb72617f3dea9). Endpoint image data and IDs are preserved when inserting generated drawings.
 
 ## Verification
 
@@ -59,4 +73,4 @@ npm run test:frame-by-frame:browser
 npm run build
 ```
 
-The Chromium harness uses an isolated profile and temporary Vite server. It verifies composite pixels, held poses, transparency, GIF frames, playable video duration, cancellation, real pointer drawing, timeline edits, save/reopen, rapid scrubbing, and recovery from failed storage writes.
+The Chromium harness uses an isolated profile and temporary Vite server. It verifies composite pixels, held poses, transparency, GIF frames, playable video duration, cancellation, real pointer drawing, timeline edits, save/reopen, rapid scrubbing, recovery from failed storage writes, and real worker analysis, generated pixel positions, preview invalidation, insertion, fit timing, one-step Undo, and persistence of generated drawings.

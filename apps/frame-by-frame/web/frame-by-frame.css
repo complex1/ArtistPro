@@ -80,3 +80,6 @@
   .fbf-stage-top>span { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
   .fbf-stage-top>div { flex-shrink:0; }
 }
+
+.fbf-timeline-actions .fbf-inbetween-button { color:var(--fbf-accent)!important; border-color:#d7ad6d40; margin-left:6px; }
+@media(max-width:600px) { .fbf-timeline-actions .fbf-inbetween-button>span { display:none; } }

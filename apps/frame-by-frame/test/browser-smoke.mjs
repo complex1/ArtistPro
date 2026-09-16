@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runFeedbackChecks } from './feedback-checks.mjs'
+import { runInbetweenChecks } from './inbetween-checks.mjs'
 
 const root = fileURLToPath(new URL('../../../', import.meta.url))
 app.on('window-all-closed', () => {})
@@ -13,10 +14,10 @@ async function run() {
 const profile = await mkdtemp(path.join(tmpdir(), 'frame-by-frame-test-'))
 app.setPath('userData', profile)
 await app.whenReady()
-const watchdog = setTimeout(() => { console.error('FrameByFrame browser checks timed out.'); app.exit(1) }, 90_000)
+const watchdog = setTimeout(() => { console.error('FrameByFrame browser checks timed out.'); app.exit(1) }, 120_000)
 let server, window, exitCode = 0
 try {
-  server = await createServer({ root, server: { host: '127.0.0.1', port: 0, strictPort: false }, logLevel: 'error' })
+  server = await createServer({ root, server: { host: '127.0.0.1', port: 0, strictPort: false, hmr: false }, logLevel: 'error' })
   await server.listen()
   window = new BrowserWindow({ show: false, width: 1280, height: 900, webPreferences: { backgroundThrottling: false } })
   await window.loadURL(server.resolvedUrls.local[0])
@@ -191,7 +192,10 @@ try {
     check((await fbfGetProject(fbfRecord.id)).document.layers[0].cels.length === unsaved, 'Retry flushes retained changes before leaving the shot')
     return results
   }.toString()})()`))
+  console.log('Checking selection tools and track editing…')
   results.push(...await runFeedbackChecks(window))
+  console.log('Checking line-art workers, previews, and insertion…')
+  results.push(...await runInbetweenChecks(window))
   for (const result of results) console.log('PASS ' + result)
   console.log(results.length + ' FrameByFrame Chromium checks passed.')
 } catch (error) {
