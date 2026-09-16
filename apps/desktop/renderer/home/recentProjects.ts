@@ -18,21 +18,23 @@ export type RecentProject = ProjectSummary & {
 }
 
 /**
- * Merge tool-owned project stores. Drawing Canvas and Live Character use IndexedDB;
+ * Merge tool-owned project stores. Drawing Canvas, FrameByFrame, and Live Character use IndexedDB;
  * existing tools continue using their manifest API endpoints.
  */
 export async function loadRecentProjects(
   tools: ToolManifest[],
 ): Promise<RecentProject[]> {
   const sources = tools.filter(
-    (tool) => tool.status === 'ready' && (Boolean(tool.apiPrefix) || tool.id === 'live-character' || tool.id === 'drawing-canvas'),
+    (tool) => tool.status === 'ready' && (Boolean(tool.apiPrefix) || tool.id === 'live-character' || tool.id === 'drawing-canvas' || tool.id === 'frame-by-frame'),
   )
 
   const batches = await Promise.all(
     sources.map(async (tool) => {
       const apiPrefix = tool.apiPrefix
       try {
-        const summaries = tool.id === 'drawing-canvas'
+        const summaries = tool.id === 'frame-by-frame'
+          ? await (await import('@artist-studio/frame-by-frame/library')).listProjects()
+          : tool.id === 'drawing-canvas'
           ? await (await import('@artist-studio/drawing-canvas/library')).listProjects()
           : tool.id === 'live-character'
           ? await (await import('@artist-studio/live-character/library')).listProjects()
@@ -61,6 +63,10 @@ export async function loadRecentProjects(
 export async function deleteRecentProject(
   project: RecentProject,
 ): Promise<void> {
+  if (project.toolId === 'frame-by-frame') {
+    await (await import('@artist-studio/frame-by-frame/library')).deleteProject(project.id)
+    return
+  }
   if (project.toolId === 'drawing-canvas') {
     await (await import('@artist-studio/drawing-canvas/library')).deleteProject(project.id)
     return

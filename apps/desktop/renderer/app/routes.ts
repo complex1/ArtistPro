@@ -1,5 +1,7 @@
 export type AppRoute =
   | { page: 'home' }
+  | { page: 'frame-home' }
+  | { page: 'frame-editor'; projectId: string }
   | { page: 'svg-home' }
   | { page: 'svg-editor'; projectId: string }
   | { page: 'paint-home' }
@@ -18,6 +20,11 @@ export function parseHash(hash: string): AppRoute {
   if (!path) return { page: 'home' }
 
   const parts = path.split('/').filter(Boolean)
+  if (parts[0] === 'frame-by-frame') {
+    if (!parts[1]) return { page: 'frame-home' }
+    try { return { page: 'frame-editor', projectId: decodeURIComponent(parts[1]) } }
+    catch { return { page: 'frame-home' } }
+  }
   if (parts[0] === 'drawing-canvas') {
     if (!parts[1]) return { page: 'drawing-home' }
     try {
@@ -65,6 +72,8 @@ export function parseHash(hash: string): AppRoute {
 
 export function toHash(route: AppRoute): string {
   if (route.page === 'home') return '#/'
+  if (route.page === 'frame-home') return '#/frame-by-frame'
+  if (route.page === 'frame-editor') return `#/frame-by-frame/${encodeURIComponent(route.projectId)}`
   if (route.page === 'drawing-home') return '#/drawing-canvas'
   if (route.page === 'drawing-editor') return `#/drawing-canvas/${encodeURIComponent(route.projectId)}`
   if (route.page === 'svg-home') return '#/svg'
@@ -90,6 +99,7 @@ export function toHash(route: AppRoute): string {
 }
 
 export function toolHomeRoute(toolRoute: string): AppRoute | undefined {
+  if (toolRoute === '/frame-by-frame') return { page: 'frame-home' }
   if (toolRoute === '/drawing-canvas') return { page: 'drawing-home' }
   if (toolRoute === '/svg') return { page: 'svg-home' }
   if (toolRoute === '/paint') return { page: 'paint-home' }
@@ -103,6 +113,7 @@ export function projectRoute(
   toolRoute: string,
   projectId: string,
 ): AppRoute | undefined {
+  if (toolRoute === '/frame-by-frame') return { page: 'frame-editor', projectId }
   if (toolRoute === '/drawing-canvas') return { page: 'drawing-editor', projectId }
   if (toolRoute === '/svg') return { page: 'svg-editor', projectId }
   if (toolRoute === '/paint') return { page: 'paint-editor', projectId }

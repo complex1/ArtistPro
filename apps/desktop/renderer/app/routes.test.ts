@@ -8,6 +8,14 @@ import {
 } from './routes'
 
 describe('app routes', () => {
+  it('opens FrameByFrame shots and safely round-trips encoded IDs', () => {
+    expect(parseHash('#/frame-by-frame')).toEqual({ page: 'frame-home' })
+    const route: AppRoute = { page: 'frame-editor', projectId: 'my shot/1' }
+    expect(parseHash(toHash(route))).toEqual(route)
+    expect(parseHash('#/frame-by-frame/%E0%A4%A')).toEqual({ page: 'frame-home' })
+    expect(toolHomeRoute('/frame-by-frame')).toEqual({ page: 'frame-home' })
+    expect(projectRoute('/frame-by-frame', 'shot')).toEqual({ page: 'frame-editor', projectId: 'shot' })
+  })
   it('lands on Artist Pro home for empty and unknown hashes', () => {
     expect(parseHash('')).toEqual({ page: 'home' })
     expect(parseHash('#/')).toEqual({ page: 'home' })

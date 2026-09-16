@@ -23,6 +23,7 @@ def test_lists_tool_manifests() -> None:
     assert "cel" in ids
     assert "live-character" in ids
     assert "drawing-canvas" in ids
+    assert "frame-by-frame" in ids
     paint = next(tool for tool in tools if tool["id"] == "animated-paint")
     assert paint["status"] == "ready"
     assert paint["apiPrefix"] == "/v1/apps/animated-paint"

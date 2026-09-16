@@ -256,6 +256,7 @@ function DrawingArt() {
 }
 
 const ART: Record<string, () => ReactNode> = {
+  'frame-by-frame': () => <Art><rect width="240" height="132" fill="#2d2b24" /><path d="M24 95Q116-33 215 96" fill="none" stroke="#bda579" strokeDasharray="3 5" opacity=".5" />{[0, 1, 2].map(index => <g key={index} transform={`translate(${17 + index * 70} ${index === 1 ? 17 : 30}) rotate(${index === 0 ? -7 : index === 2 ? 7 : 0} 32 41)`}><rect width="65" height="85" rx="4" fill="#f0e6d3" /><path d="M8 67H57" stroke="#b6a78c" /><ellipse cx="32" cy={index === 1 ? 32 : 49} rx="15" ry={index === 1 ? 19 : 14} fill={index === 1 ? '#d6a064' : '#8eab9c'} stroke="#596152" strokeWidth="1.4" /><circle cx="27" cy={index === 1 ? 29 : 47} r="1.5" fill="#424c3e" /><circle cx="38" cy={index === 1 ? 29 : 47} r="1.5" fill="#424c3e" /><path d={`M28 ${index === 1 ? 37 : 54}q5 4 10-1`} stroke="#424c3e" fill="none" /><rect x="8" y="75" width="21" height="2" fill="#b6a78c" /></g>)}</Art>,
   'drawing-canvas': DrawingArt,
   'animated-paint': PaintArt,
   cel: CelArt,

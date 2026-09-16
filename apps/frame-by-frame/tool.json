@@ -1,0 +1,7 @@
+{
+  "id": "frame-by-frame",
+  "title": "FrameByFrame Animation",
+  "blurb": "Draw frames, shape timing, bring stories to life",
+  "route": "/frame-by-frame",
+  "status": "ready"
+}

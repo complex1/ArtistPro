@@ -26,6 +26,9 @@ const TapPilotStudio = lazy(() =>
   })),
 )
 
+const FrameHome = lazy(() => import('@artist-studio/frame-by-frame').then(module => ({ default: module.FrameHome })))
+const FrameEditor = lazy(() => import('@artist-studio/frame-by-frame').then(module => ({ default: module.FrameEditor })))
+
 const DrawingHome = lazy(() =>
   import('@artist-studio/drawing-canvas').then((module) => ({ default: module.DrawingHome })),
 )
@@ -49,6 +52,7 @@ export default function App() {
 
   useEffect(() => {
     if (route.page === 'home') document.title = 'Artist Pro'
+    else if (route.page === 'frame-home' || route.page === 'frame-editor') { document.title = 'FrameByFrame Animation — Artist Pro' }
     else if (route.page === 'drawing-home' || route.page === 'drawing-editor') {
       document.title = 'Drawing Canvas — Artist Pro'
     } else if (route.page === 'svg-home' || route.page === 'svg-editor') {
@@ -68,6 +72,9 @@ export default function App() {
     } else document.title = 'Artist Pro'
   }, [route])
 
+  if (route.page === 'frame-home' || route.page === 'frame-editor') {
+    return <Suspense fallback={<div className="studio-loading">Opening FrameByFrame Animation…</div>}>{route.page === 'frame-home' ? <FrameHome /> : <FrameEditor key={route.projectId} projectId={route.projectId} />}</Suspense>
+  }
   if (route.page === 'svg-home') return <SvgToolHome />
   if (route.page === 'drawing-home' || route.page === 'drawing-editor') {
     return (

@@ -9,6 +9,7 @@
     "apps/svg-tool",
     "apps/animated-paint",
     "apps/drawing-canvas",
+    "apps/frame-by-frame",
     "apps/cel",
     "apps/live-character",
     "apps/tappilot",
@@ -30,7 +31,8 @@
     "test:tappilot": "npm test --workspace=@artist-studio/tappilot",
     "test:api": "PYTHONPATH=. .venv/bin/python -m pytest",
     "setup:api": "python3 -m venv .venv && .venv/bin/pip install fastapi 'uvicorn[standard]' pytest httpx",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:frame-by-frame:browser": "electron apps/frame-by-frame/test/browser-smoke.mjs"
   },
   "dependencies": {
     "@buzz-dee/vtrace": "^1.2.0",

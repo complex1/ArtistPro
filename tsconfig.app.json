@@ -33,6 +33,8 @@
       "@artist-studio/render/*": ["./common/packages/render/src/*"],
       "@artist-studio/tool-registry": ["./common/packages/tool-registry/src/index.ts"],
       "@artist-studio/animated-paint": ["./apps/animated-paint/web/index.ts"],
+      "@artist-studio/frame-by-frame": ["./apps/frame-by-frame/web/index.ts"],
+      "@artist-studio/frame-by-frame/library": ["./apps/frame-by-frame/web/library.ts"],
       "@artist-studio/drawing-canvas": ["./apps/drawing-canvas/web/index.ts"],
       "@artist-studio/drawing-canvas/library": ["./apps/drawing-canvas/web/library.ts"],
       "@artist-studio/cel": ["./apps/cel/web/index.ts"],

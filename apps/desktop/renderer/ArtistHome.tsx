@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ChevronRight,
+  Clapperboard,
   CircleQuestionMark,
   Bone,
   Moon,
@@ -32,6 +33,7 @@ const icons: Record<string, LucideIcon> = {
   'svg-tool': PenTool,
   'animated-paint': Paintbrush,
   'drawing-canvas': Palette,
+  'frame-by-frame': Clapperboard,
   cel: Sparkles,
   tappilot: Smartphone,
   'live-character': Bone,

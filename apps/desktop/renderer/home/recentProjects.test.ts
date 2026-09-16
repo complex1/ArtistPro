@@ -4,6 +4,8 @@ import { deleteRecentProject, loadRecentProjects } from './recentProjects'
 
 const localProjects = vi.hoisted(() => ({ list: vi.fn(), remove: vi.fn() }))
 const drawingProjects = vi.hoisted(() => ({ list: vi.fn(), remove: vi.fn() }))
+const animationProjects = vi.hoisted(() => ({ list: vi.fn(), remove: vi.fn() }))
+vi.mock('@artist-studio/frame-by-frame/library', () => ({ listProjects: animationProjects.list, deleteProject: animationProjects.remove }))
 vi.mock('@artist-studio/drawing-canvas/library', () => ({
   listProjects: drawingProjects.list,
   deleteProject: drawingProjects.remove,
@@ -134,6 +136,17 @@ describe('loadRecentProjects', () => {
 
 
 describe('browser project integration', () => {
+  it('loads and deletes FrameByFrame shots without the API', async () => {
+    const fetch = stubFetch({})
+    const tool: ToolManifest = { id: 'frame-by-frame', title: 'FrameByFrame Animation', blurb: 'Animation', route: '/frame-by-frame', status: 'ready' }
+    animationProjects.list.mockResolvedValue([summary('shot', 700)])
+    animationProjects.remove.mockResolvedValue(undefined)
+    const projects = await loadRecentProjects([tool])
+    expect(projects).toMatchObject([{ id: 'shot', toolId: 'frame-by-frame' }])
+    await deleteRecentProject(projects[0])
+    expect(animationProjects.remove).toHaveBeenCalledWith('shot')
+    expect(fetch).not.toHaveBeenCalled()
+  })
   it('loads and deletes Drawing Canvas projects through local storage', async () => {
     const fetchStub = stubFetch({})
     const drawingTool: ToolManifest = {

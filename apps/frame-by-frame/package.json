@@ -1,0 +1,6 @@
+{
+  "name": "@artist-studio/frame-by-frame",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./web/index.ts", "./library": "./web/library.ts" }
+}
