@@ -1,0 +1,46 @@
+.lp-art {
+  width: 100%;
+  max-width: 560px;
+  min-width: 0;
+  margin-inline: auto;
+  pointer-events: none;
+  user-select: none;
+  isolation: isolate;
+}
+
+.lp-art > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.lp-art-guides {
+  opacity: .23;
+}
+
+.lp-art-sparkles {
+  animation: lp-art-shimmer 7s ease-in-out infinite;
+}
+
+.lp-art-bezier {
+  animation: lp-art-handles 8s ease-in-out infinite;
+}
+
+@keyframes lp-art-shimmer {
+  0%, 100% { opacity: .68; }
+  50% { opacity: 1; }
+}
+
+@keyframes lp-art-handles {
+  0%, 100% { opacity: .72; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-art *,
+  .lp-art *::before,
+  .lp-art *::after {
+    animation: none;
+  }
+}

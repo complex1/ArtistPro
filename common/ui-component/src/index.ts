@@ -4,6 +4,7 @@ export {
   IconButton,
   Select,
 } from './controls'
+export { ProjectLaunchpad, type ProjectLaunchpadProps } from './ProjectLaunchpad'
 export {
   AngleDial,
   ColorField,

@@ -1,142 +1,112 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
-import { formatUpdated } from '@artist-studio/utils'
-import { navigate } from '../app/routes'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ProjectLaunchpad } from '@artist-studio/ui-component'
 import { ARTBOARD_PRESETS } from '../model/document'
+import { navigate } from '../app/routes'
 import {
   createProject,
   deleteProject,
   listProjects,
   type ProjectSummary,
 } from '../projects/library'
-import { Button, Select } from '../ui/controls'
 
 export function SvgToolHome() {
   const [projects, setProjects] = useState<ProjectSummary[]>([])
   const [name, setName] = useState('Untitled')
   const [size, setSize] = useState('800x600')
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const mountedRef = useRef(false)
+  const requestRef = useRef(0)
+  const creatingRef = useRef(false)
+  const deletingRef = useRef(new Set<string>())
 
-  const preset = useMemo(
-    () => ARTBOARD_PRESETS.find((item) => item.id === size) ?? ARTBOARD_PRESETS[0],
-    [size],
-  )
+  const preset = ARTBOARD_PRESETS.find(item => item.id === size) ?? ARTBOARD_PRESETS[0]
 
-  const refresh = () => {
-    void listProjects()
-      .then(setProjects)
-      .catch((reason: unknown) => {
-        setError(reason instanceof Error ? reason.message : 'Could not load projects')
-      })
-  }
-
-  useEffect(() => {
-    refresh()
+  const loadProjects = useCallback(() => {
+    const request = ++requestRef.current
+    return listProjects().then(next => {
+      if (!mountedRef.current || request !== requestRef.current) return
+      setProjects(next)
+      setError(null)
+    }).catch((reason: unknown) => {
+      if (mountedRef.current && request === requestRef.current) {
+        setError(reason instanceof Error ? reason.message : 'Could not load projects.')
+      }
+    }).finally(() => {
+      if (mountedRef.current && request === requestRef.current) setLoading(false)
+    })
   }, [])
 
-  const openNew = () => {
-    void createProject(name, preset.width, preset.height).then((project) => {
-      navigate({ page: 'svg-editor', projectId: project.id })
-    })
+  useEffect(() => {
+    mountedRef.current = true
+    void loadProjects()
+    return () => {
+      mountedRef.current = false
+      requestRef.current += 1
+    }
+  }, [loadProjects])
+
+  const refresh = useCallback(() => {
+    setLoading(true)
+    setError(null)
+    return loadProjects()
+  }, [loadProjects])
+
+  const openNew = async () => {
+    if (creatingRef.current || !mountedRef.current) return
+    creatingRef.current = true
+    setCreating(true)
+    setCreateError(null)
+    try {
+      const project = await createProject(name, preset.width, preset.height)
+      if (mountedRef.current) navigate({ page: 'svg-editor', projectId: project.id })
+    } catch (reason: unknown) {
+      if (mountedRef.current) {
+        setCreateError(reason instanceof Error ? reason.message : 'Could not create the project.')
+      }
+    } finally {
+      creatingRef.current = false
+      if (mountedRef.current) setCreating(false)
+    }
+  }
+
+  const removeProject = async (project: { id: string; name: string }) => {
+    if (deletingRef.current.has(project.id) || !mountedRef.current) return
+    if (!window.confirm(`Delete “${project.name}”? This cannot be undone.`)) return
+    deletingRef.current.add(project.id)
+    try {
+      await deleteProject(project.id)
+      if (mountedRef.current) await refresh()
+    } catch (reason: unknown) {
+      if (mountedRef.current) {
+        const detail = reason instanceof Error ? ` ${reason.message}` : ''
+        setError(`Could not delete “${project.name}”.${detail}`)
+      }
+    } finally {
+      deletingRef.current.delete(project.id)
+    }
   }
 
   return (
-    <div className="studio-shell">
-      <header className="studio-topbar">
-        <button
-          type="button"
-          className="studio-back"
-          onClick={() => navigate({ page: 'home' })}
-        >
-          <ArrowLeft size={14} />
-          Artist Pro
-        </button>
-        <div className="studio-brand">
-          <div className="brand-mark">S</div>
-          <div>
-            <strong>SVG</strong>
-            <span>Vector editor</span>
-          </div>
-        </div>
-      </header>
-
-      <main className="studio-main svg-home">
-        <section className="new-project">
-          <p className="studio-kicker">New project</p>
-          <h1>Start a canvas</h1>
-          <div className="new-project-row">
-            <label>
-              <span>Name</span>
-              <input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') openNew()
-                }}
-              />
-            </label>
-            <label>
-              <span>Size</span>
-              <Select
-                aria-label="Project size"
-                value={size}
-                onChange={(event) => setSize(event.target.value)}
-              >
-                {ARTBOARD_PRESETS.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.label}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <Button variant="primary" onClick={openNew}>
-              <Plus size={14} /> Create
-            </Button>
-          </div>
-        </section>
-
-        <section>
-          <p className="studio-kicker">Projects</p>
-          {error ? (
-            <p className="studio-empty">{error}</p>
-          ) : projects.length === 0 ? (
-            <p className="studio-empty">
-              Nothing here yet. Create a project to open the editor.
-            </p>
-          ) : (
-            <ul className="project-list">
-              {projects.map((project) => (
-                <li key={project.id}>
-                  <button
-                    type="button"
-                    className="project-card"
-                    onClick={() =>
-                      navigate({ page: 'svg-editor', projectId: project.id })
-                    }
-                  >
-                    <strong>{project.name}</strong>
-                    <small>
-                      {project.width} × {project.height}
-                      {' · '}
-                      {formatUpdated(project.updatedAt)}
-                    </small>
-                  </button>
-                  <button
-                    type="button"
-                    className="project-delete"
-                    aria-label={`Delete ${project.name}`}
-                    onClick={() => {
-                      void deleteProject(project.id).then(refresh)
-                    }}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </main>
-    </div>
+    <ProjectLaunchpad
+      tool="svg"
+      projects={projects}
+      loading={loading}
+      error={error}
+      name={name}
+      onNameChange={setName}
+      size={size}
+      onSizeChange={setSize}
+      presets={ARTBOARD_PRESETS}
+      creating={creating}
+      createError={createError}
+      onCreate={() => { void openNew() }}
+      onOpen={(projectId: string) => navigate({ page: 'svg-editor', projectId })}
+      onDelete={(project: { id: string; name: string }) => { void removeProject(project) }}
+      onBack={() => navigate({ page: 'home' })}
+      onRefresh={() => { void refresh() }}
+    />
   )
 }

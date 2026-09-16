@@ -3,6 +3,11 @@ import type { ToolManifest } from '@artist-studio/tool-registry'
 import { deleteRecentProject, loadRecentProjects } from './recentProjects'
 
 const localProjects = vi.hoisted(() => ({ list: vi.fn(), remove: vi.fn() }))
+const drawingProjects = vi.hoisted(() => ({ list: vi.fn(), remove: vi.fn() }))
+vi.mock('@artist-studio/drawing-canvas/library', () => ({
+  listProjects: drawingProjects.list,
+  deleteProject: drawingProjects.remove,
+}))
 vi.mock('@artist-studio/live-character/library', () => ({
   listProjects: localProjects.list,
   deleteProject: localProjects.remove,
@@ -129,6 +134,19 @@ describe('loadRecentProjects', () => {
 
 
 describe('browser project integration', () => {
+  it('loads and deletes Drawing Canvas projects through local storage', async () => {
+    const fetchStub = stubFetch({})
+    const drawingTool: ToolManifest = {
+      id: 'drawing-canvas', title: 'Drawing Canvas', blurb: 'Drawing', route: '/drawing-canvas', status: 'ready',
+    }
+    drawingProjects.list.mockResolvedValue([summary('canvas', 600)])
+    drawingProjects.remove.mockResolvedValue(undefined)
+    const projects = await loadRecentProjects([drawingTool])
+    expect(projects).toMatchObject([{ id: 'canvas', toolId: 'drawing-canvas', toolRoute: '/drawing-canvas' }])
+    await deleteRecentProject(projects[0])
+    expect(drawingProjects.remove).toHaveBeenCalledWith('canvas')
+    expect(fetchStub).not.toHaveBeenCalled()
+  })
   it('merges browser projects even when every API service is offline', async () => {
     stubFetch({ 'apps/svg-tool': 'fail', 'apps/animated-paint': 'fail', 'apps/cel': 'fail' })
     localProjects.list.mockResolvedValue([summary('local-rig', 500)])

@@ -26,6 +26,13 @@ const TapPilotStudio = lazy(() =>
   })),
 )
 
+const DrawingHome = lazy(() =>
+  import('@artist-studio/drawing-canvas').then((module) => ({ default: module.DrawingHome })),
+)
+const DrawingEditor = lazy(() =>
+  import('@artist-studio/drawing-canvas').then((module) => ({ default: module.DrawingEditor })),
+)
+
 const LiveCharacterHome = lazy(() =>
   import('@artist-studio/live-character').then((module) => ({
     default: module.LiveCharacterHome,
@@ -42,7 +49,9 @@ export default function App() {
 
   useEffect(() => {
     if (route.page === 'home') document.title = 'Artist Pro'
-    else if (route.page === 'svg-home' || route.page === 'svg-editor') {
+    else if (route.page === 'drawing-home' || route.page === 'drawing-editor') {
+      document.title = 'Drawing Canvas — Artist Pro'
+    } else if (route.page === 'svg-home' || route.page === 'svg-editor') {
       document.title = 'SVG — Artist Pro'
     } else if (
       route.page === 'paint-home' ||
@@ -60,6 +69,13 @@ export default function App() {
   }, [route])
 
   if (route.page === 'svg-home') return <SvgToolHome />
+  if (route.page === 'drawing-home' || route.page === 'drawing-editor') {
+    return (
+      <Suspense fallback={<div className="studio-loading">Opening Drawing Canvas…</div>}>
+        {route.page === 'drawing-home' ? <DrawingHome /> : <DrawingEditor key={route.projectId} projectId={route.projectId} />}
+      </Suspense>
+    )
+  }
   if (route.page === 'svg-editor') {
     return <SvgEditor projectId={route.projectId} />
   }

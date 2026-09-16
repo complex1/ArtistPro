@@ -5,6 +5,7 @@ import {
   Bone,
   Moon,
   Paintbrush,
+  Palette,
   PenTool,
   Search,
   Settings,
@@ -30,6 +31,7 @@ import {
 const icons: Record<string, LucideIcon> = {
   'svg-tool': PenTool,
   'animated-paint': Paintbrush,
+  'drawing-canvas': Palette,
   cel: Sparkles,
   tappilot: Smartphone,
   'live-character': Bone,

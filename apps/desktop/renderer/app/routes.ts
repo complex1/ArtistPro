@@ -5,6 +5,8 @@ export type AppRoute =
   | { page: 'paint-home' }
   | { page: 'paint-playground'; brushId?: string }
   | { page: 'paint-editor'; projectId: string }
+  | { page: 'drawing-home' }
+  | { page: 'drawing-editor'; projectId: string }
   | { page: 'cel-home' }
   | { page: 'cel-editor'; projectId: string }
   | { page: 'tappilot' }
@@ -16,6 +18,14 @@ export function parseHash(hash: string): AppRoute {
   if (!path) return { page: 'home' }
 
   const parts = path.split('/').filter(Boolean)
+  if (parts[0] === 'drawing-canvas') {
+    if (!parts[1]) return { page: 'drawing-home' }
+    try {
+      return { page: 'drawing-editor', projectId: decodeURIComponent(parts[1]) }
+    } catch {
+      return { page: 'drawing-home' }
+    }
+  }
   if (parts[0] === 'tappilot') return { page: 'tappilot' }
   if (parts[0] === 'live-character') {
     if (!parts[1]) return { page: 'live-character-home' }
@@ -55,6 +65,8 @@ export function parseHash(hash: string): AppRoute {
 
 export function toHash(route: AppRoute): string {
   if (route.page === 'home') return '#/'
+  if (route.page === 'drawing-home') return '#/drawing-canvas'
+  if (route.page === 'drawing-editor') return `#/drawing-canvas/${encodeURIComponent(route.projectId)}`
   if (route.page === 'svg-home') return '#/svg'
   if (route.page === 'svg-editor') {
     return `#/svg/${encodeURIComponent(route.projectId)}`
@@ -78,6 +90,7 @@ export function toHash(route: AppRoute): string {
 }
 
 export function toolHomeRoute(toolRoute: string): AppRoute | undefined {
+  if (toolRoute === '/drawing-canvas') return { page: 'drawing-home' }
   if (toolRoute === '/svg') return { page: 'svg-home' }
   if (toolRoute === '/paint') return { page: 'paint-home' }
   if (toolRoute === '/cel') return { page: 'cel-home' }
@@ -90,6 +103,7 @@ export function projectRoute(
   toolRoute: string,
   projectId: string,
 ): AppRoute | undefined {
+  if (toolRoute === '/drawing-canvas') return { page: 'drawing-editor', projectId }
   if (toolRoute === '/svg') return { page: 'svg-editor', projectId }
   if (toolRoute === '/paint') return { page: 'paint-editor', projectId }
   if (toolRoute === '/cel') return { page: 'cel-editor', projectId }

@@ -229,7 +229,34 @@ function LiveCharacterArt() {
   )
 }
 
+function DrawingArt() {
+  return (
+    <Art>
+      <defs>
+        <linearGradient id="drawing-paper" x1="0" y1="0" x2="1" y2="1">
+          <stop stopColor="#faf4e8" /><stop offset="1" stopColor="#ebe2d3" />
+        </linearGradient>
+        <linearGradient id="drawing-stroke" x1="0" y1="1" x2="1" y2="0">
+          <stop stopColor="#de795e" /><stop offset="1" stopColor="#efad71" />
+        </linearGradient>
+      </defs>
+      <rect width="240" height="132" fill="#24282e" />
+      <rect x="28" y="12" width="185" height="111" rx="3" fill="#111" opacity=".25" />
+      <rect x="25" y="9" width="185" height="111" rx="3" fill="url(#drawing-paper)" />
+      <circle cx="162" cy="39" r="17" fill="#efc879" />
+      <path d="M35 99C58 80 62 57 88 59s26 35 50 24 25-23 52-11" fill="none" stroke="#90aba2" strokeWidth="19" strokeLinecap="round" />
+      <path d="M44 80C73 103 81 26 112 47s0 74 36 48 33-48 48-36" fill="none" stroke="url(#drawing-stroke)" strokeWidth="14" strokeLinecap="round" />
+      <path d="M45 78C75 102 80 24 111 45s0 73 36 47" fill="none" stroke="#f7c39c" strokeWidth="2" strokeLinecap="round" opacity=".7" />
+      <path d="M189 103l22-68 7 2-22 68-6 7z" fill="#344343" />
+      <path d="M189 103l7 2-6 7z" fill="#debca0" />
+      <rect x="8" y="25" width="9" height="80" rx="4.5" fill="#171b20" />
+      <circle cx="12.5" cy="36" r="3" fill="#e69874" /><circle cx="12.5" cy="49" r="3" fill="#90aba2" /><circle cx="12.5" cy="62" r="3" fill="#efc879" />
+    </Art>
+  )
+}
+
 const ART: Record<string, () => ReactNode> = {
+  'drawing-canvas': DrawingArt,
   'animated-paint': PaintArt,
   cel: CelArt,
   'svg-tool': SvgArt,

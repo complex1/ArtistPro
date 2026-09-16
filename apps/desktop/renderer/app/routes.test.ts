@@ -59,9 +59,20 @@ describe('app routes', () => {
     expect(parseHash('#/tappilot')).toEqual({ page: 'tappilot' })
   })
 
+  it('opens Drawing Canvas and safely decodes project links', () => {
+    expect(parseHash('#/drawing-canvas')).toEqual({ page: 'drawing-home' })
+    expect(parseHash('#/drawing-canvas/')).toEqual({ page: 'drawing-home' })
+    expect(parseHash('#/drawing-canvas/my%20canvas%2F1')).toEqual({ page: 'drawing-editor', projectId: 'my canvas/1' })
+    expect(parseHash('#/drawing-canvas/%E0%A4%A')).toEqual({ page: 'drawing-home' })
+    expect(toolHomeRoute('/drawing-canvas')).toEqual({ page: 'drawing-home' })
+    expect(projectRoute('/drawing-canvas', 'sketch')).toEqual({ page: 'drawing-editor', projectId: 'sketch' })
+  })
+
   it('round-trips hashes', () => {
     const routes: AppRoute[] = [
       { page: 'home' },
+      { page: 'drawing-home' },
+      { page: 'drawing-editor', projectId: 'my canvas/1' },
       { page: 'svg-home' },
       { page: 'svg-editor', projectId: 'p1' },
       { page: 'paint-home' },

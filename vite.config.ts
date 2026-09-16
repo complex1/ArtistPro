@@ -39,6 +39,8 @@ export default defineConfig({
         'apps/animated-paint/web/index.ts',
       ),
       '@artist-studio/cel': path.resolve(root, 'apps/cel/web/index.ts'),
+      '@artist-studio/drawing-canvas/library': path.resolve(root, 'apps/drawing-canvas/web/library.ts'),
+      '@artist-studio/drawing-canvas': path.resolve(root, 'apps/drawing-canvas/web/index.ts'),
       '@artist-studio/live-character/library': path.resolve(root, 'apps/live-character/web/library.ts'),
       '@artist-studio/live-character': path.resolve(root, 'apps/live-character/web/index.ts'),
       '@artist-studio/tappilot': path.resolve(

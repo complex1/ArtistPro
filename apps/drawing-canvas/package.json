@@ -1,0 +1,9 @@
+{
+  "name": "@artist-studio/drawing-canvas",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./web/index.ts",
+    "./library": "./web/library.ts"
+  }
+}

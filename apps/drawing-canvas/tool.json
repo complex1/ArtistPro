@@ -1,0 +1,7 @@
+{
+  "id": "drawing-canvas",
+  "title": "Drawing Canvas",
+  "blurb": "Brushes, layers, and freehand drawing",
+  "route": "/drawing-canvas",
+  "status": "ready"
+}

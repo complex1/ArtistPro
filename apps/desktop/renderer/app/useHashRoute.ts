@@ -7,7 +7,10 @@ export function useHashRoute(): AppRoute {
   )
 
   useEffect(() => {
-    const sync = () => setRoute(parseHash(window.location.hash))
+    const sync = () => {
+      const navigation = new CustomEvent('artist-studio:before-route-change', { cancelable: true })
+      if (window.dispatchEvent(navigation)) setRoute(parseHash(window.location.hash))
+    }
     window.addEventListener('hashchange', sync)
     sync()
     return () => window.removeEventListener('hashchange', sync)

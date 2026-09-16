@@ -18,21 +18,23 @@ export type RecentProject = ProjectSummary & {
 }
 
 /**
- * Merge tool-owned project stores. Live Character works offline in IndexedDB;
+ * Merge tool-owned project stores. Drawing Canvas and Live Character use IndexedDB;
  * existing tools continue using their manifest API endpoints.
  */
 export async function loadRecentProjects(
   tools: ToolManifest[],
 ): Promise<RecentProject[]> {
   const sources = tools.filter(
-    (tool) => tool.status === 'ready' && (Boolean(tool.apiPrefix) || tool.id === 'live-character'),
+    (tool) => tool.status === 'ready' && (Boolean(tool.apiPrefix) || tool.id === 'live-character' || tool.id === 'drawing-canvas'),
   )
 
   const batches = await Promise.all(
     sources.map(async (tool) => {
       const apiPrefix = tool.apiPrefix
       try {
-        const summaries = tool.id === 'live-character'
+        const summaries = tool.id === 'drawing-canvas'
+          ? await (await import('@artist-studio/drawing-canvas/library')).listProjects()
+          : tool.id === 'live-character'
           ? await (await import('@artist-studio/live-character/library')).listProjects()
           : await apiJson<ProjectSummary[]>(`${apiPrefix}/projects`)
         return summaries.map((summary) => ({
@@ -59,6 +61,10 @@ export async function loadRecentProjects(
 export async function deleteRecentProject(
   project: RecentProject,
 ): Promise<void> {
+  if (project.toolId === 'drawing-canvas') {
+    await (await import('@artist-studio/drawing-canvas/library')).deleteProject(project.id)
+    return
+  }
   if (project.toolId === 'live-character') {
     await (await import('@artist-studio/live-character/library')).deleteProject(project.id)
     return

@@ -22,6 +22,7 @@ def test_lists_tool_manifests() -> None:
     assert "animated-paint" in ids
     assert "cel" in ids
     assert "live-character" in ids
+    assert "drawing-canvas" in ids
     paint = next(tool for tool in tools if tool["id"] == "animated-paint")
     assert paint["status"] == "ready"
     assert paint["apiPrefix"] == "/v1/apps/animated-paint"
@@ -33,3 +34,8 @@ def test_lists_tool_manifests() -> None:
     assert character["status"] == "ready"
     assert character["route"] == "/live-character"
     assert "apiPrefix" not in character
+
+    drawing = next(tool for tool in tools if tool["id"] == "drawing-canvas")
+    assert drawing["status"] == "ready"
+    assert drawing["route"] == "/drawing-canvas"
+    assert "apiPrefix" not in drawing
