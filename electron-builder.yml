@@ -1,0 +1,48 @@
+# electron-builder contents layout:
+# https://www.electron.build/docs/contents/
+appId: com.artiststudio.app
+productName: Artist Studio
+asar: true
+npmRebuild: false
+directories:
+  output: release
+files:
+  - package.json
+  - dist/**/*
+  - dist-tappilot-phone/**/*
+  - apps/desktop/electron/**/*
+  - apps/tappilot/electron/**/*
+  - '!apps/**/electron/**/*.test.*'
+extraResources:
+  - from: build/python-deps
+    to: python/site-packages
+    filter:
+      - '**/*'
+  - from: backend
+    to: python/backend
+    filter:
+      - '**/*'
+      - '!**/test_*.py'
+      - '!**/__pycache__/**'
+  - from: apps
+    to: python/apps
+    filter:
+      - '**/tool.json'
+      - '**/server/**'
+      - '!**/test_*.py'
+      - '!**/__pycache__/**'
+mac:
+  category: public.app-category.graphics-design
+  identity: null
+  icon: apps/tappilot/phone/public/icons/icon-512.png
+  target:
+    - dmg
+    - zip
+win:
+  icon: apps/tappilot/phone/public/icons/icon-512.png
+  target:
+    - nsis
+linux:
+  icon: apps/tappilot/phone/public/icons/icon-512.png
+  target:
+    - AppImage

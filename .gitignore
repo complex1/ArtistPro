@@ -10,6 +10,9 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist-tappilot-phone
+release
+build
 *.local
 .venv
 __pycache__/

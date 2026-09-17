@@ -2,6 +2,15 @@
 
 TapPilot is an Artist Studio tool for building phone-controlled shortcut decks.
 
+## Starter profiles
+
+The TapPilot home screen includes editable starter decks for Figma, Adobe
+Photoshop, Blender, and Visual Studio Code. Creating one makes a local,
+unpublished profile with common shortcuts and opens it in the existing editor.
+Review its bindings before publishing: the examples use the software's common
+default shortcuts, but personal keymaps and platform conventions can differ.
+Starter profiles only send actions while their named target app is active.
+
 ## Structure
 
 - `src/` — desktop editor rendered inside Artist Studio

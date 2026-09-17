@@ -5,11 +5,17 @@ import { existsSync } from 'node:fs'
 import { createServer } from 'node:net'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { resolvePythonCommand, resolveStudioPaths } from './paths.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const repoRoot = path.resolve(__dirname, '../../..')
 const require = createRequire(import.meta.url)
 const tapPilot = require('../../tappilot/electron/runtime.cjs')
+const studioPaths = resolveStudioPaths({
+  isPackaged: app.isPackaged,
+  appPath: app.getAppPath(),
+  resourcesPath: process.resourcesPath,
+  electronDir: __dirname,
+})
 
 let sidecar = null
 let apiBase = 'http://127.0.0.1:8765'
@@ -46,13 +52,15 @@ async function startSidecar() {
   const port = await freePort()
   apiBase = `http://127.0.0.1:${port}`
   const dataRoot = path.join(app.getPath('userData'), 'artist-studio')
-  const venvPython = path.join(repoRoot, '.venv/bin/python')
-  const python =
-    process.env.ARTIST_PYTHON ||
-    (existsSync(venvPython) ? venvPython : 'python3')
+  const python = resolvePythonCommand({
+    isPackaged: app.isPackaged,
+    venvPython: studioPaths.venvPython,
+    venvExists: existsSync(studioPaths.venvPython),
+  })
   sidecar = spawn(
-    python,
+    python.command,
     [
+      ...python.args,
       '-m',
       'uvicorn',
       'backend.host.main:app',
@@ -62,12 +70,12 @@ async function startSidecar() {
       String(port),
     ],
     {
-      cwd: repoRoot,
+      cwd: studioPaths.pythonRoot,
       env: {
         ...process.env,
         ARTIST_DATA_ROOT: dataRoot,
-        ARTIST_REPO_ROOT: repoRoot,
-        PYTHONPATH: repoRoot,
+        ARTIST_REPO_ROOT: studioPaths.pythonRoot,
+        PYTHONPATH: studioPaths.pythonPath,
         PYTHONUNBUFFERED: '1',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -106,8 +114,7 @@ function createWindow(hash = '#/') {
     url.hash = hash
     void win.loadURL(url.toString())
   } else {
-    const index = path.join(repoRoot, 'dist/index.html')
-    void win.loadFile(index, { query: { apiBase }, hash })
+    void win.loadFile(studioPaths.distIndex, { query: { apiBase }, hash })
   }
   return win
 }
@@ -151,7 +158,7 @@ app.whenReady().then(async () => {
   await tapPilot.initialize({
     isDev: Boolean(process.env.VITE_DEV_SERVER_URL),
     getWindows: () => BrowserWindow.getAllWindows(),
-    phoneDistPath: path.join(repoRoot, 'dist-tappilot-phone'),
+    phoneDistPath: studioPaths.phoneDistPath,
   })
   createHomeWindow()
 })

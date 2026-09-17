@@ -3,6 +3,19 @@ from fastapi.testclient import TestClient
 from backend.host.main import app
 
 
+def test_cors_allows_file_origin() -> None:
+    client = TestClient(app)
+    response = client.options(
+        "/health",
+        headers={
+            "Origin": "null",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers.get("access-control-allow-origin") == "null"
+
+
 def test_health(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("ARTIST_DATA_ROOT", str(tmp_path))
     client = TestClient(app)

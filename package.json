@@ -2,6 +2,9 @@
   "name": "artist-studio",
   "private": true,
   "version": "0.0.0",
+  "productName": "Artist Studio",
+  "author": "Artist Studio",
+  "description": "Artist Studio desktop app",
   "type": "module",
   "main": "apps/desktop/electron/main.mjs",
   "workspaces": [
@@ -32,6 +35,8 @@
     "test:api": "PYTHONPATH=. .venv/bin/python -m pytest",
     "setup:api": "python3 -m venv .venv && .venv/bin/pip install fastapi 'uvicorn[standard]' pytest httpx",
     "preview": "vite preview",
+    "package": "npm run build && node scripts/bundle-python-deps.mjs && electron-builder --dir",
+    "dist": "npm run build && node scripts/bundle-python-deps.mjs && electron-builder",
     "test:frame-by-frame:browser": "electron apps/frame-by-frame/test/browser-smoke.mjs"
   },
   "dependencies": {
@@ -53,7 +58,11 @@
     "perfect-freehand": "^1.2.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "zustand": "^5.0.15"
+    "zustand": "^5.0.15",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "qrcode": "^1.5.4",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
@@ -63,6 +72,7 @@
     "@xmldom/xmldom": "^0.9.12",
     "concurrently": "^9.2.1",
     "electron": "^39.5.2",
+    "electron-builder": "^26.8.1",
     "fake-indexeddb": "^6.2.5",
     "oxlint": "^1.75.0",
     "typescript": "~6.0.2",

@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { installGlobalClickFeedback } from "../shared/feedback";
 import tapPilotLogo from "../shared/images/logo.png";
+import {
+  applySampleProfile,
+  getSampleProfile,
+  type SampleProfileId,
+} from "../shared/sampleProfiles";
 import type { Profile, ServerInfo } from "../shared/types";
 import { DynamicIcon } from "./components/DynamicIcon";
 import { EditorView } from "./components/EditorView";
@@ -92,6 +97,20 @@ export default function App({ onExit }: { onExit?: () => void }) {
     setRoute({ name: "editor", profileId: created.id });
   }
 
+  async function createSampleProfile(sampleId: SampleProfileId) {
+    const sample = getSampleProfile(sampleId);
+    const created = await window.tapPilot.createProfile({
+      name: sample.name,
+      description: sample.description,
+      targetApp: sample.targetApp,
+      grid: { cols: 4, rows: 2 },
+    });
+    const saved = await window.tapPilot.saveProfile(
+      applySampleProfile(created, sampleId)
+    );
+    setRoute({ name: "editor", profileId: saved.id });
+  }
+
   async function handleStartServer() {
     setServerBusy(true);
     try {
@@ -173,6 +192,9 @@ export default function App({ onExit }: { onExit?: () => void }) {
           <HomeView
             onOpen={(id) => setRoute({ name: "editor", profileId: id })}
             onCreate={() => void createProfile()}
+            onCreateSample={createSampleProfile}
+            serverRunning={running}
+            onOpenServer={() => setServerOpen(true)}
           />
         ) : route.name === "styles" ? (
           <StylesView onBack={() => setRoute({ name: "home" })} />

@@ -255,12 +255,46 @@ function DrawingArt() {
   )
 }
 
+function TapPilotArt() {
+  return (
+    <Art>
+      <defs>
+        <linearGradient id="tappilot-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop stopColor="#171d35" />
+          <stop offset="1" stopColor="#2d3f71" />
+        </linearGradient>
+        <linearGradient id="tappilot-phone" x1="0" y1="0" x2="0" y2="1">
+          <stop stopColor="#5f83ff" />
+          <stop offset="1" stopColor="#3956c8" />
+        </linearGradient>
+      </defs>
+      <rect width="240" height="132" fill="url(#tappilot-bg)" />
+      <path d="M0 106C39 80 63 122 108 98s75-50 132-15v49H0z" fill="#11172b" opacity=".55" />
+      <rect x="24" y="23" width="118" height="73" rx="8" fill="#101625" stroke="#7c91de" strokeWidth="1.5" />
+      <rect x="32" y="31" width="102" height="54" rx="4" fill="#202c4d" />
+      <path d="M43 44h31M43 54h52M43 64h39" stroke="#8fa5ff" strokeWidth="3" strokeLinecap="round" opacity=".85" />
+      <rect x="97" y="41" width="25" height="10" rx="3" fill="#f2c979" />
+      <rect x="88" y="58" width="34" height="10" rx="3" fill="#5878eb" />
+      <rect x="152" y="13" width="48" height="100" rx="11" fill="#101625" stroke="#9eb1ff" strokeWidth="2" />
+      <rect x="158" y="23" width="36" height="72" rx="6" fill="url(#tappilot-phone)" />
+      <circle cx="176" cy="103" r="3" fill="#9eb1ff" />
+      <g fill="#f7f4ea">
+        <rect x="164" y="33" width="10" height="10" rx="2" /><rect x="179" y="33" width="10" height="10" rx="2" />
+        <rect x="164" y="48" width="10" height="10" rx="2" /><rect x="179" y="48" width="10" height="10" rx="2" />
+      </g>
+      <path d="M144 55c7 0 8-15 15-15M144 70c8 0 9 14 15 14" fill="none" stroke="#f2c979" strokeWidth="2" strokeLinecap="round" strokeDasharray="3 4" />
+      <circle cx="144" cy="62" r="4" fill="#f2c979" />
+    </Art>
+  )
+}
+
 const ART: Record<string, () => ReactNode> = {
   'frame-by-frame': () => <Art><rect width="240" height="132" fill="#2d2b24" /><path d="M24 95Q116-33 215 96" fill="none" stroke="#bda579" strokeDasharray="3 5" opacity=".5" />{[0, 1, 2].map(index => <g key={index} transform={`translate(${17 + index * 70} ${index === 1 ? 17 : 30}) rotate(${index === 0 ? -7 : index === 2 ? 7 : 0} 32 41)`}><rect width="65" height="85" rx="4" fill="#f0e6d3" /><path d="M8 67H57" stroke="#b6a78c" /><ellipse cx="32" cy={index === 1 ? 32 : 49} rx="15" ry={index === 1 ? 19 : 14} fill={index === 1 ? '#d6a064' : '#8eab9c'} stroke="#596152" strokeWidth="1.4" /><circle cx="27" cy={index === 1 ? 29 : 47} r="1.5" fill="#424c3e" /><circle cx="38" cy={index === 1 ? 29 : 47} r="1.5" fill="#424c3e" /><path d={`M28 ${index === 1 ? 37 : 54}q5 4 10-1`} stroke="#424c3e" fill="none" /><rect x="8" y="75" width="21" height="2" fill="#b6a78c" /></g>)}</Art>,
   'drawing-canvas': DrawingArt,
   'animated-paint': PaintArt,
   cel: CelArt,
   'svg-tool': SvgArt,
+  tappilot: TapPilotArt,
   'live-character': LiveCharacterArt,
 }
 

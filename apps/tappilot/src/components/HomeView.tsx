@@ -1,11 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { DEFAULT_PROFILE_IMAGE } from "../../shared/defaultImage";
+import {
+  getSampleProfile,
+  SAMPLE_PROFILES,
+  type SampleProfileId,
+} from "../../shared/sampleProfiles";
 import type { ProfileSummary } from "../../shared/types";
 import { DynamicIcon } from "./DynamicIcon";
 
 type Props = {
   onOpen: (id: string) => void;
   onCreate: () => void;
+  onCreateSample: (sampleId: SampleProfileId) => Promise<void>;
+  serverRunning: boolean;
+  onOpenServer: () => void;
 };
 
 type PendingImport = {
@@ -14,12 +22,21 @@ type PendingImport = {
   idConflict: { id: string; name: string } | null;
 };
 
-export function HomeView({ onOpen, onCreate }: Props) {
+export function HomeView({
+  onOpen,
+  onCreate,
+  onCreateSample,
+  serverRunning,
+  onOpenServer,
+}: Props) {
   const [profiles, setProfiles] = useState<ProfileSummary[]>([]);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [selectedSampleId, setSelectedSampleId] = useState<SampleProfileId>("figma");
+  const [creatingSampleId, setCreatingSampleId] = useState<SampleProfileId | null>(null);
   const importInput = useRef<HTMLInputElement>(null);
+  const selectedSample = getSampleProfile(selectedSampleId);
 
   async function refresh() {
     setProfiles(await window.tapPilot.listProfiles());
@@ -44,6 +61,20 @@ export function HomeView({ onOpen, onCreate }: Props) {
     if (!confirm("Delete this profile?")) return;
     await window.tapPilot.deleteProfile(id);
     await refresh();
+  }
+
+  async function createSample(sampleId: SampleProfileId) {
+    setCreatingSampleId(sampleId);
+    setImportError(null);
+    try {
+      await onCreateSample(sampleId);
+    } catch (err) {
+      setImportError(
+        err instanceof Error ? err.message : "Could not create the starter profile."
+      );
+    } finally {
+      setCreatingSampleId(null);
+    }
   }
 
   function slugify(name: string) {
@@ -144,11 +175,105 @@ export function HomeView({ onOpen, onCreate }: Props) {
   }
 
   return (
-    <div className="home">
-      <div className="home-head">
-        <h2>Profiles</h2>
-        <span className="home-count">{profiles.length}</span>
-        <div className="home-head-actions">
+    <div className="home home-command-center">
+      <section className="command-hero">
+        <div className="command-hero-copy">
+          <span className="eyebrow"><i /> MOBILE COMMAND DESK</span>
+          <h2>Make your phone feel like a <em>control surface.</em></h2>
+          <p>
+            Start with a familiar workspace, tune every action, then publish it
+            to your phone when it feels right.
+          </p>
+          <div className="command-hero-actions">
+            <button className="btn btn-primary neon" onClick={onCreate}>
+              <DynamicIcon name="Plus" size={16} /> Build a custom remote
+            </button>
+            <button className="ghost-btn" onClick={onOpenServer}>
+              <DynamicIcon name="Smartphone" size={16} /> Pair a phone
+            </button>
+          </div>
+        </div>
+        <aside className={`command-connection ${serverRunning ? "online" : ""}`}>
+          <span className="connection-orbit one" /><span className="connection-orbit two" />
+          <div className="connection-icon"><DynamicIcon name="Smartphone" size={24} /></div>
+          <div>
+            <span className="connection-label">PHONE LINK</span>
+            <strong>{serverRunning ? "Ready on your Wi-Fi" : "Pair your phone"}</strong>
+            <p>{serverRunning ? "A published remote can connect now." : "Start the local server to connect a remote."}</p>
+          </div>
+          <button className="connection-button" onClick={onOpenServer}>
+            {serverRunning ? "Open pairing" : "Set up"}<DynamicIcon name="ArrowUpRight" size={14} />
+          </button>
+        </aside>
+      </section>
+
+      <section className="starter-section" aria-labelledby="starter-title">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow"><i /> START WITH A WORKSPACE</span>
+            <h2 id="starter-title">Starter profiles</h2>
+            <p>Editable samples with common shortcuts. They stay unpublished until you choose to share them with your phone.</p>
+          </div>
+          <span className="starter-note"><DynamicIcon name="ShieldCheck" size={15} /> Only runs while the selected app is active</span>
+        </div>
+        <div className="starter-layout">
+          <div className="template-grid" role="list">
+            {SAMPLE_PROFILES.map((sample) => (
+              <article
+                key={sample.id}
+                className={`template-card ${selectedSampleId === sample.id ? "selected" : ""}`}
+                style={{ "--template-accent": sample.accent } as CSSProperties}
+                role="listitem"
+              >
+                <button
+                  className="template-select"
+                  aria-pressed={selectedSampleId === sample.id}
+                  onClick={() => setSelectedSampleId(sample.id)}
+                >
+                  <span className="template-icon"><DynamicIcon name={sample.icon} size={21} /></span>
+                  <span className="template-meta"><small>{sample.appName}</small><strong>{sample.name.split(" · ")[1]}</strong></span>
+                  <DynamicIcon name="ChevronRight" size={16} />
+                </button>
+                <div className="template-controls" aria-label={`${sample.name} included controls`}>
+                  {sample.controls.map((control) => <span key={control}>{control}</span>)}
+                </div>
+                <button
+                  className="template-use"
+                  disabled={creatingSampleId !== null}
+                  onClick={() => void createSample(sample.id)}
+                >
+                  {creatingSampleId === sample.id ? "Creating…" : "Use profile"}
+                  <DynamicIcon name="ArrowRight" size={15} />
+                </button>
+              </article>
+            ))}
+          </div>
+          <aside className="template-preview" style={{ "--template-accent": selectedSample.accent } as CSSProperties}>
+            <div className="template-preview-top"><span><DynamicIcon name={selectedSample.icon} size={16} /> {selectedSample.appName}</span><span>UNPUBLISHED</span></div>
+            <div className="template-phone" aria-label={`${selectedSample.name} remote preview`}>
+              <div className="template-phone-header"><span /><strong>{selectedSample.name}</strong><DynamicIcon name="MoreHorizontal" size={14} /></div>
+              <div className="template-phone-grid">
+                {selectedSample.controls.map((control, index) => (
+                  <button key={control} type="button" onClick={() => setSelectedSampleId(selectedSample.id)}>
+                    <DynamicIcon name={index % 2 ? "Command" : "Sparkles"} size={16} />
+                    <span>{control}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="template-preview-bottom"><span>8 ready actions</span><button onClick={() => void createSample(selectedSample.id)}>Create this profile <DynamicIcon name="ArrowRight" size={14} /></button></div>
+          </aside>
+        </div>
+      </section>
+
+      <section className="profiles-section" aria-labelledby="profiles-title">
+        <div className="home-head">
+          <div>
+            <span className="eyebrow"><i /> YOUR LIBRARY</span>
+            <h2 id="profiles-title">Your remotes</h2>
+          </div>
+          <span className="home-count">{profiles.length}</span>
+          <div className="home-head-actions">
           <input
             ref={importInput}
             type="file"
@@ -163,7 +288,7 @@ export function HomeView({ onOpen, onCreate }: Props) {
             <DynamicIcon name="Upload" size={16} /> Import
           </button>
         </div>
-      </div>
+        </div>
 
       {importError ? (
         <div className="status error" role="alert">
@@ -311,6 +436,7 @@ export function HomeView({ onOpen, onCreate }: Props) {
           <span>New profile</span>
         </button>
       </div>
+      </section>
     </div>
   );
 }
