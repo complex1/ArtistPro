@@ -3,7 +3,7 @@ import { ArrowRight, Check, LoaderCircle, Pause, Play, Plus, RotateCcw, Sparkles
 import type { AnimationDocument, Cel } from '../model'
 import { analyzeInbetweens, generateInbetweens } from './client'
 import { insertInbetweens, planInbetweens, type InbetweenPlacement } from './timeline'
-import { MAX_ANCHORS, MAX_GENERATED_PIXELS, MAX_INBETWEENS, type AnalysisResult, type AnchorPair, type GeneratedDrawing, type PixelPoint, type Spacing } from './types'
+import { MAX_ANCHORS, MAX_GENERATED_PIXELS, MAX_INBETWEENS, type AnalysisResult, type AnchorPair, type GeneratedDrawing, type MotionRefinement, type PixelPoint, type Spacing } from './types'
 import './inbetween.css'
 
 type Props = { document: AnimationDocument; layerId: string; fromCelId?: string; onClose: () => void; onApply: (document: AnimationDocument, firstFrame: number) => void }
@@ -16,13 +16,15 @@ export function InbetweenDialog({ document: doc, layerId, fromCelId, onClose, on
   const [fromId, setFromId] = useState(preferred?.id ?? '')
   const from = choices.find(cel => cel.id === fromId), to = from ? layer.cels[layer.cels.indexOf(from) + 1] : undefined
   const [count, setCount] = useState(3), [exposure, setExposure] = useState(1), [placement, setPlacement] = useState<InbetweenPlacement>('insert')
-  const [spacing, setSpacing] = useState<Spacing>('linear'), [threshold, setThreshold] = useState(.35), [removeSpecks, setRemoveSpecks] = useState(true)
+  const [spacing, setSpacing] = useState<Spacing>('linear'), [threshold, setThreshold] = useState(.35), [removeSpecks, setRemoveSpecks] = useState(true), [refinement, setRefinement] = useState<MotionRefinement>('adaptive')
   const [pairs, setPairs] = useState<AnchorPair[]>([]), [analysis, setAnalysis] = useState<AnalysisResult | null>(null)
   const [selected, setSelected] = useState<string | null>(null), [adding, setAdding] = useState(false), [pending, setPending] = useState<PixelPoint | null>(null)
-  const [generated, setGenerated] = useState<GeneratedDrawing[]>([]), [index, setIndex] = useState(0), [playing, setPlaying] = useState(false)
+  const [generated, setGenerated] = useState<GeneratedDrawing[]>([]), [generatedRefinement, setGeneratedRefinement] = useState<MotionRefinement | null>(null), [index, setIndex] = useState(0), [playing, setPlaying] = useState(false)
   const [status, setStatus] = useState<'idle' | 'analyzing' | 'generating'>('idle'), [progress, setProgress] = useState(0), [error, setError] = useState<string | null>(null)
   const abort = useRef<AbortController | null>(null), request = useRef(0), alive = useRef(true), dialog = useRef<HTMLDivElement>(null), close = useRef<HTMLButtonElement>(null)
   const busy = status !== 'idle'
+  const effectiveRefinement = generatedRefinement ?? refinement
+  const usedGuidedFallback = refinement === 'adaptive' && generatedRefinement === 'guided'
   const stopWork = useCallback(() => { request.current++; abort.current?.abort(); abort.current = null }, [])
   const { plan, planError } = useMemo(() => {
     try {
@@ -32,12 +34,12 @@ export function InbetweenDialog({ document: doc, layerId, fromCelId, onClose, on
       return { plan: fromId && nextId ? planInbetweens(doc, layerId, fromId, nextId, count, exposure, placement) : undefined, planError: '' }
     } catch (error) { return { plan: undefined, planError: message(error) } }
   }, [doc, layerId, fromId, count, exposure, placement])
-  const invalidate = () => { setGenerated([]); setPlaying(false); setIndex(0); setError(null) }
+  const invalidate = () => { setGenerated([]); setGeneratedRefinement(null); setPlaying(false); setIndex(0); setError(null) }
   const cancel = useCallback(() => { stopWork(); setStatus('idle'); setProgress(0) }, [stopWork])
   const match = useCallback(async (a: Cel, b: Cel, inkThreshold: number, cleanup: boolean) => {
     abort.current?.abort()
     const current = ++request.current, controller = new AbortController(); abort.current = controller
-    setStatus('analyzing'); setError(null); setGenerated([]); setPlaying(false); setAnalysis(null)
+    setStatus('analyzing'); setError(null); setGenerated([]); setGeneratedRefinement(null); setPlaying(false); setAnalysis(null)
     try {
       const result = await analyzeInbetweens(a.dataUrl!, b.dataUrl!, doc.width, doc.height, { threshold: inkThreshold, removeSpecks: cleanup }, controller.signal)
       if (!alive.current || current !== request.current) return
@@ -111,13 +113,13 @@ export function InbetweenDialog({ document: doc, layerId, fromCelId, onClose, on
   async function generate() {
     if (!from || !to || !plan || planError || busy || !pairs.length) return
     const current = ++request.current, controller = new AbortController(); abort.current = controller
-    setStatus('generating'); setProgress(0); setError(null); setGenerated([]); setPlaying(false)
+    setStatus('generating'); setProgress(0); setError(null); setGenerated([]); setGeneratedRefinement(null); setPlaying(false)
     try {
-      const result = await generateInbetweens(from.dataUrl!, to.dataUrl!, doc.width, doc.height, { count, spacing, pairs, threshold, removeSpecks }, controller.signal, value => { if (alive.current && current === request.current) setProgress(value) })
+      const result = await generateInbetweens(from.dataUrl!, to.dataUrl!, doc.width, doc.height, { count, spacing, pairs, threshold, removeSpecks, refinement }, controller.signal, value => { if (alive.current && current === request.current) setProgress(value) })
       if (!alive.current || current !== request.current) return
       // Validate size and insertion against the complete shot before enabling Apply.
-      insertInbetweens(doc, layerId, from.id, to.id, result, exposure, placement)
-      setGenerated(result); setIndex(Math.ceil(result.length / 2))
+      insertInbetweens(doc, layerId, from.id, to.id, result.drawings, exposure, placement)
+      setGenerated(result.drawings); setGeneratedRefinement(result.refinement); setIndex(Math.ceil(result.drawings.length / 2))
     } catch (error) { if (alive.current && current === request.current && !controller.signal.aborted) setError(message(error)) }
     finally { if (alive.current && current === request.current) { setStatus('idle'); abort.current = null } }
   }
@@ -128,12 +130,14 @@ export function InbetweenDialog({ document: doc, layerId, fromCelId, onClose, on
   }
 
   return <div className="fbf-ib-backdrop"><div className="fbf-ib-dialog" ref={dialog} role="dialog" aria-modal="true" aria-labelledby="fbf-ib-title">
-    <header><div className="fbf-ib-heading"><Sparkles size={22} /><div><h2 id="fbf-ib-title">Line art in-betweens</h2><p>Guide the motion. Preview it. Keep the drawings you like.</p></div></div><span className="fbf-ib-local">On device</span><button ref={close} aria-label="Close in-between studio" onClick={onClose}><X size={18} /></button></header>
+    <header><div className="fbf-ib-heading"><Sparkles size={22} /><div><h2 id="fbf-ib-title">Line art in-betweens</h2><p>Guide the motion. Preview it. Keep the drawings you like.</p></div></div><span className="fbf-ib-local">{usedGuidedFallback ? 'Guided fallback · on device' : effectiveRefinement === 'adaptive' ? 'ML assist · on device' : 'Guided · on device'}</span><button ref={close} aria-label="Close in-between studio" onClick={onClose}><X size={18} /></button></header>
     {!from || !to ? <div className="fbf-ib-empty"><Sparkles size={35} /><h3>Start with two drawings</h3><p>Draw or import two neighboring key poses on the same layer, then open In-between. Both drawings need visible dark lines on transparent or white paper.</p><p>Blank drawings between your keys count as drawings. Delete those blank cels first if you want to generate across the gap.</p><button className="fbf-primary" onClick={onClose}>Back to drawing</button></div> : <>
       <div className="fbf-ib-body"><aside className="fbf-ib-settings"><fieldset disabled={busy}>
         <label>Key drawings<select aria-label="Key drawing pair" value={fromId} onChange={event => { invalidate(); setPairs([]); setAnalysis(null); setSelected(null); setAdding(false); setPending(null); setThreshold(.35); setRemoveSpecks(true); setFromId(event.target.value) }}>{choices.map(cel => { const next = layer.cels[layer.cels.indexOf(cel) + 1]; return <option key={cel.id} value={cel.id}>Frames {cel.start + 1} → {next.start + 1}</option> })}</select></label><p className="fbf-ib-hint">Neighboring drawings on <strong>{layer.name}</strong>.</p>
         <div className="fbf-ib-setting-row"><label>In-between drawings<input aria-label="In-between drawing count" type="number" min={1} max={MAX_INBETWEENS} value={count} onChange={event => { invalidate(); setCount(Number(event.target.value)) }} /></label><label>Exposure<select aria-label="Generated drawing exposure" disabled={placement === 'fit'} value={exposure} onChange={event => { invalidate(); setExposure(Number(event.target.value)) }}>{[1,2,3,4,6,12].map(value => <option key={value} value={value}>{value} {value === 1 ? 'frame' : 'frames'}</option>)}</select></label></div>
         <label>Motion spacing<select aria-label="Motion spacing" value={spacing} onChange={event => { invalidate(); setSpacing(event.target.value as Spacing) }}><option value="linear">Even spacing</option><option value="ease-in">Slow start</option><option value="ease-out">Slow finish</option><option value="ease-in-out">Slow start & finish</option></select></label>
+        <label>Line motion refinement<select aria-label="Line motion refinement" value={refinement} onChange={event => { invalidate(); setRefinement(event.target.value as MotionRefinement) }}><option value="adaptive">ML assist · local motion model</option><option value="guided">Guided TPS only</option></select></label>
+        <p className="fbf-ib-hint fbf-ib-model-note">ML assist fits a small local motion model from both drawings and your guides. It stays on this device, does not invent line art, and falls back to Guided TPS when auto-matching is weak.</p>
         <label>Timeline placement<select aria-label="In-between placement" value={placement} onChange={event => { invalidate(); setPlacement(event.target.value as InbetweenPlacement) }}><option value="insert">Insert after the first key</option><option value="fit">Fit between key starts</option></select></label>
         <p className="fbf-ib-timing">{planError || (plan && (placement === 'fit' ? `First key holds for 1 frame. The end key stays at frame ${to.start + 1}.` : `Keeps both key drawings and their holds. ${plan.shift ? `The end key and later drawings on this layer move ${plan.shift} frames later.` : `Uses the empty gap; later drawings stay in place.${remainingGap ? ` ${remainingGap} empty frames remain before the end key. Use Fit to fill the span.` : ''}`}`))}</p>
         <div className="fbf-ib-divider" /><label>Ink threshold <strong>{Math.round(threshold * 100)}%</strong><input aria-label="Ink threshold" type="range" min={10} max={80} value={Math.round(threshold * 100)} onChange={event => { invalidate(); setThreshold(Number(event.target.value) / 100) }} /></label><label className="fbf-ib-checkbox"><input type="checkbox" checked={removeSpecks} onChange={event => { invalidate(); setRemoveSpecks(event.target.checked) }} />Remove tiny specks</label>
@@ -149,6 +153,7 @@ export function InbetweenDialog({ document: doc, layerId, fromCelId, onClose, on
         <div className="fbf-ib-guidance" aria-live="polite">{busy ? <><LoaderCircle className="fbf-ib-spin" size={15} />{status === 'analyzing' ? 'Finding matching line features…' : `Drawing in-betweens… ${Math.round(progress * 100)}%`}</> : adding ? pending ? 'Now click the matching feature in the end drawing.' : 'Click a feature in the start drawing.' : <><Check size={14} />Review the matching guides, then generate a preview.</>}</div>
         <div className="fbf-ib-key-pair"><KeyDrawing title={`Start · frame ${from.start + 1}`} dataUrl={from.dataUrl!} width={doc.width} height={doc.height} side="from" pairs={pairs} selected={selected} disabled={busy} adding={adding} pending={pending} onSelect={setSelected} onMove={movePair} onPlace={place} onRemove={removePair} /><div className="fbf-ib-arrow"><ArrowRight size={19} /></div><KeyDrawing title={`End · frame ${to.start + 1}`} dataUrl={to.dataUrl!} width={doc.width} height={doc.height} side="to" pairs={pairs} selected={selected} disabled={busy} adding={adding} pending={null} onSelect={setSelected} onMove={movePair} onPlace={place} onRemove={removePair} /></div>
         {analysis?.warnings.length ? <div className="fbf-ib-warnings">{analysis.warnings.map((warning, index) => <p key={index}>{warning}</p>)}</div> : null}
+        {usedGuidedFallback ? <div className="fbf-ib-warnings fbf-ib-model-fallback"><p>ML assist used Guided TPS for this preview because the line matches were too ambiguous.</p></div> : null}
         <div className="fbf-ib-preview-heading"><h3>Motion preview <span>{generated.length ? `${generated.length} new drawings` : 'Not generated yet'}</span></h3><button className="fbf-button" disabled={!generated.length || busy} aria-label={playing ? 'Pause in-between preview' : 'Play in-between preview'} onClick={() => setPlaying(value => !value)}>{playing ? <Pause size={13} /> : <Play size={13} />}{playing ? 'Pause' : 'Play'}</button></div>
         <div className="fbf-ib-preview">{previews.length ? <>
           {previews[index]?.dataUrl ? <img src={previews[index].dataUrl!} alt={`Preview ${previews[index].label}`} /> : <div className="fbf-ib-blank">Empty timeline gap</div>}
@@ -157,7 +162,7 @@ export function InbetweenDialog({ document: doc, layerId, fromCelId, onClose, on
         {previews.length > 0 && <div className="fbf-ib-filmstrip" aria-label="Generated preview drawings">{previews.map((preview, at) => <button key={at} aria-label={`Preview ${preview.label}`} className={index === at ? 'is-selected' : ''} onClick={() => { setPlaying(false); setIndex(at) }}>{preview.dataUrl ? <img src={preview.dataUrl} alt="" /> : <div className="fbf-ib-blank" />}<span>{preview.short}</span></button>)}</div>}
       </main></div>
       {error && <div className="fbf-ib-error" role="alert">{error}</div>}
-      <footer><span>{status === 'generating' ? <progress value={progress} max={1} /> : 'Runs locally · editable drawings · one-step Undo'}</span><div>{busy ? <button className="fbf-button" onClick={cancel}>Cancel processing</button> : <button className="fbf-button" onClick={() => void generate()} disabled={Boolean(planError) || !pairs.length || adding}><Sparkles size={14} />{generated.length ? 'Generate again' : 'Generate preview'}</button>}<button className="fbf-primary" disabled={busy || generated.length !== count || !generated.length || Boolean(planError)} onClick={apply}><Plus size={14} />Insert {generated.length || count} drawings</button></div></footer>
+      <footer><span>{status === 'generating' ? <progress value={progress} max={1} /> : usedGuidedFallback ? 'Guided TPS fallback · editable drawings · one-step Undo' : effectiveRefinement === 'adaptive' ? 'Local ML motion model · editable drawings · one-step Undo' : 'Guided TPS · editable drawings · one-step Undo'}</span><div>{busy ? <button className="fbf-button" onClick={cancel}>Cancel processing</button> : <button className="fbf-button" onClick={() => void generate()} disabled={Boolean(planError) || !pairs.length || adding}><Sparkles size={14} />{generated.length ? 'Generate again' : 'Generate preview'}</button>}<button className="fbf-primary" disabled={busy || generated.length !== count || !generated.length || Boolean(planError)} onClick={apply}><Plus size={14} />Insert {generated.length || count} drawings</button></div></footer>
     </>}
   </div></div>
 }

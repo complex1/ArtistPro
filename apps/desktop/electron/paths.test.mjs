@@ -1,6 +1,10 @@
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { resolvePythonCommand, resolveStudioPaths } from './paths.mjs'
+import {
+  pythonCandidates,
+  resolveStudioPaths,
+  selectPython,
+} from './paths.mjs'
 
 describe('resolveStudioPaths', () => {
   it('points at the repo when unpackaged', () => {
@@ -49,47 +53,86 @@ describe('resolveStudioPaths', () => {
   })
 })
 
-describe('resolvePythonCommand', () => {
-  it('prefers ARTIST_PYTHON', () => {
+describe('pythonCandidates', () => {
+  const commands = (options) =>
+    pythonCandidates({ env: {}, platform: 'darwin', ...options }).map(
+      (candidate) => [candidate.command, ...candidate.args].join(' '),
+    )
+
+  it('prefers ARTIST_PYTHON, then the repo venv when unpackaged', () => {
     expect(
-      resolvePythonCommand({
+      commands({
         isPackaged: false,
         venvPython: '/repo/.venv/bin/python',
         env: { ARTIST_PYTHON: '/custom/python' },
-        venvExists: true,
-      }),
-    ).toEqual({ command: '/custom/python', args: [] })
+      }).slice(0, 2),
+    ).toEqual(['/custom/python', '/repo/.venv/bin/python'])
   })
 
-  it('uses the venv only when unpackaged', () => {
+  it('skips the repo venv when packaged', () => {
     expect(
-      resolvePythonCommand({
-        isPackaged: false,
-        venvPython: '/repo/.venv/bin/python',
-        env: {},
-        venvExists: true,
-      }),
-    ).toEqual({ command: '/repo/.venv/bin/python', args: [] })
-    expect(
-      resolvePythonCommand({
-        isPackaged: true,
-        venvPython: '/asar/.venv/bin/python',
-        env: {},
-        platform: 'darwin',
-        venvExists: true,
-      }),
-    ).toEqual({ command: 'python3', args: [] })
+      commands({ isPackaged: true, venvPython: '/asar/.venv/bin/python' }),
+    ).not.toContain('/asar/.venv/bin/python')
   })
 
-  it('uses the Windows launcher when no venv is available', () => {
+  it('probes absolute install dirs because Finder gives apps a minimal PATH', () => {
     expect(
-      resolvePythonCommand({
-        isPackaged: true,
-        venvPython: 'C:\\app\\.venv\\Scripts\\python.exe',
-        env: {},
-        platform: 'win32',
-        venvExists: false,
-      }),
-    ).toEqual({ command: 'py', args: ['-3'] })
+      commands({ isPackaged: true, requiredVersion: '3.14' }),
+    ).toEqual([
+      '/opt/homebrew/bin/python3.14',
+      '/usr/local/bin/python3.14',
+      '/usr/bin/python3.14',
+      'python3.14',
+      '/opt/homebrew/bin/python3',
+      '/usr/local/bin/python3',
+      '/usr/bin/python3',
+      'python3',
+    ])
+  })
+
+  it('asks the Windows launcher for the bundled version first', () => {
+    expect(
+      commands({ isPackaged: true, platform: 'win32', requiredVersion: '3.14' }),
+    ).toEqual(['py -3.14', 'py -3', 'python'])
+  })
+})
+
+describe('selectPython', () => {
+  const candidates = [
+    { command: '/usr/bin/python3', args: [] },
+    { command: '/opt/homebrew/bin/python3', args: [] },
+  ]
+  const versions = {
+    '/usr/bin/python3': '3.9',
+    '/opt/homebrew/bin/python3': '3.14',
+  }
+  const probeVersion = ({ command }) => versions[command] ?? null
+
+  it('skips interpreters that cannot run the bundled wheels', () => {
+    const { python } = selectPython({
+      candidates,
+      requiredVersion: '3.14',
+      probeVersion,
+    })
+    expect(python).toEqual({
+      command: '/opt/homebrew/bin/python3',
+      args: [],
+      version: '3.14',
+    })
+  })
+
+  it('reports what it found when nothing matches', () => {
+    const { python, probed } = selectPython({
+      candidates,
+      requiredVersion: '3.13',
+      probeVersion,
+    })
+    expect(python).toBeNull()
+    expect(probed.map((c) => c.version)).toEqual(['3.9', '3.14'])
+  })
+
+  it('takes the first working interpreter when no version is required', () => {
+    const { python } = selectPython({ candidates, probeVersion })
+    expect(python?.command).toBe('/usr/bin/python3')
   })
 })

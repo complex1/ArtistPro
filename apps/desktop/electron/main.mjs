@@ -1,11 +1,15 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
-import { spawn } from 'node:child_process'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { spawn, spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { existsSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { resolvePythonCommand, resolveStudioPaths } from './paths.mjs'
+import {
+  pythonCandidates,
+  resolveStudioPaths,
+  selectPython,
+} from './paths.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
@@ -48,15 +52,57 @@ async function waitForHealth(url, attempts = 50) {
   throw new Error(`Python sidecar did not become healthy at ${url}`)
 }
 
+/** Written next to the vendored wheels by scripts/bundle-python-deps.mjs. */
+function bundledPythonVersion() {
+  try {
+    const manifest = JSON.parse(
+      readFileSync(studioPaths.runtimeManifest, 'utf8'),
+    )
+    return typeof manifest.pythonVersion === 'string'
+      ? manifest.pythonVersion
+      : null
+  } catch {
+    return null
+  }
+}
+
+function probeVersion({ command, args }) {
+  const probe = spawnSync(
+    command,
+    [...args, '-c', 'import sys; print("%d.%d" % sys.version_info[:2])'],
+    { encoding: 'utf8' },
+  )
+  if (probe.status !== 0) return null
+  return String(probe.stdout).trim() || null
+}
+
+function findPython() {
+  const requiredVersion = bundledPythonVersion()
+  const { python, probed } = selectPython({
+    candidates: pythonCandidates({
+      isPackaged: app.isPackaged,
+      venvPython: studioPaths.venvPython,
+      requiredVersion,
+    }),
+    requiredVersion,
+    probeVersion,
+  })
+  if (python) return python
+  const found = probed.length
+    ? probed.map((c) => `${c.command} (${c.version})`).join('\n')
+    : 'none'
+  throw new Error(
+    `Artist Studio bundles Python ${requiredVersion} libraries, but no matching Python ${requiredVersion} interpreter was found.\n\n` +
+      `Interpreters checked:\n${found}\n\n` +
+      `Install Python ${requiredVersion}, or set ARTIST_PYTHON to its full path.`,
+  )
+}
+
 async function startSidecar() {
   const port = await freePort()
   apiBase = `http://127.0.0.1:${port}`
   const dataRoot = path.join(app.getPath('userData'), 'artist-studio')
-  const python = resolvePythonCommand({
-    isPackaged: app.isPackaged,
-    venvPython: studioPaths.venvPython,
-    venvExists: existsSync(studioPaths.venvPython),
-  })
+  const python = findPython()
   sidecar = spawn(
     python.command,
     [
@@ -84,10 +130,18 @@ async function startSidecar() {
   sidecar.stdout?.on('data', (chunk) => {
     console.log('[fastapi]', String(chunk).trim())
   })
+  let stderr = ''
   sidecar.stderr?.on('data', (chunk) => {
+    stderr = `${stderr}${chunk}`.slice(-4000)
     console.error('[fastapi]', String(chunk).trim())
   })
-  await waitForHealth(apiBase)
+  try {
+    await waitForHealth(apiBase)
+  } catch (error) {
+    throw new Error(
+      `${error.message}\n\nCommand: ${python.command} (Python ${python.version})\n\n${stderr.trim()}`,
+    )
+  }
 }
 
 function stopSidecar() {
@@ -154,7 +208,19 @@ ipcMain.handle('artist:get-api-base', () => apiBase)
 ipcMain.handle('artist:open-window', (_event, hash) => openToolWindow(hash))
 
 app.whenReady().then(async () => {
-  await startSidecar()
+  try {
+    await startSidecar()
+  } catch (error) {
+    // Without this the window is never created and the app looks like it
+    // failed to launch at all.
+    dialog.showErrorBox(
+      'Artist Studio could not start',
+      error.message || String(error),
+    )
+    stopSidecar()
+    app.exit(1)
+    return
+  }
   await tapPilot.initialize({
     isDev: Boolean(process.env.VITE_DEV_SERVER_URL),
     getWindows: () => BrowserWindow.getAllWindows(),

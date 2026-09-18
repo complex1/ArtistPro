@@ -1,5 +1,5 @@
 import { MAX_ANCHORS, MAX_GENERATED_PIXELS, MAX_INBETWEENS } from './types'
-import type { AnalysisOptions, AnalysisResult, AnchorPair, GenerationOptions, PixelPoint, Raster, Spacing } from './types'
+import type { AnalysisOptions, AnalysisResult, AnchorPair, GenerationOptions, MotionRefinement, PixelPoint, Raster, Spacing } from './types'
 
 type Ink = { width: number; height: number; coverage: Float32Array; center: PixelPoint; angle: number; radius: number; anisotropy: number; count: number }
 type Mask = { width: number; height: number; scale: number; data: Uint8Array }
@@ -294,6 +294,175 @@ function deformation(source: PixelPoint[], target: PixelPoint[], scale: number):
   }
 }
 
+type MotionSample = { from: PixelPoint; to: PixelPoint; weight: number }
+type AdaptiveMotionField = { map: MapPoint; isRefined: true }
+
+const clamp = (value: number, minimum: number, maximum: number) => Math.max(minimum, Math.min(maximum, value))
+const gaussian = (squaredDistance: number, radius: number) => Math.exp(-squaredDistance / (2 * radius * radius))
+
+function tangentScore(a?: PixelPoint, b?: PixelPoint) {
+  if (!a || !b) return 1
+  const length = Math.hypot(a.x, a.y) * Math.hypot(b.x, b.y)
+  return length ? Math.abs((a.x * b.x + a.y * b.y) / length) : 1
+}
+
+/**
+ * Find conservative, bidirectionally-consistent local line matches after the
+ * guide-driven TPS has supplied a coarse pose. These become labels for the
+ * small local motion model. The artist's guide pairs remain zero-residual
+ * constraints, and the renderer pins them into the sampled deformation grid.
+ */
+function localMotionSamples(
+  source: FeaturePoint[],
+  target: FeaturePoint[],
+  guides: MotionSample[],
+  forward: MapPoint,
+  backward: MapPoint,
+  scale: number,
+): MotionSample[] {
+  if (!source.length || !target.length) return guides
+  const radius = clamp(scale * .08, 5, 32), radius2 = radius * radius
+  const candidates: Array<MotionSample & { targetIndex: number }> = []
+  for (const point of source) {
+    const expected = forward(point.x, point.y)
+    const found = nearest(expected, target)
+    if (found.distance > radius2) continue
+    const matched = target[found.index], reverse = backward(matched.x, matched.y)
+    const reverseDistance = distance2(reverse, point)
+    if (reverseDistance > radius2 * 1.35) continue
+    const direction = tangentScore(point.tangent, matched.tangent)
+    if (direction < .35) continue
+    const fit = 1 - Math.sqrt(found.distance) / radius
+    const consistency = 1 - Math.sqrt(reverseDistance) / (radius * Math.sqrt(1.35))
+    candidates.push({
+      from: { x: point.x, y: point.y },
+      to: { x: matched.x, y: matched.y },
+      weight: clamp((.35 + .65 * fit) * (.4 + .6 * consistency) * (.45 + .55 * direction), .08, 1),
+      targetIndex: found.index,
+    })
+  }
+  // A single target feature should not supervise incompatible source strokes.
+  // Keep high-confidence candidates, then distribute the retained examples.
+  candidates.sort((a, b) => b.weight - a.weight)
+  const usedTargets = new Set<number>(), unique: MotionSample[] = []
+  for (const candidate of candidates) {
+    if (usedTargets.has(candidate.targetIndex)) continue
+    usedTargets.add(candidate.targetIndex)
+    unique.push(candidate)
+  }
+  if (unique.length < 3) return guides
+  const room = Math.max(0, 56 - guides.length)
+  const compact = room
+    ? spread(unique.map((sample, index) => ({ x: sample.from.x, y: sample.from.y, index })), room).map(item => unique[item.index])
+    : []
+  return [...guides, ...compact]
+}
+
+function supportsAdaptiveRefinement(pairs: AnchorPair[]) {
+  const automatic = pairs.filter(pair => !pair.manual)
+  if (!automatic.length || pairs.some(pair => pair.manual)) return true
+  const confidence = automatic.reduce((sum, pair) => sum + (pair.confidence ?? 0), 0) / automatic.length
+  return automatic.length >= 3 && confidence >= .72
+}
+
+/**
+ * A compact radial-basis motion field fit separately for each pair
+ * of drawings. The TPS result is its prior; it only learns a bounded residual
+ * where mutually-consistent line features provide evidence for local motion.
+ */
+function learnAdaptiveMotionField(
+  sourceFeatures: FeaturePoint[],
+  targetFeatures: FeaturePoint[],
+  pairs: AnchorPair[],
+  scale: number,
+): AdaptiveMotionField | undefined {
+  const source = pairs.map(pair => pair.from), target = pairs.map(pair => pair.to)
+  const base = deformation(source, target, scale)
+  if (!supportsAdaptiveRefinement(pairs) || sourceFeatures.length < 3 || targetFeatures.length < 3) return undefined
+  const inverse = deformation(target, source, scale)
+  const guides: MotionSample[] = pairs.map(pair => ({ from: pair.from, to: pair.to, weight: pair.manual ? 18 : 8 + 10 * (pair.confidence ?? 0) }))
+  const samples = localMotionSamples(sourceFeatures, targetFeatures, guides, base, inverse, scale)
+  const dense = samples.slice(guides.length), denseConfidence = dense.reduce((sum, sample) => sum + sample.weight, 0) / Math.max(1, dense.length)
+  if (dense.length < 3 || denseConfidence < .45) return undefined
+
+  const extraCenterCount = Math.max(0, 56 - guides.length)
+  const extraCenters = extraCenterCount
+    ? spread(samples.slice(guides.length).map(sample => ({ x: sample.from.x, y: sample.from.y })), extraCenterCount)
+    : []
+  const centerPoints = [
+    ...guides.map(sample => ({ x: sample.from.x, y: sample.from.y })),
+    ...extraCenters,
+  ]
+  const centers: PixelPoint[] = []
+  for (const point of centerPoints) {
+    if (centers.some(center => distance2(center, point) < .25)) continue
+    centers.push({ x: point.x, y: point.y })
+  }
+  if (centers.length < 2) return undefined
+
+  const radius = clamp(scale * .085, 9, 88), matrix = Array.from({ length: centers.length }, () => new Float64Array(centers.length)), vx = new Float64Array(centers.length), vy = new Float64Array(centers.length)
+  for (const sample of samples) {
+    const basis = centers.map(center => gaussian(distance2(sample.from, center), radius))
+    const prior = base(sample.from.x, sample.from.y), dx = sample.to.x - prior.x, dy = sample.to.y - prior.y
+    for (let row = 0; row < centers.length; row++) {
+      vx[row] += sample.weight * basis[row] * dx
+      vy[row] += sample.weight * basis[row] * dy
+      for (let column = 0; column < centers.length; column++) matrix[row][column] += sample.weight * basis[row] * basis[column]
+    }
+  }
+  // Ridge regularization makes the learned field stable around sparse and
+  // nearly-collinear strokes while preserving the guide-driven TPS prior.
+  for (let index = 0; index < centers.length; index++) matrix[index][index] += .035
+  let wx: Float64Array, wy: Float64Array
+  try { wx = solve(matrix, vx); wy = solve(matrix, vy) } catch { return undefined }
+  const maximumResidual = clamp(scale * .07, 3, 26)
+  const guideKeys = new Set(guides.map(guide => `${Math.round(guide.from.x * 128)}:${Math.round(guide.from.y * 128)}`))
+  return { isRefined: true, map: (x, y) => {
+    const prior = base(x, y)
+    let dx = 0, dy = 0
+    for (let index = 0; index < centers.length; index++) {
+      const basis = gaussian(distance2({ x, y }, centers[index]), radius)
+      dx += wx[index] * basis
+      dy += wy[index] * basis
+    }
+    const length = Math.hypot(dx, dy)
+    if (!Number.isFinite(length)) return prior
+    if (length > maximumResidual) { dx = dx / length * maximumResidual; dy = dy / length * maximumResidual }
+    // Protect an explicitly placed guide from the residual learned nearby.
+    if (guideKeys.has(`${Math.round(x * 128)}:${Math.round(y * 128)}`)) return prior
+    return { x: prior.x + dx, y: prior.y + dy }
+  } }
+}
+
+/** Invert a forward field around the TPS inverse using two stable fixed-point steps. */
+function inverseMotionMap(forward: MapPoint, amount: number, fallback: MapPoint): MapPoint {
+  return (x, y) => {
+    let point = fallback(x, y)
+    for (let iteration = 0; iteration < 2; iteration++) {
+      const moved = forward(point.x, point.y)
+      const next = { x: x - amount * (moved.x - point.x), y: y - amount * (moved.y - point.y) }
+      if (!Number.isFinite(next.x + next.y)) return point
+      point = next
+    }
+    return point
+  }
+}
+
+/** Reject a learned residual when its forward and backward fields disagree. */
+function motionFieldsCoherent(forward: MapPoint, backward: MapPoint, features: FeaturePoint[], scale: number) {
+  const probes = spread(features, 48)
+  if (!probes.length) return false
+  let sum = 0, worst = 0
+  for (const probe of probes) {
+    const moved = forward(probe.x, probe.y), returned = backward(moved.x, moved.y)
+    const error = Math.sqrt(distance2(returned, probe))
+    if (!Number.isFinite(error)) return false
+    sum += error; worst = Math.max(worst, error)
+  }
+  const threshold = clamp(scale * .04, 2, 14)
+  return sum / probes.length <= threshold && worst <= threshold * 2.5
+}
+
 function sample(data: Float32Array, width: number, height: number, x: number, y: number): number {
   if (x <= -1 || y <= -1 || x >= width || y >= height || !Number.isFinite(x + y)) return 0
   const left = Math.floor(x), top = Math.floor(y), fx = x - left, fy = y - top
@@ -304,10 +473,33 @@ function sample(data: Float32Array, width: number, height: number, x: number, y:
   return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy
 }
 
-function warp(ink: Ink, map: MapPoint): Float32Array {
+type WarpPin = { output: PixelPoint; input: PixelPoint }
+
+/**
+ * The deformation is sampled on a bounded grid before rasterizing. Correct the
+ * four surrounding grid samples so its bilinear value lands exactly on each
+ * artist guide, including guides that fall between grid nodes.
+ */
+function pinWarpGrid(gx: Float32Array, gy: Float32Array, columns: number, rows: number, step: number, pins: WarpPin[]) {
+  for (let pass = 0; pass < 3; pass++) for (const pin of pins) {
+    const u = pin.output.x / step, v = pin.output.y / step
+    const left = clamp(Math.floor(u), 0, columns - 2), top = clamp(Math.floor(v), 0, rows - 2)
+    const fx = clamp(u - left, 0, 1), fy = clamp(v - top, 0, 1)
+    const indices = [top * columns + left, top * columns + left + 1, (top + 1) * columns + left, (top + 1) * columns + left + 1]
+    const weights = [(1 - fx) * (1 - fy), fx * (1 - fy), (1 - fx) * fy, fx * fy]
+    let mappedX = 0, mappedY = 0, denominator = 0
+    for (let index = 0; index < 4; index++) { mappedX += gx[indices[index]] * weights[index]; mappedY += gy[indices[index]] * weights[index]; denominator += weights[index] ** 2 }
+    if (denominator < EPSILON) continue
+    const dx = pin.input.x - mappedX, dy = pin.input.y - mappedY
+    for (let index = 0; index < 4; index++) { const adjustment = weights[index] / denominator; gx[indices[index]] += dx * adjustment; gy[indices[index]] += dy * adjustment }
+  }
+}
+
+function warp(ink: Ink, map: MapPoint, pins: WarpPin[] = []): Float32Array {
   const { width, height, coverage } = ink, step = Math.max(2, Math.ceil(Math.max(width, height) / 192)), columns = Math.max(2, Math.ceil((width - 1) / step) + 1), rows = Math.max(2, Math.ceil((height - 1) / step) + 1)
   const gx = new Float32Array(columns * rows), gy = new Float32Array(columns * rows)
   for (let y = 0; y < rows; y++) for (let x = 0; x < columns; x++) { const p = map(x * step, y * step), i = y * columns + x; gx[i] = p.x; gy[i] = p.y }
+  if (pins.length) pinWarpGrid(gx, gy, columns, rows, step, pins)
   const output = new Float32Array(width * height)
   for (let y = 0; y < height; y++) {
     const v = y / step, top = Math.min(rows - 2, Math.floor(v)), fy = v - top
@@ -401,20 +593,39 @@ function checkPairs(pairs: AnchorPair[], width: number, height: number) {
 }
 
 /** Streams frames one at a time; callers can transfer each raster out of a worker. */
-export function generateLineArt(from: Raster, to: Raster, options: GenerationOptions, onFrame: (raster: Raster, index: number) => void, onProgress?: (value: number) => void): void {
+export function generateLineArt(from: Raster, to: Raster, options: GenerationOptions, onFrame: (raster: Raster, index: number) => void, onProgress?: (value: number) => void): MotionRefinement {
   checkRasters(from, to); checkThreshold(options.threshold); checkPairs(options.pairs, from.width, from.height)
   if (!Number.isInteger(options.count) || options.count < 1 || options.count > MAX_INBETWEENS) throw new Error(`Generate between 1 and ${MAX_INBETWEENS} drawings at a time.`)
   if (from.width * from.height * options.count > MAX_GENERATED_PIXELS) throw new Error('This batch is too large. Generate fewer drawings or use a smaller canvas (48 megapixels per batch).')
+  const refinement = options.refinement ?? 'guided'
+  if (refinement !== 'guided' && refinement !== 'adaptive') throw new Error('Choose a supported motion refinement.')
   spacingAt(.5, options.spacing)
   const source = options.pairs.map(pair => pair.from), target = options.pairs.map(pair => pair.to), times = Array.from({ length: options.count }, (_, i) => spacingAt((i + 1) / (options.count + 1), options.spacing))
   const positions = times.map(t => source.map((p, i) => ({ x: p.x * (1 - t) + target[i].x * t, y: p.y * (1 - t) + target[i].y * t })))
   // Validate the complete batch before streaming any frames to keep failure atomic.
   for (const points of positions) for (let i = 0; i < points.length; i++) for (let j = 0; j < i; j++) if (distance2(points[i], points[j]) < .01) throw new Error('Guide paths meet or cross at an in-between frame. Correct the pairings or add another key pose.')
   const a = prepare(from, options, 'The first drawing'), b = prepare(to, options, 'The second drawing'), scale = Math.max(from.width, from.height)
+  const adaptiveRequested = refinement === 'adaptive' && supportsAdaptiveRefinement(options.pairs)
+  const sourceFeatures = adaptiveRequested ? cloud(a, options.threshold) : [], targetFeatures = adaptiveRequested ? cloud(b, options.threshold) : []
+  const reversePairs = options.pairs.map(pair => ({ ...pair, from: pair.to, to: pair.from }))
+  const candidateForward = adaptiveRequested
+    ? learnAdaptiveMotionField(sourceFeatures, targetFeatures, options.pairs, scale)
+    : undefined
+  const candidateBackward = adaptiveRequested
+    ? learnAdaptiveMotionField(targetFeatures, sourceFeatures, reversePairs, scale)
+    : undefined
+  const adaptive = Boolean(candidateForward?.isRefined && candidateBackward?.isRefined && motionFieldsCoherent(candidateForward.map, candidateBackward.map, sourceFeatures, scale))
+  const forward = adaptive && candidateForward ? candidateForward.map : undefined, backward = adaptive && candidateBackward ? candidateBackward.map : undefined
   onProgress?.(0)
   for (let index = 0; index < options.count; index++) {
-    const t = times[index], points = positions[index], warpedA = warp(a, deformation(points, source, scale)), warpedB = warp(b, deformation(points, target, scale)), data = synthesize(warpedA, warpedB, from.width, from.height, t, options.threshold)
+    const t = times[index], points = positions[index]
+    const fromMap = deformation(points, source, scale), toMap = deformation(points, target, scale)
+    const sourcePins = points.map((output, at) => ({ output, input: source[at] })), targetPins = points.map((output, at) => ({ output, input: target[at] }))
+    const warpedA = warp(a, forward ? inverseMotionMap(forward, t, fromMap) : fromMap, sourcePins)
+    const warpedB = warp(b, backward ? inverseMotionMap(backward, 1 - t, toMap) : toMap, targetPins)
+    const data = synthesize(warpedA, warpedB, from.width, from.height, t, options.threshold)
     onFrame({ width: from.width, height: from.height, data }, index)
     onProgress?.((index + 1) / options.count)
   }
+  return adaptive ? 'adaptive' : 'guided'
 }

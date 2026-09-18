@@ -141,6 +141,47 @@ describe('guided line-art in-between generation', () => {
     expect(alpha(frame, 10, 32)).toBe(255); expect(alpha(frame, 41, 32)).toBe(255)
     expect(alpha(frame, 40, 32)).toBe(0); expect(alpha(frame, 42, 32)).toBe(0)
   })
+  it('learns a local line motion field without moving a guided stationary stroke', () => {
+    const still: Stroke = { from: [12, 8], to: [12, 70], width: 2 }
+    const a = drawing([still, { from: [42, 22], to: [42, 58], width: 2 }])
+    const b = drawing([still, { from: [48, 22], to: [48, 58], width: 2 }])
+    const guides = [pair([12, 40], [12, 40])]
+    const [guided] = generate(a, b, { pairs: guides, refinement: 'guided' })
+    const [adaptive] = generate(a, b, { pairs: guides, refinement: 'adaptive' })
+    expect(alpha(guided, 45, 40)).toBe(0)
+    expect(alpha(adaptive, 45, 40)).toBeGreaterThan(180)
+    expect(alpha(adaptive, 12, 40)).toBeGreaterThan(220)
+    expect(alpha(adaptive, 42, 40)).toBe(0)
+    expect(alpha(adaptive, 48, 40)).toBe(0)
+  })
+  it('keeps a moving detail when a large static contour has more feature samples', () => {
+    const a = drawing([{ from: [181, 100], to: [181, 680], width: 2 }, { from: [500, 250], to: [500, 550], width: 2 }], false, 1024, 768)
+    const b = drawing([{ from: [181, 100], to: [181, 680], width: 2 }, { from: [520, 250], to: [520, 550], width: 2 }], false, 1024, 768)
+    const guides = [pair([181, 384], [181, 384])]
+    const [adaptive] = generate(a, b, { pairs: guides, refinement: 'adaptive' })
+    expect(alpha(adaptive, 181, 384)).toBeGreaterThan(220)
+    expect(alpha(adaptive, 510, 400)).toBeGreaterThan(180)
+    expect(alpha(adaptive, 500, 400)).toBe(0)
+    expect(alpha(adaptive, 520, 400)).toBe(0)
+  })
+  it('falls back to guided TPS when automatic guide confidence is weak', () => {
+    const still: Stroke = { from: [12, 8], to: [12, 70], width: 2 }
+    const a = drawing([still, { from: [42, 22], to: [42, 58], width: 2 }])
+    const b = drawing([still, { from: [48, 22], to: [48, 58], width: 2 }])
+    const lowConfidence: AnchorPair[] = [{ id: 'uncertain', from: { x: 12, y: 40 }, to: { x: 12, y: 40 }, confidence: .2 }]
+    const [guided] = generate(a, b, { pairs: lowConfidence, refinement: 'guided' })
+    const [adaptive] = generate(a, b, { pairs: lowConfidence, refinement: 'adaptive' })
+    expect(adaptive.data).toEqual(guided.data)
+  })
+  it('reports Guided TPS when no local residual can be learned', () => {
+    const a = drawing([{ from: [20, 12], to: [20, 68] }]), b = drawing([{ from: [80, 12], to: [80, 68] }])
+    const guides = [pair([20, 40], [20, 40])], guided: Raster[] = [], adaptive: Raster[] = []
+    const guidedMode = generateLineArt(a, b, { ...settings, pairs: guides, count: 1, spacing: 'linear', refinement: 'guided' }, frame => guided.push(frame))
+    const adaptiveMode = generateLineArt(a, b, { ...settings, pairs: guides, count: 1, spacing: 'linear', refinement: 'adaptive' }, frame => adaptive.push(frame))
+    expect(adaptiveMode).toBe('guided')
+    expect(guidedMode).toBe('guided')
+    expect(adaptive[0].data).toEqual(guided[0].data)
+  })
   it('streams exactly the requested drawings with progress and excludes both key frames', () => {
     const a = drawing([{ from: [10, 10], to: [10, 60] }]), b = drawing([{ from: [50, 10], to: [50, 60] }]), frames: Raster[] = [], indices: number[] = [], progress: number[] = []
     generateLineArt(a, b, { ...settings, pairs: [pair([10, 30], [50, 30])], count: 3, spacing: 'linear' }, (frame, index) => { frames.push(frame); indices.push(index) }, value => progress.push(value))

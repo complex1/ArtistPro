@@ -1,6 +1,6 @@
 import { MAX_BYTES } from '../model'
 import { thumbnail } from '../raster'
-import type { AnalysisOptions, AnalysisResult, GeneratedDrawing, GenerationOptions, Raster, WorkerReply, WorkerRequest } from './types'
+import type { AnalysisOptions, AnalysisResult, GeneratedDrawing, GenerationOptions, GenerationResult, Raster, WorkerReply, WorkerRequest } from './types'
 
 const cancelled = () => new DOMException('Generation cancelled', 'AbortError')
 
@@ -45,7 +45,7 @@ export async function analyzeInbetweens(from: string, to: string, width: number,
   return runWorker({ id: 1, kind: 'analyze', from: a, to: b, options }, signal, message => message.kind === 'analysis' ? message.result : undefined)
 }
 
-export async function generateInbetweens(from: string, to: string, width: number, height: number, options: GenerationOptions, signal: AbortSignal, progress: (value: number) => void): Promise<GeneratedDrawing[]> {
+export async function generateInbetweens(from: string, to: string, width: number, height: number, options: GenerationOptions, signal: AbortSignal, progress: (value: number) => void): Promise<GenerationResult> {
   const [a, b] = await Promise.all([decode(from, width, height, signal), decode(to, width, height, signal)])
   const frames: GeneratedDrawing[] = []
   let bytes = 0
@@ -63,7 +63,7 @@ export async function generateInbetweens(from: string, to: string, width: number
     }
     if (message.kind === 'done') {
       if (frames.filter(Boolean).length !== options.count) throw new Error('Generation stopped before all drawings were ready.')
-      return frames
+      return { drawings: frames, refinement: message.refinement }
     }
   })
 }

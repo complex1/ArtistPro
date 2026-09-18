@@ -8,10 +8,10 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
     if (request.kind === 'analyze') {
       reply({ id: request.id, kind: 'analysis', result: analyzeLineArt(request.from, request.to, request.options) })
     } else {
-      generateLineArt(request.from, request.to, request.options,
+      const refinement = generateLineArt(request.from, request.to, request.options,
         (raster, index) => reply({ id: request.id, kind: 'frame', raster, index }, [raster.data.buffer as ArrayBuffer]),
         value => reply({ id: request.id, kind: 'progress', value }))
-      reply({ id: request.id, kind: 'done' })
+      reply({ id: request.id, kind: 'done', refinement })
     }
   } catch (error) {
     reply({ id: request.id, kind: 'error', message: error instanceof Error ? error.message : 'Could not interpolate these drawings.' })
