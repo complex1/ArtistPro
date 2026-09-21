@@ -44,6 +44,11 @@ export type StrokePointV2 = {
   velocity: number
 }
 
+export type AnimationTiming =
+  | { mode: 'static'; sourceHash: string }
+  | { mode: 'stepped'; fps: number; sourceHash: string }
+  | { mode: 'once'; settleSeconds: number; sourceHash: string }
+
 export type BrushV2 = {
   id: string
   version: number
@@ -52,6 +57,9 @@ export type BrushV2 = {
   preview?: string
   renderer: RendererIdV2
   animated: boolean
+  /** Only supported brush recipes interpret closure and interior fills. */
+  closedPath: boolean
+  fill: { enabled: boolean; outline: boolean }
   size: number
   color: string
   opacity: number
@@ -73,10 +81,13 @@ export type BrushV2 = {
   speed: number
   seed: number
   animationJs: string
+  animationTiming?: AnimationTiming
   legacy?: Record<string, unknown>
 }
 
 export type StrokeV2 = {
+  /** Increment when editing existing points in place; appends also invalidate by length. */
+  geometryRevision?: number
   id: string
   layerId: string
   brushSnapshot: BrushV2
@@ -85,9 +96,23 @@ export type StrokeV2 = {
   createdAt: number
 }
 
+export type ImageLayerV2Data = {
+  /** Embedded original source; placement stays editable independently of pixels. */
+  dataUrl: string
+  naturalWidth: number
+  naturalHeight: number
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 export type LayerV2 = {
   id: string
   name: string
+  /** Documents saved before image layers omit kind and remain drawing layers. */
+  kind?: 'drawing' | 'image'
+  image?: ImageLayerV2Data
   visible: boolean
   opacity: number
   blendMode: BlendModeV2
@@ -121,6 +146,8 @@ export type DrawItem = {
   glow: number
   shadow: ShadowConfig
   kind: DrawItemKind
+  /** Start a separate contour instead of connecting to the preceding segment. */
+  breakBefore?: boolean
   life?: number
   vx?: number
   vy?: number

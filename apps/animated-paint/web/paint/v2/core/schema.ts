@@ -12,8 +12,10 @@ import {
   STATIC_ANIMATION_JS,
 } from './defaults'
 import type {
+  AnimationTiming,
   BrushV2,
   DrawItem,
+  ImageLayerV2Data,
   LayerV2,
   PaintDocumentV2,
   ScatterConfig,
@@ -22,6 +24,7 @@ import type {
   StrokeV2,
 } from './types'
 import { DEFAULT_BUDGETS } from './types'
+import { upgradeParsedBrush } from './brushUpgrades'
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value)
@@ -70,13 +73,24 @@ export function parsePoint(value: unknown): StrokePointV2 | null {
   }
 }
 
+function parseTiming(value: unknown): AnimationTiming | undefined {
+  if (!isObject(value) || typeof value.sourceHash !== 'string') return undefined
+  if (value.mode === 'static') return { mode: 'static', sourceHash: value.sourceHash }
+  if (value.mode === 'stepped') return { mode: 'stepped', sourceHash: value.sourceHash,
+    fps: clampNumber(value.fps, 12, 1, 120) }
+  if (value.mode === 'once') return { mode: 'once', sourceHash: value.sourceHash,
+    settleSeconds: clampNumber(value.settleSeconds, 3, 0.01, 3600) }
+  return undefined
+}
+
 export function parseBrush(value: unknown): BrushV2 | null {
   if (!isObject(value)) return null
   const stamps = Array.isArray(value.stamps)
     ? value.stamps.filter((item): item is string => typeof item === 'string')
     : ['dot']
   const particle = isObject(value.particle) ? value.particle : {}
-  return createBrushV2({
+  const fill = isObject(value.fill) ? value.fill : {}
+  return upgradeParsedBrush(createBrushV2({
     id: asString(value.id, crypto.randomUUID()),
     version: clampNumber(value.version, 1, 1),
     name: asString(value.name, 'Untitled brush'),
@@ -84,6 +98,8 @@ export function parseBrush(value: unknown): BrushV2 | null {
     preview: typeof value.preview === 'string' ? value.preview : undefined,
     renderer: isRendererId(value.renderer) ? value.renderer : 'stamp',
     animated: asBoolean(value.animated, false),
+    closedPath: asBoolean(value.closedPath, false),
+    fill: { enabled: asBoolean(fill.enabled, false), outline: asBoolean(fill.outline, true) },
     size: clampNumber(value.size, 12, 0.5, 400),
     color: asString(value.color, '#111111'),
     opacity: clampNumber(value.opacity, 1, 0, 1),
@@ -114,8 +130,9 @@ export function parseBrush(value: unknown): BrushV2 | null {
       typeof value.animationJs === 'string' && value.animationJs.trim()
         ? value.animationJs
         : STATIC_ANIMATION_JS,
+    animationTiming: parseTiming(value.animationTiming),
     legacy: isObject(value.legacy) ? value.legacy : undefined,
-  })
+  }))
 }
 
 export function parseStroke(value: unknown): StrokeV2 | null {
@@ -138,6 +155,24 @@ export function parseStroke(value: unknown): StrokeV2 | null {
   }
 }
 
+function parseImageLayerData(value: unknown): ImageLayerV2Data | undefined {
+  if (!isObject(value) || typeof value.dataUrl !== 'string' ||
+      !/^data:image\/[a-z0-9.+-]+(?:;[^,]*)?,.+/i.test(value.dataUrl)) return undefined
+  if (typeof value.naturalWidth !== 'number' || !Number.isFinite(value.naturalWidth) || value.naturalWidth <= 0 ||
+      typeof value.naturalHeight !== 'number' || !Number.isFinite(value.naturalHeight) || value.naturalHeight <= 0) return undefined
+  const naturalWidth = clampNumber(value.naturalWidth, 1, 1, 32768)
+  const naturalHeight = clampNumber(value.naturalHeight, 1, 1, 32768)
+  return {
+    dataUrl: value.dataUrl,
+    naturalWidth,
+    naturalHeight,
+    x: clampNumber(value.x, 0, -1_000_000, 1_000_000),
+    y: clampNumber(value.y, 0, -1_000_000, 1_000_000),
+    width: clampNumber(value.width, naturalWidth, 0.5, 32768),
+    height: clampNumber(value.height, naturalHeight, 0.5, 32768),
+  }
+}
+
 export function parseLayer(value: unknown): LayerV2 | null {
   if (!isObject(value)) return null
   const layer = createLayerV2(asString(value.name, 'Layer'))
@@ -146,6 +181,8 @@ export function parseLayer(value: unknown): LayerV2 | null {
   layer.opacity = clampNumber(value.opacity, 1, 0, 1)
   layer.blendMode = isBlendMode(value.blendMode) ? value.blendMode : 'source-over'
   layer.groupId = typeof value.groupId === 'string' ? value.groupId : undefined
+  const image = value.kind === 'image' ? parseImageLayerData(value.image) : undefined
+  if (image) { layer.kind = 'image'; layer.image = image }
   layer.rasterDataUrl =
     typeof value.rasterDataUrl === 'string' ? value.rasterDataUrl : null
   layer.eraseMaskDataUrl =
@@ -200,6 +237,7 @@ export function parseDrawItem(value: unknown): DrawItem | null {
     glow: clampNumber(value.glow, 0, 0, 80),
     shadow: parseShadow(value.shadow),
     kind,
+    breakBefore: value.breakBefore === true,
     life: typeof value.life === 'number' ? value.life : undefined,
     vx: typeof value.vx === 'number' ? value.vx : undefined,
     vy: typeof value.vy === 'number' ? value.vy : undefined,

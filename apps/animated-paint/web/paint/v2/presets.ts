@@ -1,5 +1,12 @@
+import { animationSourceHash } from './core/animationTiming'
+import { ANIME_BRUSHES } from './animePresets'
 import { createBrushV2 } from './core/defaults'
 import type { BrushV2 } from './core/types'
+import { FUNKY_BRUSHES } from './funkyPresets'
+import { ORGANIC_BRUSHES } from './organicPresets'
+import { WEATHER_BRUSHES } from './weatherPresets'
+import { EXPRESSIVE_BRUSHES } from './expressivePresets'
+import { REVEAL_BRUSHES } from './revealPresets'
 
 const WIGGLE = `function animate(points, config, time) {
   var items = [];
@@ -358,6 +365,7 @@ export const BUILTIN_BRUSHES: BrushV2[] = [
     spacing: STROKE_SPACING,
     stability: 55,
     animationJs: BOIL,
+    animationTiming: { mode: 'stepped', fps: 12, sourceHash: animationSourceHash(BOIL) },
   }),
   createBrushV2({
     id: 'textureBoil',
@@ -371,6 +379,7 @@ export const BUILTIN_BRUSHES: BrushV2[] = [
     spacing: 5,
     stability: 55,
     animationJs: TEXTURE_BOIL,
+    animationTiming: { mode: 'stepped', fps: 12, sourceHash: animationSourceHash(TEXTURE_BOIL) },
   }),
   createBrushV2({
     id: 'pulse',
@@ -423,6 +432,12 @@ export const BUILTIN_BRUSHES: BrushV2[] = [
     spacing: STROKE_SPACING,
     animationJs: DRAW_ON,
   }),
+  ...ORGANIC_BRUSHES,
+  ...FUNKY_BRUSHES,
+  ...ANIME_BRUSHES,
+  ...WEATHER_BRUSHES,
+  ...EXPRESSIVE_BRUSHES,
+  ...REVEAL_BRUSHES,
 ]
 
 export function getBuiltinBrush(id: string): BrushV2 {

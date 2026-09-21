@@ -19,6 +19,7 @@ import {
   FlaskConical,
   Group,
   Hand,
+  ImagePlus,
   MousePointer2,
   Plus,
   Redo2,
@@ -30,15 +31,20 @@ import { navigate } from '../app/routes'
 import { Button, CollapsibleSection, IconButton, Select } from '../ui/controls'
 import { PropertyRow, SliderField } from '../ui/fields'
 import { duplicateBrush, listAllBrushes } from './v2/brushLibrary'
-import { createLayerV2 } from './v2/core/defaults'
+import { createImageLayerV2, createLayerV2 } from './v2/core/defaults'
 import type {
   BlendModeV2,
   BrushV2,
+  ImageLayerV2Data,
   PaintDocumentV2,
   StrokePointV2,
   StrokeV2,
 } from './v2/core/types'
 import { strokeAtPoint } from './v2/input/hitTest'
+import { getBrushFillKind } from './v2/core/fill'
+import { importImageFile, loadImageRaster } from './v2/input/imageImport'
+import { fitImageToCanvas } from './v2/input/imageTransform'
+import './v2/ui/ImageLayerControls.css'
 import {
   fromPointer,
   randomStrokeSeed,
@@ -46,6 +52,8 @@ import {
   stabilizePoint,
 } from './v2/input/sampler'
 import { BrushInspector } from './v2/ui/BrushInspector'
+import { BrushHoverPreview } from './v2/ui/BrushPreview'
+import { ImageLayerTransform } from './v2/ui/ImageLayerTransform'
 import { PaintExportModal } from './v2/ui/PaintExportModal'
 import {
   getPaintProjectV2,
@@ -53,7 +61,10 @@ import {
   savePaintProjectV2,
   type PaintProjectRecordV2,
 } from './v2/library'
-import { renderDocumentV2, type LayerSurfaces } from './v2/render/engine'
+import { type LayerSurfaces } from './v2/render/engine'
+import { PaintPreviewHost, touchSurface } from './v2/render/previewHost'
+import { createPaintScheduler } from './v2/render/scheduler'
+import { nextDocumentFrame } from './v2/render/timing'
 import { BUILTIN_BRUSHES } from './v2/presets'
 
 type Tool = 'brush' | 'eraser' | 'hand' | 'select'
@@ -162,8 +173,23 @@ export function PaintEditor({ projectId }: { projectId: string }) {
 function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stageRef = useRef<HTMLElement>(null)
+  const feedbackRef = useRef<HTMLCanvasElement>(null)
+  const schedulerRef = useRef<ReturnType<typeof createPaintScheduler> | null>(null)
+  const renderVersion = useRef(0)
+  const [previewFps, setPreviewFps] = useState(30)
+  const [gpuPreview, setGpuPreview] = useState(false)
+  const [renderError, setRenderError] = useState('')
+  const [renderStatus, setRenderStatus] = useState('')
+  const invalidatePreview = useCallback(() => {
+    renderVersion.current++
+    schedulerRef.current?.invalidate()
+  }, [])
   const documentRef = useRef<PaintDocumentV2>(project.document)
   const rasterLayers = useRef(new Map<string, HTMLCanvasElement>())
+  const imageSources = useRef(new Map<string, { dataUrl: string; raster: HTMLCanvasElement }>())
+  const rasterBuildVersion = useRef(0)
+  const imageImportRef = useRef<HTMLInputElement>(null)
+  const addLayerDialogRef = useRef<HTMLDialogElement>(null)
   const eraseMasks = useRef(new Map<string, HTMLCanvasElement>())
   const currentStroke = useRef<StrokeV2 | null>(null)
   const drawing = useRef(false)
@@ -196,6 +222,10 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
   )
   const [historyState, setHistoryState] = useState({ undo: 0, redo: 0 })
   const [saveError, setSaveError] = useState('')
+  const [imageError, setImageError] = useState('')
+  const [loadingSurfaces, setLoadingSurfaces] = useState(true)
+  const [importingImage, setImportingImage] = useState(false)
+  const [showAddLayerMenu, setShowAddLayerMenu] = useState(false)
   const [exportSurfaces, setExportSurfaces] = useState<LayerSurfaces | null>(
     null,
   )
@@ -209,8 +239,9 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
         typeof next === 'function' ? next(documentRef.current) : next
       documentRef.current = resolved
       setDocumentState(resolved)
+      invalidatePreview()
     },
-    [],
+    [invalidatePreview],
   )
 
   const syncHistoryState = () => {
@@ -221,25 +252,53 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
   }
 
   const rebuildRasters = useCallback(async (next: PaintDocumentV2) => {
+    setLoadingSurfaces(true)
+    const version = ++rasterBuildVersion.current
     const rasters = new Map<string, HTMLCanvasElement>()
     const masks = new Map<string, HTMLCanvasElement>()
+    const images = new Map<string, { dataUrl: string; raster: HTMLCanvasElement }>()
     for (const layer of next.layers) {
-      const raster = makeRaster(next.width, next.height)
-      if (layer.rasterDataUrl) await loadRaster(layer.rasterDataUrl, raster)
-      rasters.set(layer.id, raster)
+      if (layer.kind === 'image' && layer.image) {
+        try {
+          const cached = imageSources.current.get(layer.id)
+          const raster = cached?.dataUrl === layer.image.dataUrl ? cached.raster : await loadImageRaster(layer.image.dataUrl)
+          images.set(layer.id, { dataUrl: layer.image.dataUrl, raster })
+          rasters.set(layer.id, raster)
+        } catch {
+          setImageError(`Could not load image layer “${layer.name}”.`)
+        }
+      } else {
+        const raster = makeRaster(next.width, next.height)
+        if (layer.rasterDataUrl) await loadRaster(layer.rasterDataUrl, raster)
+        rasters.set(layer.id, raster)
+      }
       if (layer.eraseMaskDataUrl) {
         const mask = makeRaster(next.width, next.height)
         await loadRaster(layer.eraseMaskDataUrl, mask)
         masks.set(layer.id, mask)
       }
     }
+    if (version !== rasterBuildVersion.current) return false
     rasterLayers.current = rasters
+    imageSources.current = images
     eraseMasks.current = masks
-  }, [])
+    setLoadingSurfaces(false)
+    invalidatePreview()
+    return true
+  }, [invalidatePreview])
 
   useEffect(() => {
-    void rebuildRasters(project.document)
+    let cancelled = false
+    queueMicrotask(() => { if (!cancelled) void rebuildRasters(project.document) })
+    return () => { cancelled = true }
   }, [project.document, rebuildRasters])
+
+  useEffect(() => {
+    if (!showAddLayerMenu) return
+    const dialog = addLayerDialogRef.current
+    dialog?.showModal()
+    return () => dialog?.close()
+  }, [showAddLayerMenu])
 
   useEffect(() => {
     void rememberPaintProjectV2(project.id)
@@ -267,29 +326,53 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
   }, [])
 
   useEffect(() => {
-    let frame = 0
-    const paint = (time: number) => {
-      const canvas = canvasRef.current
-      const context = canvas?.getContext('2d')
-      if (canvas && context) {
-        renderDocumentV2(
-          context,
-          documentRef.current,
-          time,
-          rasterLayers.current,
-          eraseMasks.current,
-        )
-        paintSelectionOutline(
-          context,
-          documentRef.current,
-          selectedStrokeIdRef.current,
-        )
-      }
-      frame = window.requestAnimationFrame(paint)
-    }
-    frame = window.requestAnimationFrame(paint)
-    return () => window.cancelAnimationFrame(frame)
-  }, [])
+    const canvas = canvasRef.current
+    if (!canvas) return
+    let statusAt = -Infinity
+    setRenderError('')
+    const host = new PaintPreviewHost(canvas, {
+      invalidate: invalidatePreview,
+      error: (message) => { setRenderError(message); schedulerRef.current?.setPaused(true) },
+      painted: (stats, worker, batches) => {
+        const overlay = feedbackRef.current?.getContext('2d')
+        if (overlay) {
+          overlay.clearRect(0, 0, overlay.canvas.width, overlay.canvas.height)
+          paintSelectionOutline(overlay, documentRef.current, selectedStrokeIdRef.current)
+        }
+        if (performance.now() - statusAt > 1000) {
+          statusAt = performance.now()
+          setRenderStatus(`${worker ? 'Worker' : 'Canvas'}${batches ? ' + GPU' : ''} · ${stats.totalMs.toFixed(1)} ms · ${stats.itemCount.toLocaleString()} marks`)
+        }
+      },
+    })
+    const scheduler = createPaintScheduler((time) => {
+      host.request({ document: documentRef.current,
+        surfaces: { rasters: rasterLayers.current, masks: eraseMasks.current },
+        time, now: Date.now(), version: renderVersion.current, gpu: gpuPreview })
+      return nextDocumentFrame(documentRef.current, time, Date.now())
+    }, previewFps)
+    schedulerRef.current = scheduler
+    return () => { scheduler.dispose(); host.dispose(); schedulerRef.current = null }
+  }, [previewFps, gpuPreview, invalidatePreview])
+
+  useEffect(() => {
+    schedulerRef.current?.setPaused(exportSurfaces !== null)
+  }, [exportSurfaces, previewFps, gpuPreview])
+
+  const paintInputFeedback = () => {
+    const context = feedbackRef.current?.getContext('2d')
+    const stroke = currentStroke.current
+    if (!context || !stroke) return
+    context.clearRect(0, 0, context.canvas.width, context.canvas.height)
+    context.save()
+    context.strokeStyle = stroke.brushSnapshot.color
+    context.globalAlpha = Math.min(0.4, stroke.brushSnapshot.opacity)
+    context.lineWidth = Math.max(1, stroke.brushSnapshot.size * 0.35)
+    context.lineCap = 'round'; context.lineJoin = 'round'; context.beginPath()
+    stroke.points.forEach((point, i) => { if (i === 0) context.moveTo(point.x, point.y); else context.lineTo(point.x, point.y) })
+    if (stroke.points.length > 2 && (stroke.brushSnapshot.closedPath || stroke.brushSnapshot.fill.enabled) && getBrushFillKind(stroke.brushSnapshot)) context.closePath()
+    context.stroke(); context.restore()
+  }
 
   const snapshot = () => {
     undoStack.current.push(cloneDocument(documentRef.current))
@@ -298,11 +381,12 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
     syncHistoryState()
   }
 
-  const restore = async (next: PaintDocumentV2) => {
-    await rebuildRasters(next)
+  const restore = (next: PaintDocumentV2) => {
     setDocument(next)
     setSelectedLayerIds(new Set([next.activeLayerId]))
+    selectStroke(null)
     syncHistoryState()
+    void rebuildRasters(next)
   }
 
   const undo = () => {
@@ -371,6 +455,7 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
   const selectStroke = (id: string | null) => {
     selectedStrokeIdRef.current = id
     setSelectedStrokeId(id)
+    invalidatePreview()
   }
 
   const pointFromEvent = (
@@ -425,6 +510,8 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
       context.stroke()
     }
     context.restore()
+    touchSurface(context.canvas)
+    invalidatePreview()
   }
 
   const beginStroke = (event: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -448,17 +535,25 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
     if (tool === 'select') {
       const canvas = event.currentTarget
       const bounds = canvas.getBoundingClientRect()
-      const hit = strokeAtPoint(
-        documentRef.current.layers,
-        (event.clientX - bounds.left) * (canvas.width / bounds.width),
-        (event.clientY - bounds.top) * (canvas.height / bounds.height),
-      )
-      selectStroke(hit?.id ?? null)
+      const x = (event.clientX - bounds.left) * (canvas.width / bounds.width)
+      const y = (event.clientY - bounds.top) * (canvas.height / bounds.height)
+      for (const layer of [...documentRef.current.layers].reverse()) {
+        if (!layer.visible) continue
+        const image = layer.kind === 'image' ? layer.image : undefined
+        const hit = strokeAtPoint([layer], x, y)
+        if (hit || (image && x >= image.x && x <= image.x + image.width && y >= image.y && y <= image.y + image.height)) {
+          selectStroke(hit?.id ?? null)
+          setSelectedLayerIds(new Set([layer.id]))
+          setDocument(current => ({ ...current, activeLayerId: layer.id }))
+          return
+        }
+      }
+      selectStroke(null)
       return
     }
 
     const layer = currentActiveLayer()
-    if (!layer || !layer.visible) return
+    if (!layer || !layer.visible || layer.kind === 'image') return
     snapshot()
     drawing.current = true
     const point = stabilizePoint(pointFromEvent(event), null, draftBrush.stability)
@@ -514,6 +609,8 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
         currentStroke.current.points[currentStroke.current.points.length - 1]
       if (Math.hypot(point.x - previous.x, point.y - previous.y) > 2) {
         currentStroke.current.points.push(point)
+        invalidatePreview()
+        paintInputFeedback()
       }
     }
     lastPoint.current = point
@@ -559,6 +656,7 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
   }
 
   const addLayer = () => {
+    setShowAddLayerMenu(false)
     snapshot()
     const layer = createLayerV2(
       `Layer ${documentRef.current.layers.length + 1}`,
@@ -573,12 +671,88 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
       activeLayerId: layer.id,
     }))
     setSelectedLayerIds(new Set([layer.id]))
+    selectStroke(null)
+    setTool('brush')
+  }
+
+  const addImageLayer = async (file: File) => {
+    setShowAddLayerMenu(false)
+    setImageError('')
+    setImportingImage(true)
+    try {
+      const imported = await importImageFile(file)
+      const current = documentRef.current
+      const layer = createImageLayerV2(file.name.replace(/\.[^.]+$/, '') || 'Image', {
+        dataUrl: imported.dataUrl,
+        naturalWidth: imported.naturalWidth,
+        naturalHeight: imported.naturalHeight,
+        ...fitImageToCanvas(imported.naturalWidth, imported.naturalHeight, current.width, current.height),
+      })
+      snapshot()
+      rasterLayers.current.set(layer.id, imported.raster)
+      imageSources.current.set(layer.id, { dataUrl: imported.dataUrl, raster: imported.raster })
+      setDocument(value => ({ ...value, layers: [...value.layers, layer], activeLayerId: layer.id }))
+      setSelectedLayerIds(new Set([layer.id]))
+      selectStroke(null)
+      setTool('select')
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : 'This image could not be opened.')
+    } finally {
+      setImportingImage(false)
+    }
+  }
+
+  const changeImage = (layerId: string, image: ImageLayerV2Data) => {
+    setDocument(current => ({
+      ...current,
+      layers: current.layers.map(layer => layer.id === layerId ? { ...layer, image } : layer),
+    }))
+  }
+
+  // Live dragging updates the worker immediately, then commits one undo step.
+  const commitImageTransform = (layerId: string, before: ImageLayerV2Data) => {
+    const current = documentRef.current
+    const image = current.layers.find(layer => layer.id === layerId)?.image
+    if (!image || (image.x === before.x && image.y === before.y && image.width === before.width && image.height === before.height)) return
+    const previous = cloneDocument(current)
+    const layer = previous.layers.find(item => item.id === layerId)
+    if (!layer) return
+    layer.image = structuredClone(before)
+    undoStack.current.push(previous)
+    if (undoStack.current.length > 30) undoStack.current.shift()
+    redoStack.current = []
+    syncHistoryState()
+  }
+
+  const editImageField = (field: 'x' | 'y' | 'width' | 'height', value: number) => {
+    if (!activeLayer?.image || !Number.isFinite(value)) return
+    const image = activeLayer.image
+    const next = { ...image }
+    if (field === 'x' || field === 'y') next[field] = Math.max(-100_000, Math.min(100_000, value))
+    else {
+      const dimension = Math.max(8, Math.min(32_768, value))
+      const factor = Math.min(dimension / image[field], 32_768 / image.width, 32_768 / image.height)
+      next.width = image.width * factor
+      next.height = image.height * factor
+    }
+    if (startsEditBurst(lastEditAt)) snapshot()
+    changeImage(activeLayer.id, next)
+  }
+
+  const fitActiveImage = () => {
+    if (!activeLayer?.image) return
+    const image = activeLayer.image
+    snapshot()
+    changeImage(activeLayer.id, { ...image, ...fitImageToCanvas(image.naturalWidth, image.naturalHeight, document.width, document.height) })
   }
 
   const selectLayer = (
     layerId: string,
     event: ReactPointerEvent<HTMLButtonElement>,
   ) => {
+    const layer = documentRef.current.layers.find(item => item.id === layerId)
+    if (layer?.kind === 'image') setTool('select')
+    selectStroke(null)
     const additive = event.metaKey || event.ctrlKey || event.shiftKey
     setSelectedLayerIds((current) => {
       if (!additive) return new Set([layerId])
@@ -623,10 +797,11 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
     for (const layer of documentRef.current.layers) {
       if (!selectedLayerIds.has(layer.id)) continue
       const id = crypto.randomUUID()
-      const raster = makeRaster(document.width, document.height)
       const source = rasterLayers.current.get(layer.id)
+      const raster = makeRaster(source?.width ?? document.width, source?.height ?? document.height)
       if (source) raster.getContext('2d')?.drawImage(source, 0, 0)
       rasterLayers.current.set(id, raster)
+      if (layer.kind === 'image' && layer.image && source) imageSources.current.set(id, { dataUrl: layer.image.dataUrl, raster })
       const sourceMask = eraseMasks.current.get(layer.id)
       if (sourceMask) {
         const mask = makeRaster(document.width, document.height)
@@ -667,7 +842,7 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
         makeRaster(document.width, document.height),
       )
     }
-    for (const id of selectedLayerIds) rasterLayers.current.delete(id)
+    for (const id of selectedLayerIds) { rasterLayers.current.delete(id); imageSources.current.delete(id); eraseMasks.current.delete(id) }
     const active = remaining[remaining.length - 1]
     setDocument((current) => ({
       ...current,
@@ -737,7 +912,8 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
   }, [brushes, search])
 
   return (
-    <div className="paint-workspace">
+    <>
+    <div className="paint-workspace" inert={loadingSurfaces || importingImage} aria-busy={loadingSurfaces || importingImage}>
       <header className="app-header paint-v2-header">
         <div className="brand">
           <button
@@ -831,8 +1007,8 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
               </summary>
               <div>
                 {presets.map((preset) => (
+                  <BrushHoverPreview key={preset.id} brush={preset}>
                   <button
-                    key={preset.id}
                     type="button"
                     className={preset.id === presetId ? 'is-active' : ''}
                     onClick={() => {
@@ -845,6 +1021,7 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
                     <span />
                     {preset.name}
                   </button>
+                  </BrushHoverPreview>
                 ))}
               </div>
             </details>
@@ -858,6 +1035,7 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
         onWheel={zoomCanvas}
       >
         <div className="paint-canvas-wrap">
+          <div style={{ position: 'relative' }}>
           <canvas
             ref={canvasRef}
             role="application"
@@ -874,6 +1052,19 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
             onPointerUp={endStroke}
             onPointerCancel={endStroke}
           />
+          <canvas ref={feedbackRef} aria-hidden="true" width={document.width} height={document.height}
+            style={{ position: 'absolute', pointerEvents: 'none', top: 0, left: 0, background: 'transparent', boxShadow: 'none',
+              width: `${document.width * zoom}px`, height: `${document.height * zoom}px` }} />
+          {tool === 'select' && activeLayer?.kind === 'image' && activeLayer.visible && activeLayer.image ? (
+            <ImageLayerTransform
+              key={activeLayer.id}
+              image={activeLayer.image}
+              zoom={zoom}
+              onChange={image => changeImage(activeLayer.id, image)}
+              onCommit={before => commitImageTransform(activeLayer.id, before)}
+            />
+          ) : null}
+          </div>
         </div>
         <div className="zoom-controls paint-zoom-controls">
           <IconButton
@@ -899,7 +1090,24 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
       <aside className="inspector paint-v2-inspector">
         <div className="paint-v2-sidebar-title">
           <strong>Tool settings</strong>
-          <small>{inspectorBrush.name}</small>
+          <small>{activeLayer?.kind === 'image' ? 'Image layer' : inspectorBrush.name}</small>
+        </div>
+        <div style={{ padding: '0 12px 12px', display: 'grid', gap: 8 }}>
+        <label className="preview-field">
+          <span>Preview speed</span>
+          <Select aria-label="Preview speed" value={previewFps} onChange={event => setPreviewFps(Number(event.target.value))}>
+            <option value={30}>30 FPS · Save energy</option><option value={60}>60 FPS · Smooth</option>
+          </Select>
+        </label>
+        <label className="preview-field">
+          <span>Preview rendering</span>
+          <Select aria-label="Preview rendering" value={gpuPreview ? 'fast' : 'accurate'} onChange={event => setGpuPreview(event.target.value === 'fast')}>
+            <option value="accurate">Accurate</option><option value="fast">Faster grain · GPU</option>
+          </Select>
+        </label>
+        {gpuPreview ? <small>Faster grain preview may soften tiny edges. Exports use full quality.</small> : null}
+        <small aria-live="off">{renderStatus}</small>
+        {renderError ? <p role="alert">{renderError}</p> : null}
         </div>
         <nav className="mode-switcher paint-v2-tool-switcher" aria-label="Animated Paint tool">
           <button
@@ -930,6 +1138,30 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
             <MousePointer2 size={15} /> Select
           </button>
         </nav>
+        {activeLayer?.kind === 'image' && activeLayer.image ? (
+          <div className="paint-image-controls">
+            <strong>{activeLayer.name}</strong>
+            <p>Use Select to drag the image or resize it from a corner. Proportions stay locked.</p>
+            <div className="paint-image-fields">
+              {(['x', 'y', 'width', 'height'] as const).map(field => (
+                <label key={field}>
+                  {field === 'x' || field === 'y' ? field.toUpperCase() : field === 'width' ? 'Width' : 'Height'}
+                  <input
+                    type="number"
+                    aria-label={`Image ${field}`}
+                    value={Math.round(activeLayer.image![field] * 10) / 10}
+                    min={field === 'width' || field === 'height' ? 8 : undefined}
+                    step={1}
+                    onChange={event => { if (event.target.value !== '') editImageField(field, Number(event.target.value)) }}
+                  />
+                </label>
+              ))}
+            </div>
+            <Button onClick={fitActiveImage}>Fit image to canvas</Button>
+            <p>Add a drawing layer above the image to paint over it.</p>
+            <Button onClick={addLayer}><Plus size={13} /> Add drawing layer</Button>
+          </div>
+        ) : <>
         <div className="paint-selection-banner">
           {selectedStroke ? (
             <>
@@ -959,6 +1191,7 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
             />
           </div>
         </CollapsibleSection>
+        </>}
       </aside>
 
       <footer className="bottom-panel paint-v2-bottom">
@@ -967,9 +1200,33 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
             <span className="is-active">Layers</span>
           </div>
           <div className="panel-actions paint-layer-toolbar">
-            <Button onClick={addLayer}>
+            <Button onClick={() => setShowAddLayerMenu(true)} disabled={importingImage} aria-haspopup="dialog">
               <Plus size={13} /> Add
             </Button>
+            <dialog
+              ref={addLayerDialogRef}
+              className="paint-layer-add-menu"
+              aria-label="Add layer"
+              onCancel={event => { event.preventDefault(); setShowAddLayerMenu(false) }}
+              onClick={event => { if (event.target === event.currentTarget) setShowAddLayerMenu(false) }}
+            >
+              <h3>Add layer</h3>
+              <button type="button" onClick={addLayer}><Brush size={17} /> New drawing layer</button>
+              <button type="button" onClick={() => { setShowAddLayerMenu(false); imageImportRef.current?.click() }}><ImagePlus size={17} /> Image layer…</button>
+              <button type="button" onClick={() => setShowAddLayerMenu(false)}>Cancel</button>
+            </dialog>
+            <input
+              ref={imageImportRef}
+              type="file"
+              accept="image/*"
+              aria-label="Upload image layer"
+              hidden
+              onChange={event => {
+                const file = event.currentTarget.files?.[0]
+                event.currentTarget.value = ''
+                if (file) void addImageLayer(file)
+              }}
+            />
             <Button disabled={selectedLayerIds.size < 2} onClick={groupSelected}>
               <Group size={13} /> Group
             </Button>
@@ -1030,7 +1287,7 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
                 >
                   <span>{layer.name}</span>
                   <small>
-                    {layer.strokes.length} strokes
+                    {layer.kind === 'image' ? 'Image' : `${layer.strokes.length} strokes`}
                     {layer.groupId ? ' · Grouped' : ''}
                   </small>
                 </button>
@@ -1076,6 +1333,7 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
           </div>
         </section>
       </footer>
+      {imageError ? <p role="alert" className="paint-image-error">{imageError}</p> : null}
       {exportSurfaces ? (
         <PaintExportModal
           document={document}
@@ -1084,5 +1342,7 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
         />
       ) : null}
     </div>
+    {loadingSurfaces || importingImage ? <p role="status" className="paint-image-notice">{importingImage ? 'Opening image…' : 'Loading layers…'}</p> : null}
+    </>
   )
 }

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Anime brush studies · Animated Paint</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#161922;color:#f6f0e8;font:15px system-ui,sans-serif}main{max-width:1150px;margin:auto;padding:32px 24px}h1{font-size:38px;letter-spacing:-1.5px;margin:8px 0 10px}.eyebrow{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#cfb6f5}p{line-height:1.6;color:#bfc2d0;max-width:800px;margin:0}nav{display:flex;gap:9px;flex-wrap:wrap;margin:22px 0 14px}button{font:inherit;padding:10px 14px;border:1px solid #56596b;border-radius:8px;color:inherit;background:#252a39;cursor:pointer}button.primary{background:#f1cb80;border-color:transparent;color:#322c22}button:disabled{opacity:.4;cursor:default}.transport{display:flex;gap:12px;align-items:center;font-size:12px;color:#c3bfd4;margin:12px 0 20px}.transport input{width:220px;accent-color:#f1cb80}#status{font-size:12px;min-height:22px;margin-bottom:14px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}article{border:1px solid #3e4155;border-radius:13px;overflow:hidden;background:#202532}canvas{display:block;width:100%;height:auto;touch-action:none;cursor:crosshair}section{padding:17px}h2{margin:0 0 7px;font-size:18px}article p{font-size:12px;min-height:58px}small{display:block;color:#aaaec1;font-size:11px;margin-top:12px}a{color:#f1cb80}pre{font-size:12px;white-space:pre-wrap;color:#b4c9ba}footer{margin-top:24px;font-size:12px;line-height:1.6;color:#a6acbe}@media(max-width:950px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:610px){.grid{grid-template-columns:1fr}h1{font-size:30px}}
+</style>
+<main>
+<div class="eyebrow">Animated Paint / Anime studies</div><h1>A little motion. A lot of expression.</h1>
+<p>Six original brushes for expressive outlines and animated accents. Play the examples, or draw inside any card to try that brush. Find them in the app’s <strong>Anime</strong> category.</p>
+<nav><button class="primary" id="play">Play 8-second preview</button><button id="pause" disabled>Pause</button><button id="reset">Restore examples</button><button id="check">Run finite checks</button></nav>
+<div class="transport"><label for="time">Pose</label><input id="time" type="range" min="0" max="6000" value="0" step="25"><output id="clock">0.00 s</output></div>
+<div id="status" role="status">Preparing studies…</div><div class="grid" id="cards"></div><pre id="results"></pre>
+<footer>Draw Follow Through from the attached end toward the loose tip. Tap for one Impact Burst or Sparkle Star.<br>These effects animate their own strokes. They do not rig an existing character. Preview runs stop automatically and never change saved artwork.<br>Research: <a href="https://help.clip-studio.com/en-us/manual_en/540_comic/Speed_lines_and_Focus_lines.htm">speed and focus lines</a> · <a href="https://learn.toonboom.com/modules/animation-principles/topic/follow-through-principle">follow-through</a> · <a href="https://tips.clip-studio.com/en-us/articles/10173">manga effects in animation</a>.</footer>
+</main>
+<script type="module">
+import { ANIME_BRUSHES } from '/apps/animated-paint/web/paint/v2/animePresets.ts';
+import { createDocumentV2, emptyPoint } from '/apps/animated-paint/web/paint/v2/core/defaults.ts';
+import { snapshotStroke } from '/apps/animated-paint/web/paint/v2/input/sampler.ts';
+import { renderDocumentV2, strokeFrame, clearStrokeCache, releaseRenderCache } from '/apps/animated-paint/web/paint/v2/render/engine.ts';
+import { PaintPreviewHost } from '/apps/animated-paint/web/paint/v2/render/previewHost.ts';
+const descriptions={animeJiggle:'Draw a contour that trembles in held poses. Useful for nervous expressions and trembling objects.',followThrough:'Draw from root to tip. The attachment stays put while hair, ribbon, or cloth swings behind it.',speedLines:'Draw in the direction of motion. Three tapered tracks give a gesture a sense of speed.',impactBurst:'Tap at a point of contact. Eight sharp rays expand and fade; drag for spaced bursts.',powerAura:'Trace an energy outline. Angular lightning changes shape with sparse branching sparks.',sparkleStar:'Tap for a four-point shine, or drag a trail. Staggered twinkles suit eyes, magic, and gleaming objects.'};
+const cards=document.querySelector('#cards'),status=document.querySelector('#status'),results=document.querySelector('#results'),play=document.querySelector('#play'),pause=document.querySelector('#pause'),reset=document.querySelector('#reset'),check=document.querySelector('#check'),slider=document.querySelector('#time'),clock=document.querySelector('#clock');
+const path=(count,fn)=>Array.from({length:count},(_,i)=>{const u=i/Math.max(1,count-1),[x,y]=fn(u);return {...emptyPoint(x,y,i/100),pressure:.65+.25*Math.sin(u*Math.PI)};});
+const polyline=vertices=>vertices.flatMap((p,i)=>i===vertices.length-1?[emptyPoint(...p)]:path(12,u=>[p[0]+(vertices[i+1][0]-p[0])*u,p[1]+(vertices[i+1][1]-p[1])*u]));
+function examples(id){
+ if(id==='animeJiggle')return [polyline([[175,194],[137,168],[140,96],[167,47],[198,88],[274,88],[307,47],[336,99],[335,166],[298,194],[175,194]])];
+ if(id==='followThrough')return [-1,0,1].map(j=>path(65,u=>[238+j*6+u*55*j+22*Math.sin(u*4),42+u*170]));
+ if(id==='speedLines')return [-1,0,1].map(j=>path(60,u=>[65+u*350,165+j*48-u*85+Math.sin(u*Math.PI)*15]));
+ if(id==='impactBurst')return [[125,125],[243,125],[361,125]].map(p=>[emptyPoint(...p)]);
+ if(id==='powerAura')return [path(110,u=>[240+85*Math.cos(u*Math.PI*2),127+85*Math.sin(u*Math.PI*2)])];
+ return [[110,133],[180,83],[248,150],[325,91],[378,150]].map(p=>[emptyPoint(...p)]);
+}
+function setStrokes(sample,paths){sample.doc.layers[0].strokes=paths.map((points,i)=>{const stroke=snapshotStroke(sample.brush,points,sample.doc.layers[0].id,17+i*19);stroke.createdAt=0;return stroke;});}
+const samples=ANIME_BRUSHES.map(brush=>{
+ const article=document.createElement('article'),canvas=document.createElement('canvas'),section=document.createElement('section'),title=document.createElement('h2'),description=document.createElement('p'),info=document.createElement('small');
+ canvas.width=480;canvas.height=250;canvas.setAttribute('aria-label',brush.name+' drawing preview');title.textContent=brush.name;description.textContent=descriptions[brush.id];section.append(title,description,info);article.append(canvas,section);cards.append(article);
+ const doc=createDocumentV2(brush.name,480,250);doc.background=brush.id==='powerAura'?'#171f36':'#fff8eb';
+ const sample={brush,canvas,context:canvas.getContext('2d'),doc,info,rasters:new Map(),drawing:false,pointer:null};setStrokes(sample,examples(brush.id));
+ function point(event){const rect=canvas.getBoundingClientRect();return {...emptyPoint((event.clientX-rect.left)/rect.width*480,(event.clientY-rect.top)/rect.height*250,performance.now()/1000),pressure:event.pointerType==='pen'?event.pressure:.75};}
+ canvas.onpointerdown=event=>{if(check.disabled)return;event.preventDefault();stop();canvas.setPointerCapture(event.pointerId);sample.pointer=event.pointerId;sample.drawing=true;setStrokes(sample,[[point(event)]]);paint(time);status.textContent='Drawing '+brush.name+'…';};
+ canvas.onpointermove=event=>{if(!sample.drawing||event.pointerId!==sample.pointer)return;const stroke=doc.layers[0].strokes[0];if(stroke.points.length<2000)stroke.points.push(point(event));paint(time);};
+ const finish=event=>{if(event.pointerId!==sample.pointer)return;sample.drawing=false;sample.pointer=null;start();};canvas.onpointerup=finish;canvas.onpointercancel=event=>{if(event.pointerId===sample.pointer){sample.drawing=false;sample.pointer=null;status.textContent='Drawing paused.';}};
+ return sample;
+});
+let raf=0,timer=0,started=0,time=0;
+function paint(ms){for(const s of samples){const stats=renderDocumentV2(s.context,s.doc,ms,s.rasters);s.info.textContent=`${s.brush.animationTiming.fps} held poses/sec · ${stats.itemCount} marks`;}slider.value=ms%6000;clock.textContent=((ms%6000)/1000).toFixed(2)+' s';}
+function stop(){cancelAnimationFrame(raf);clearTimeout(timer);play.disabled=check.disabled;pause.disabled=true;}
+function tick(now){time=now-started;paint(time);if(time>=8000){stop();status.textContent='Paused. Draw in a card, scrub the pose, or replay.';return;}timer=setTimeout(()=>{raf=requestAnimationFrame(tick)},24);}
+function start(){if(check.disabled)return;stop();started=performance.now();play.disabled=true;pause.disabled=false;status.textContent='Playing anime brush studies…';raf=requestAnimationFrame(tick);}
+play.onclick=start;pause.onclick=()=>{stop();status.textContent='Preview paused.';};slider.oninput=()=>{stop();time=Number(slider.value);paint(time);status.textContent='Pose held at '+clock.textContent;};
+reset.onclick=()=>{stop();samples.forEach(s=>setStrokes(s,examples(s.brush.id)));time=0;paint(0);status.textContent='Examples restored.';};
+document.addEventListener('visibilitychange',()=>{if(document.hidden){stop();status.textContent='Preview paused while hidden.';}});
+check.onclick=async()=>{
+ stop();check.disabled=true;play.disabled=true;reset.disabled=true;slider.disabled=true;results.textContent='';const report=[];let host;
+ try{
+  const reference=document.createElement('canvas'),output=document.createElement('canvas');reference.width=output.width=800;reference.height=output.height=600;
+  const a=reference.getContext('2d',{willReadFrequently:true}),b=output.getContext('2d',{willReadFrequently:true});let resolveFrame,rejectFrame,version=0;
+  host=new PaintPreviewHost(output,{invalidate(){},error(message){rejectFrame?.(new Error(message));},painted(){resolveFrame?.();}});
+  if(!host.threaded)throw new Error('Render worker unavailable');
+  for(const sample of samples){
+   status.textContent='Checking '+sample.brush.name+'…';
+   const brush=sample.brush,doc=createDocumentV2('Finite anime load',800,600);doc.layers[0].strokes=Array.from({length:50},(_,i)=>snapshotStroke(brush,path(90,u=>[60+u*430+(i%4)*45,80+Math.floor(i/4)*30+28*Math.sin(u*Math.PI*3)]),doc.layers[0].id,i+1));
+   const first=strokeFrame(doc.layers[0].strokes[0],0),second=strokeFrame(doc.layers[0].strokes[0],375);if(JSON.stringify(first.items)===JSON.stringify(second.items))throw new Error(brush.name+' has no motion');
+   const durations=[];let stats;
+   for(let i=0;i<4;i++){await new Promise(resolve=>setTimeout(resolve,20));const start=performance.now();stats=renderDocumentV2(a,doc,i*250,new Map());if(i)durations.push(performance.now()-start);if(stats.diagnostics.some(d=>d.code==='animate-error'))throw new Error(brush.name+' recipe failed');}
+   const waiting=new Promise((resolve,reject)=>{resolveFrame=resolve;rejectFrame=reject;});host.request({document:doc,surfaces:{rasters:new Map(),masks:new Map()},time:750,now:750,version:++version,gpu:false});await waiting;
+   const cpu=a.getImageData(0,0,800,600).data,worker=b.getImageData(0,0,800,600).data;let maxError=0;for(let i=0;i<cpu.length;i++)maxError=Math.max(maxError,Math.abs(cpu[i]-worker[i]));if(maxError!==0)throw new Error(brush.name+' worker differs');
+   report.push({brush:brush.name,marksFor50Strokes:stats.itemCount,medianCpuMs:Math.round(durations.sort((a,b)=>a-b)[1]*10)/10,workerPixels:'exact'});results.textContent=JSON.stringify(report,null,2);clearStrokeCache();
+  }
+  releaseRenderCache(a);status.textContent='PASS · Six brushes animate; worker pixels match. CPU timings exclude GPU completion and are not thermal measurements.';
+ }catch(error){status.textContent='FAIL · '+error.message;}
+ finally{host?.dispose();check.disabled=false;play.disabled=false;reset.disabled=false;slider.disabled=false;paint(time);}
+};
+paint(0);status.textContent='Ready. Play the examples or draw inside a card.';
+</script>
+</html>

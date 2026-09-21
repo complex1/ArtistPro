@@ -1,6 +1,6 @@
 import type { DrawItem, PackedDrawList, ShadowConfig } from './types'
 
-export const DRAW_ITEM_STRIDE = 20
+export const DRAW_ITEM_STRIDE = 21
 
 function hexToRgb(color: string): number {
   const value = color.trim()
@@ -52,6 +52,7 @@ export function packDrawList(items: DrawItem[]): PackedDrawList {
     buffer[offset + 17] = hexToRgb(item.shadow.color)
     buffer[offset + 18] = item.scaleX ?? 1
     buffer[offset + 19] = item.scaleY ?? 1
+    buffer[offset + 20] = item.breakBefore ? 1 : 0
   }
   return { items: buffer, count: items.length, stride }
 }
@@ -86,6 +87,7 @@ export function unpackDrawList(packed: PackedDrawList): DrawItem[] {
       vy: data[offset + 16],
       scaleX: data[offset + 18] || 1,
       scaleY: data[offset + 19] || 1,
+      breakBefore: packed.stride > 20 && data[offset + 20] === 1,
     })
   }
   return items

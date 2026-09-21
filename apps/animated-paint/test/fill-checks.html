@@ -1,0 +1,365 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Closed path and brush fill checks</title>
+<style>
+  body { margin: 0 auto; padding: 28px; max-width: 960px; font: 15px/1.5 system-ui; color: #252333; background: #f8f7fb; }
+  h1 { margin-bottom: 6px; font-size: 26px; }
+  button { padding: 10px 16px; font: inherit; cursor: pointer; }
+  .canvases { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 24px; }
+  figure { margin: 0; }
+  canvas { display: block; border: 1px solid #ccc; max-width: 100%; background: repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 0 0 / 16px 16px; }
+  figcaption { margin-top: 8px; color: #666; }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 16px; background: #efedf5; border-radius: 8px; }
+</style>
+<h1>Closed path and brush fill checks</h1>
+<p>Finite synthetic checks of solid and textured interiors, closed seams, animation, layer compositing, worker rendering, and PNG export. Running the checks does not change any saved project.</p>
+<p>Exact comparisons use default Canvas2D rendering on both sides, matching the editor and PNG exporter. CPU readback canvases can rasterize partially transparent edge pixels differently; they display the results without rerendering the paths.</p>
+<button id="run">Run fill checks</button>
+<p id="status" role="status">Ready — checks run only when requested.</p>
+<button id="demo">Open fill demo in editor</button>
+<p id="demo-status" role="status">Creates a new “Brush fill demo” project with seven filled brush layers only when clicked. Existing projects remain unchanged.</p>
+<div class="canvases">
+  <figure><canvas id="reference" width="360" height="240"></canvas><figcaption>Main-thread default Canvas2D</figcaption></figure>
+  <figure><canvas id="output" width="360" height="240"></canvas><figcaption>Accurate render worker / exported PNG</figcaption></figure>
+</div>
+<pre id="results">No checks run yet.</pre>
+<script type="module">
+import { createDocumentV2, createLayerV2, emptyPoint } from '/apps/animated-paint/web/paint/v2/core/defaults.ts';
+import { getBuiltinBrush } from '/apps/animated-paint/web/paint/v2/presets.ts';
+import { snapshotStroke } from '/apps/animated-paint/web/paint/v2/input/sampler.ts';
+import { renderDocumentV2, releaseRenderCache } from '/apps/animated-paint/web/paint/v2/render/engine.ts';
+import { PaintPreviewHost } from '/apps/animated-paint/web/paint/v2/render/previewHost.ts';
+import { renderPaintDocument } from '/apps/animated-paint/web/paint/v2/render/exportEngine.ts';
+import { unzipSync } from 'fflate';
+import { createPaintProjectV2, savePaintProjectV2 } from '/apps/animated-paint/web/paint/v2/library.ts';
+
+const button = document.querySelector('#run');
+const status = document.querySelector('#status');
+const results = document.querySelector('#results');
+const reference = document.querySelector('#reference');
+const output = document.querySelector('#output');
+const width = reference.width, height = reference.height;
+const accurate = reference.getContext('2d', { willReadFrequently: true });
+const rendered = output.getContext('2d', { willReadFrequently: true });
+
+const demoButton = document.querySelector('#demo');
+const demoStatus = document.querySelector('#demo-status');
+let demoProject;
+demoButton.onclick = async () => {
+  demoButton.disabled = true;
+  demoStatus.textContent = 'Creating a new brush fill demo…';
+  try {
+    // Keep this new record for a retry if saving fails; never load or replace an
+    // existing project chosen elsewhere in the application.
+    demoProject ??= await createPaintProjectV2('Brush fill demo', 900, 650);
+    const ids = ['round', 'marker', 'wiggle', 'wave', 'boil', 'textureBoil', 'graphiteCrawl'];
+    const colors = ['#c44f66', '#e5a42f', '#487fbb', '#499d86', '#9365bd', '#b5673f', '#405e83'];
+    const layers = ids.map((id, index) => {
+      const nextBrush = { ...getBuiltinBrush(id), size: 12, color: colors[index], opacity: 1,
+        closedPath: true, fill: { enabled: true, outline: false } };
+      const layer = createLayerV2(nextBrush.name);
+      const centerX = index === 6 ? 450 : 170 + index % 3 * 280;
+      const centerY = 110 + Math.floor(index / 3) * 205;
+      const oval = Array.from({ length: 96 }, (_, point) => {
+        const angle = point / 96 * Math.PI * 2;
+        return emptyPoint(centerX + Math.cos(angle) * 110, centerY + Math.sin(angle) * 65, point / 60);
+      });
+      layer.strokes = [snapshotStroke(nextBrush, oval, layer.id, 29 + index * 17)];
+      return layer;
+    });
+    demoProject = await savePaintProjectV2({ ...demoProject, updatedAt: Date.now(), document: {
+      ...demoProject.document, width: 900, height: 650, background: '#ffffff', layers, activeLayerId: layers[0].id,
+    } });
+    demoStatus.textContent = 'Demo saved. Opening the editor…';
+    window.location.assign(`/#/paint/${encodeURIComponent(demoProject.id)}`);
+  } catch (error) {
+    demoStatus.textContent = `Could not create demo: ${error instanceof Error ? error.message : String(error)}`;
+    demoButton.disabled = false;
+  }
+};
+
+// The input stops at the lower-left corner. The entire final left edge must be
+// supplied by closed-path rendering, rather than relying on near-closed input.
+const corners = [[70, 50], [280, 50], [280, 190], [70, 190]];
+const points = [];
+for (let edge = 0; edge < corners.length - 1; edge++) {
+  const start = corners[edge], end = corners[edge + 1];
+  const steps = Math.ceil(Math.hypot(end[0] - start[0], end[1] - start[1]) / 5);
+  for (let i = 0; i < steps; i++) {
+    points.push(emptyPoint(start[0] + (end[0] - start[0]) * i / steps, start[1] + (end[1] - start[1]) * i / steps, points.length / 60));
+  }
+}
+points.push(emptyPoint(70, 190, points.length / 60));
+
+function pixels(context = accurate) {
+  return context.getImageData(0, 0, width, height).data;
+}
+
+function renderReference(scene, time, rasters, masks, now) {
+  // A fresh default context avoids repeated getImageData calls switching the
+  // reference to a CPU raster backend while the worker stays accelerated.
+  const surface = new OffscreenCanvas(width, height);
+  const context = surface.getContext('2d');
+  let bitmap;
+  try {
+    renderDocumentV2(context, scene, time, rasters, masks, undefined, now);
+    bitmap = surface.transferToImageBitmap();
+    accurate.clearRect(0, 0, width, height);
+    accurate.drawImage(bitmap, 0, 0);
+  } finally {
+    bitmap?.close(); releaseRenderCache(context);
+    surface.width = 1; surface.height = 1;
+  }
+}
+
+function difference(a, b) {
+  let changedPixels = 0, maxChannelError = 0;
+  for (let i = 0; i < a.length; i += 4) {
+    let changed = false;
+    for (let c = 0; c < 4; c++) {
+      const error = Math.abs(a[i + c] - b[i + c]);
+      maxChannelError = Math.max(maxChannelError, error);
+      if (error) changed = true;
+    }
+    if (changed) changedPixels++;
+  }
+  return { changedPixels, maxChannelError };
+}
+
+function diagnosePixels(a, b) {
+  let alphaChangedPixels = 0, rgbOnlyChangedPixels = 0, maxAlphaError = 0;
+  let interiorChangedPixels = 0, maxInteriorChannelError = 0;
+  let edgeChangedPixels = 0, changedPixelsWithPartialAlpha = 0;
+  const samples = [];
+  for (let i = 0; i < a.length; i += 4) {
+    const x = i / 4 % width, y = Math.floor(i / 4 / width);
+    const delta = [0, 1, 2, 3].map(channel => Math.abs(a[i + channel] - b[i + channel]));
+    const maxError = Math.max(...delta);
+    if (!maxError) continue;
+    if (delta[3]) alphaChangedPixels++;
+    else rgbOnlyChangedPixels++;
+    maxAlphaError = Math.max(maxAlphaError, delta[3]);
+    if ((a[i + 3] > 0 && a[i + 3] < 255) || (b[i + 3] > 0 && b[i + 3] < 255)) changedPixelsWithPartialAlpha++;
+    if (x >= 110 && x < 210 && y >= 90 && y < 150) {
+      interiorChangedPixels++;
+      maxInteriorChannelError = Math.max(maxInteriorChannelError, maxError);
+    } else edgeChangedPixels++;
+    if (samples.length < 8) samples.push({ x, y, a: [...a.slice(i, i + 4)], b: [...b.slice(i, i + 4)], delta });
+  }
+  return { ...difference(a, b), alphaChangedPixels, rgbOnlyChangedPixels, maxAlphaError,
+    interior: { rect: [110, 90, 100, 60], changedPixels: interiorChangedPixels, maxChannelError: maxInteriorChannelError },
+    outsideInteriorChangedPixels: edgeChangedPixels, changedPixelsWithPartialAlpha, samples };
+}
+
+// Only invoked on failure. Independent main-thread contexts distinguish a
+// geometry/thread mismatch from a CPU/accelerated Canvas2D rasterization path.
+function mismatchDiagnostics(scene, time, rasters, masks, expected, actualWorker) {
+  const surface = new OffscreenCanvas(width, height);
+  const defaultContext = surface.getContext('2d');
+  const copied = document.createElement('canvas');
+  copied.width = width; copied.height = height;
+  const copiedContext = copied.getContext('2d', { willReadFrequently: true });
+  const cpuSurface = document.createElement('canvas');
+  cpuSurface.width = width; cpuSurface.height = height;
+  const cpuContext = cpuSurface.getContext('2d', { willReadFrequently: true });
+  let bitmap;
+  try {
+    renderDocumentV2(defaultContext, scene, time, rasters, masks, undefined, time);
+    const direct = pixels(defaultContext);
+    bitmap = surface.transferToImageBitmap();
+    copiedContext.drawImage(bitmap, 0, 0);
+    const transferred = pixels(copiedContext);
+    renderDocumentV2(cpuContext, scene, time, rasters, masks, undefined, time);
+    return {
+      referenceRendering: 'Fresh main-thread default OffscreenCanvas, then bitmap copy for readback',
+      mainOffscreenContext: defaultContext.getContextAttributes?.(),
+      actualWorkerVsReference: diagnosePixels(expected, actualWorker),
+      mainOffscreenVsReference: diagnosePixels(expected, direct),
+      mainOffscreenVsWorker: diagnosePixels(actualWorker, direct),
+      mainOffscreenTransferredVsReference: diagnosePixels(expected, transferred),
+      mainOffscreenTransferredVsWorker: diagnosePixels(actualWorker, transferred),
+      informationalCpuRasterVsDefaultReference: diagnosePixels(expected, pixels(cpuContext)),
+    };
+  } finally {
+    bitmap?.close(); releaseRenderCache(defaultContext);
+    releaseRenderCache(cpuContext);
+    surface.width = 1; surface.height = 1; copied.width = 1; copied.height = 1;
+    cpuSurface.width = 1; cpuSurface.height = 1;
+  }
+}
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+function alphaAt(x, y) {
+  return accurate.getImageData(x, y, 1, 1).data[3];
+}
+
+function assertClearExterior(name) {
+  const data = pixels();
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    // A generous exterior margin leaves room for intentional animated edges.
+    if (x >= 40 && x <= 310 && y >= 20 && y <= 220) continue;
+    assert(data[(y * width + x) * 4 + 3] === 0, `${name}: paint leaked outside the shape at ${x},${y}`);
+  }
+}
+
+function textureInterior(name) {
+  const data = accurate.getImageData(110, 90, 100, 60).data;
+  let ink = 0, gaps = 0;
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] > 20) ink++;
+    if (data[i] === 0) gaps++;
+  }
+  assert(ink > 50, `${name}: texture did not cover the interior`);
+  assert(gaps > 50, `${name}: texture lost its transparent grain gaps`);
+  return { interiorInkPixels: ink, interiorTransparentPixels: gaps };
+}
+
+button.onclick = async () => {
+  button.disabled = true;
+  const report = { worker: [], behavior: [], export: null };
+  let host, pending, timeout;
+  results.textContent = 'Starting…';
+  try {
+    const scene = createDocumentV2('Synthetic brush fill checks', width, height);
+    scene.background = 'transparent';
+    const layer = scene.layers[0], rasters = new Map(), masks = new Map();
+    let version = 0;
+    function brush(id, changes = {}) {
+      return { ...getBuiltinBrush(id), size: 10, color: '#1f3457', opacity: 1, closedPath: true, fill: { enabled: true, outline: false }, ...changes };
+    }
+    function setStroke(nextBrush, nextPoints = points) {
+      layer.strokes = [snapshotStroke(nextBrush, nextPoints, layer.id, 29)];
+      layer.opacity = 1;
+      masks.clear();
+    }
+    host = new PaintPreviewHost(output, {
+      invalidate() {},
+      error(message) { pending?.reject(new Error(message)); },
+      painted(stats, threaded) { pending?.resolve({ stats, threaded }); },
+    });
+    assert(host.threaded, 'Render worker is unavailable in this browser. No parity claim was made.');
+
+    async function frame(name, time = 125) {
+      status.textContent = `Checking ${name}…`;
+      renderReference(scene, time, rasters, masks, time);
+      const waiting = new Promise((resolve, reject) => {
+        pending = { resolve, reject };
+        timeout = setTimeout(() => reject(new Error(`Timed out: ${name}`)), 11000);
+      });
+      host.request({ document: scene, surfaces: { rasters, masks }, time, now: time, version: ++version, gpu: false });
+      const response = await waiting;
+      clearTimeout(timeout); pending = null;
+      const expected = pixels(), actualWorker = pixels(rendered);
+      const comparison = difference(expected, actualWorker);
+      if (!response.threaded || comparison.maxChannelError !== 0) {
+        report.worker.push({ case: name, result: 'FAIL', ...comparison,
+          diagnostics: mismatchDiagnostics(scene, time, rasters, masks, expected, actualWorker) });
+        results.textContent = JSON.stringify(report, null, 2);
+      }
+      assert(response.threaded && comparison.maxChannelError === 0, `${name}: worker mismatch ${JSON.stringify(comparison)}`);
+      report.worker.push({ case: name, result: 'PASS', ...comparison });
+      results.textContent = JSON.stringify(report, null, 2);
+      return pixels();
+    }
+
+    for (const id of ['round', 'marker', 'wiggle', 'wave', 'boil', 'textureBoil', 'graphiteCrawl']) {
+      const nextBrush = brush(id);
+      const textured = id === 'textureBoil' || id === 'graphiteCrawl';
+      setStroke(nextBrush);
+      const first = await frame(`${nextBrush.name}: filled interior at 125ms`);
+      const interior = textured ? textureInterior(nextBrush.name) : { centerAlpha: alphaAt(170, 120) };
+      if (!textured) {
+        assert(interior.centerAlpha === 255, `${nextBrush.name}: solid interior is not opaque`);
+        const center = [...accurate.getImageData(170, 120, 1, 1).data];
+        assert(center.join(',') === '31,52,87,255', `${nextBrush.name}: solid interior did not retain brush color`);
+        assert(alphaAt(90, 120) === 255, `${nextBrush.name}: closing edge leaves an interior gap`);
+      }
+      assertClearExterior(nextBrush.name);
+      const second = await frame(`${nextBrush.name}: filled interior at 475ms`, 475);
+      const changed = difference(first, second).changedPixels;
+      assert(nextBrush.animated ? changed > 0 : changed === 0, `${nextBrush.name}: unexpected animation behavior (${changed} changed pixels)`);
+      if (textured) textureInterior(nextBrush.name);
+      assertClearExterior(nextBrush.name);
+      report.behavior.push({ case: nextBrush.name, result: 'PASS', ...interior, animatedChangedPixels: changed });
+    }
+
+    // Explicitly disabling both new settings must preserve legacy rendering.
+    for (const id of ['round', 'wiggle', 'textureBoil']) {
+      const disabled = brush(id, { closedPath: false, fill: { enabled: false, outline: true } });
+      setStroke(disabled);
+      const current = await frame(`${disabled.name}: fill disabled`);
+      assert(alphaAt(170, 120) === 0, `${disabled.name}: disabled fill still paints the interior`);
+      const legacy = { ...disabled };
+      delete legacy.closedPath; delete legacy.fill;
+      setStroke(legacy);
+      const old = await frame(`${disabled.name}: legacy fields omitted`);
+      assert(difference(current, old).maxChannelError === 0, `${disabled.name}: disabled fill changed legacy pixels`);
+      report.behavior.push({ case: `${disabled.name}: fill off matches legacy`, result: 'PASS' });
+    }
+
+    setStroke(brush('round', { fill: { enabled: false, outline: true } }));
+    await frame('Closed outline supplies the missing final edge');
+    assert(alphaAt(70, 120) > 240, 'Closed outline leaves a gap midway along the closing edge');
+    assert(alphaAt(70, 52) > 240, 'Closed outline leaves a gap where its first and final edges meet');
+    assert(alphaAt(170, 120) === 0, 'Closed outline unexpectedly fills its interior');
+    report.behavior.push({ case: 'Closed outline seam and empty interior', result: 'PASS' });
+
+    setStroke(brush('wave'));
+    layer.opacity = 0.5;
+    await frame('Fill respects layer opacity');
+    assert(Math.abs(alphaAt(170, 120) - 128) <= 1, 'Layer opacity was not applied once to the solid interior');
+    const mask = document.createElement('canvas');
+    mask.width = width; mask.height = height;
+    mask.getContext('2d').fillRect(145, 0, 30, height);
+    masks.set(layer.id, mask);
+    await frame('Erase mask removes filled interior');
+    assert(alphaAt(160, 120) === 0, 'Erase mask did not remove the filled interior');
+    assert(Math.abs(alphaAt(200, 120) - 128) <= 1, 'Erase mask removed pixels outside the mask');
+    masks.clear();
+    await frame('Undo erase mask restores fill');
+    assert(Math.abs(alphaAt(160, 120) - 128) <= 1, 'Removing the mask did not restore the fill');
+    report.behavior.push({ case: 'Layer opacity and mask removal/restoration', result: 'PASS' });
+
+    for (const [name, input] of [['empty', []], ['single point', [emptyPoint(170, 120)]], ['collinear', [emptyPoint(90, 120), emptyPoint(170, 120), emptyPoint(250, 120)]]]) {
+      setStroke(brush('wiggle'), input);
+      await frame(`Degenerate ${name} path remains safe`);
+      assert(alphaAt(170, 80) === 0, `${name}: degenerate path filled a remote region`);
+    }
+
+    status.textContent = 'Checking solid and textured PNG export, including backward seek…';
+    const scaled = (scale, offset) => points.map(point => ({ ...point, x: point.x * scale + offset }));
+    layer.opacity = 0.8;
+    layer.strokes = [
+      snapshotStroke(brush('wave'), scaled(0.5, 0), layer.id, 29),
+      snapshotStroke(brush('textureBoil', { color: '#af3958' }), scaled(0.5, 175), layer.id, 43),
+    ];
+    const artifact = await renderPaintDocument(scene, { rasters, masks }, { format: 'image-sequence', fps: 12, duration: 0.25 });
+    const entries = unzipSync(new Uint8Array(await artifact.blob.arrayBuffer()));
+    const files = Object.keys(entries).filter(name => name.endsWith('.png')).sort();
+    assert(files.length === 3, `Expected 3 PNG frames; received ${files.length}`);
+    const comparisons = [];
+    for (const index of [0, 2, 0]) {
+      const bitmap = await createImageBitmap(new Blob([entries[files[index]]], { type: 'image/png' }));
+      rendered.clearRect(0, 0, width, height); rendered.drawImage(bitmap, 0, 0); bitmap.close();
+      renderReference(scene, index / 12 * 1000, rasters, masks);
+      const comparison = difference(pixels(), pixels(rendered));
+      assert(comparison.maxChannelError === 0, `Export frame ${index} differs: ${JSON.stringify(comparison)}`);
+      comparisons.push({ frame: index, ...comparison });
+    }
+    report.export = { result: 'PASS', format: 'PNG sequence', frames: files.length, firstLastAndBackwardSeek: 'Exact pixels', comparisons };
+    results.textContent = JSON.stringify(report, null, 2);
+    status.textContent = `PASS — ${report.worker.length} exact worker checks, ${report.behavior.length} behavior checks, and PNG export complete.`;
+  } catch (error) {
+    status.textContent = `FAIL — ${error instanceof Error ? error.message : String(error)}`;
+    results.textContent = JSON.stringify(report, null, 2);
+  } finally {
+    clearTimeout(timeout); pending = null;
+    host?.dispose(); releaseRenderCache(accurate); releaseRenderCache(rendered);
+    button.disabled = false;
+  }
+};
+</script>

@@ -35,4 +35,36 @@ describe('strokeAtPoint', () => {
     ]
     expect(strokeAtPoint(layers, 50, 10)?.id).toBe(top.id)
   })
+
+  const square = [point(0, 0), point(200, 0), point(200, 200), point(0, 200)]
+  const fillBrush = createBrushV2({ renderer: 'line', size: 4, fill: { enabled: true, outline: false } })
+
+  it('selects a supported filled shape from its interior even with the outline hidden', () => {
+    const filled = snapshotStroke(fillBrush, square, 'filled')
+    const layer = { ...createLayerV2(), strokes: [filled] }
+    expect(strokeAtPoint([layer], 100, 100)?.id).toBe(filled.id)
+    expect(strokeAtPoint([layer], 250, 100)).toBeNull()
+  })
+
+  it('does not select the interior of a closed but unfilled path', () => {
+    const closed = snapshotStroke({ ...fillBrush, fill: { enabled: false, outline: true } }, square, 'closed')
+    const layer = { ...createLayerV2(), strokes: [closed] }
+    expect(strokeAtPoint([layer], 100, 100)).toBeNull()
+    expect(strokeAtPoint([layer], 0, 100)?.id).toBe(closed.id)
+  })
+
+  it('ignores fill and closure flags for unsupported brushes', () => {
+    const unsupported = snapshotStroke({ ...fillBrush, renderer: 'particle' }, square, 'particle')
+    const layer = { ...createLayerV2(), strokes: [unsupported] }
+    expect(strokeAtPoint([layer], 100, 100)).toBeNull()
+    expect(strokeAtPoint([layer], 0, 100)).toBeNull()
+  })
+
+  it('respects concave gaps instead of using a filled bounding box', () => {
+    const concave = [point(0, 0), point(200, 0), point(200, 80), point(80, 80), point(80, 200), point(0, 200)]
+    const filled = snapshotStroke(fillBrush, concave, 'concave')
+    const layer = { ...createLayerV2(), strokes: [filled] }
+    expect(strokeAtPoint([layer], 40, 140)?.id).toBe(filled.id)
+    expect(strokeAtPoint([layer], 140, 140)).toBeNull()
+  })
 })

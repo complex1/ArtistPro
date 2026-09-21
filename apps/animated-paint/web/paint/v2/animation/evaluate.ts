@@ -8,6 +8,8 @@ export type AnimationRequest = {
   points: StrokePointV2[]
   config: BrushV2
   time: number
+  /** Seconds since the stroke started, already scaled by brush speed. */
+  age?: number
   seed: number
   budgetMs?: number
 }
@@ -25,9 +27,17 @@ type AnimateFn = (
   seed: number,
   rng: () => number,
   math: Math,
+  age: number,
 ) => unknown
 
+// Editing creates new source strings, so keep this bounded rather than retaining
+// every keystroke. The wrapper still creates fresh script-local state per frame.
+const compiled = new Map<string, AnimateFn>()
+const MAX_COMPILED_ANIMATIONS = 128
+
 export function compileAnimation(source: string): AnimateFn {
+  const cached = compiled.get(source)
+  if (cached) return cached
   const wrapped = `"use strict";
     const window = undefined;
     const document = undefined;
@@ -43,17 +53,23 @@ export function compileAnimation(source: string): AnimateFn {
     if (typeof animate !== "function") {
       throw new Error("animation must declare function animate(points, config, time)");
     }
-    return animate(points, config, time);
+    return animate(points, config, time, age);
   `
-  return new Function(
+  const fn = new Function(
     'points',
     'config',
     'time',
     'seed',
     'rng',
     'Math',
+    'age',
     wrapped,
   ) as AnimateFn
+  if (compiled.size >= MAX_COMPILED_ANIMATIONS) {
+    compiled.delete(compiled.keys().next().value!)
+  }
+  compiled.set(source, fn)
+  return fn
 }
 
 export function runAnimationSync(request: AnimationRequest): AnimationResult {
@@ -69,6 +85,7 @@ export function runAnimationSync(request: AnimationRequest): AnimationResult {
       request.seed,
       mulberry32(request.seed >>> 0),
       Math,
+      request.age ?? request.time,
     )
     const durationMs = performance.now() - started
     if (durationMs > budget) {

@@ -1,0 +1,182 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Image layer rendering checks</title>
+<style>
+  body { margin: 0 auto; padding: 28px; max-width: 960px; font: 15px/1.5 system-ui; color: #252333; background: #f8f7fb; }
+  h1 { margin-bottom: 6px; font-size: 26px; }
+  button { padding: 10px 16px; font: inherit; cursor: pointer; }
+  .canvases { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 24px; }
+  figure { margin: 0; }
+  canvas { display: block; border: 1px solid #ccc; max-width: 100%; background: #fff; }
+  figcaption { margin-top: 8px; color: #666; }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 16px; background: #efedf5; border-radius: 8px; }
+</style>
+<h1>Image layer rendering checks</h1>
+<p>Finite synthetic checks of original image pixels, editable placement, compositing, worker rendering, and PNG export. No saved project is changed.</p>
+<button id="run">Run image layer checks</button>
+<p id="status" role="status">Ready — checks run only when requested.</p>
+<div class="canvases">
+  <figure><canvas id="reference" width="360" height="240"></canvas><figcaption>Accurate Canvas2D</figcaption></figure>
+  <figure><canvas id="output" width="360" height="240"></canvas><figcaption>Accurate render worker / exported PNG</figcaption></figure>
+</div>
+<pre id="results">No checks run yet.</pre>
+<script type="module">
+import { createDocumentV2, createImageLayerV2 } from '/apps/animated-paint/web/paint/v2/core/defaults.ts';
+import { renderDocumentV2, releaseRenderCache } from '/apps/animated-paint/web/paint/v2/render/engine.ts';
+import { PaintPreviewHost } from '/apps/animated-paint/web/paint/v2/render/previewHost.ts';
+import { renderPaintDocument } from '/apps/animated-paint/web/paint/v2/render/exportEngine.ts';
+import { unzipSync } from 'fflate';
+
+const button = document.querySelector('#run');
+const status = document.querySelector('#status');
+const results = document.querySelector('#results');
+const reference = document.querySelector('#reference');
+const output = document.querySelector('#output');
+const width = reference.width, height = reference.height;
+const accurate = reference.getContext('2d', { willReadFrequently: true });
+const rendered = output.getContext('2d', { willReadFrequently: true });
+
+function surface(w, h, paint) {
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  paint(canvas.getContext('2d'));
+  return canvas;
+}
+
+function compare() {
+  const a = accurate.getImageData(0, 0, width, height).data;
+  const b = rendered.getImageData(0, 0, width, height).data;
+  let changedPixels = 0, maxChannelError = 0;
+  for (let i = 0; i < a.length; i += 4) {
+    let changed = false;
+    for (let c = 0; c < 4; c++) {
+      const error = Math.abs(a[i + c] - b[i + c]);
+      maxChannelError = Math.max(maxChannelError, error);
+      if (error) changed = true;
+    }
+    if (changed) changedPixels++;
+  }
+  return { changedPixels, maxChannelError };
+}
+
+function assertPixel(x, y, expected, name) {
+  const actual = [...accurate.getImageData(x, y, 1, 1).data];
+  if (actual.some((channel, i) => channel !== expected[i])) {
+    throw new Error(`${name}: expected ${expected.join(',')}, received ${actual.join(',')}`);
+  }
+}
+
+button.onclick = async () => {
+  button.disabled = true;
+  const report = { worker: [], export: null };
+  let host, pending, timeout;
+  results.textContent = 'Starting…';
+  try {
+    const source = surface(24, 16, context => {
+      context.fillStyle = '#e64b54'; context.fillRect(0, 0, 12, 16);
+      context.fillStyle = 'rgba(37,116,235,0.6)'; context.fillRect(12, 0, 12, 16);
+      context.clearRect(9, 5, 6, 6);
+    });
+    const accent = surface(20, 20, context => {
+      context.fillStyle = '#f2ba39'; context.fillRect(0, 0, 20, 20);
+      context.clearRect(0, 0, 8, 8);
+    });
+    const scene = createDocumentV2('Synthetic image layer checks', width, height);
+    scene.background = '#f4f0e8';
+    const image = createImageLayerV2('Transparent native image', {
+      dataUrl: source.toDataURL(), naturalWidth: source.width, naturalHeight: source.height,
+      x: 50, y: 40, width: 96, height: 64,
+    });
+    const overlay = createImageLayerV2('Overlapping image', {
+      dataUrl: accent.toDataURL(), naturalWidth: accent.width, naturalHeight: accent.height,
+      x: 90, y: 60, width: 64, height: 64,
+    });
+    overlay.visible = false;
+    scene.layers.push(image, overlay);
+    const originalImage = { ...image.image };
+    const rasters = new Map([[image.id, source], [overlay.id, accent]]), masks = new Map();
+    let version = 0;
+    host = new PaintPreviewHost(output, {
+      invalidate() {},
+      error(message) { pending?.reject(new Error(message)); },
+      painted(stats, threaded) { pending?.resolve({ stats, threaded }); },
+    });
+    if (!host.threaded) throw new Error('Render worker is unavailable in this browser. No parity claim was made.');
+
+    async function frame(name) {
+      status.textContent = `Checking ${name}…`;
+      renderDocumentV2(accurate, scene, 375, rasters, masks, undefined, 375);
+      const waiting = new Promise((resolve, reject) => {
+        pending = { resolve, reject };
+        timeout = setTimeout(() => reject(new Error(`Timed out: ${name}`)), 11000);
+      });
+      host.request({ document: scene, surfaces: { rasters, masks }, time: 375, now: 375, version: ++version, gpu: false });
+      const response = await waiting;
+      clearTimeout(timeout); pending = null;
+      const pixels = compare();
+      if (!response.threaded || pixels.maxChannelError !== 0) throw new Error(`${name}: worker mismatch ${JSON.stringify(pixels)}`);
+      report.worker.push({ case: name, result: 'PASS', ...pixels });
+      results.textContent = JSON.stringify(report, null, 2);
+    }
+
+    await frame('Native image placement and transparency');
+    assertPixel(58, 48, [230, 75, 84, 255], 'Scaled opaque source pixel');
+    assertPixel(98, 72, [244, 240, 232, 255], 'Transparent source reveals canvas');
+    assertPixel(25, 40, [244, 240, 232, 255], 'Source is placed rather than flattened at origin');
+
+    image.image = { ...image.image, x: 115, y: 85, width: 144, height: 96 };
+    await frame('Move and resize with original pixels');
+    assertPixel(58, 48, [244, 240, 232, 255], 'Old image placement is cleared');
+    assertPixel(127, 97, [230, 75, 84, 255], 'New image placement');
+
+    image.opacity = 0.45; image.blendMode = 'multiply'; overlay.visible = true;
+    await frame('Image layer opacity and multiply blend');
+    const overPixel = [...accurate.getImageData(145, 110, 1, 1).data];
+    scene.layers = [scene.layers[0], overlay, image];
+    await frame('Layer reordering');
+    const underPixel = [...accurate.getImageData(145, 110, 1, 1).data];
+    if (overPixel.every((channel, i) => channel === underPixel[i])) throw new Error('Layer reordering did not change overlapping pixels');
+
+    image.visible = false;
+    await frame('Hidden image layer');
+    assertPixel(200, 145, [244, 240, 232, 255], 'Hidden image pixels are absent');
+    image.visible = true;
+    image.opacity = 1; image.blendMode = 'source-over'; overlay.visible = false;
+    image.image = originalImage;
+    await frame('Undo image transform');
+    assertPixel(58, 48, [230, 75, 84, 255], 'Undo restores original placement');
+
+    const mask = surface(width, height, context => context.fillRect(50, 40, 24, 64));
+    masks.set(image.id, mask);
+    await frame('Canvas-space erase mask on image layer');
+    assertPixel(58, 48, [244, 240, 232, 255], 'Mask removes transformed image pixels');
+    masks.clear();
+    await frame('Undo image mask');
+    assertPixel(58, 48, [230, 75, 84, 255], 'Mask undo restores source pixels');
+
+    status.textContent = 'Checking first exported PNG against accurate rendering…';
+    image.image = { ...originalImage, x: 115, y: 85, width: 144, height: 96 };
+    image.opacity = 0.65; overlay.visible = true;
+    const artifact = await renderPaintDocument(scene, { rasters, masks }, { format: 'image-sequence', fps: 12, duration: 0.25 });
+    const entries = unzipSync(new Uint8Array(await artifact.blob.arrayBuffer()));
+    const files = Object.keys(entries).filter(name => name.endsWith('.png')).sort();
+    if (files.length !== 3) throw new Error(`Expected 3 PNG frames; received ${files.length}`);
+    const bitmap = await createImageBitmap(new Blob([entries[files[0]]], { type: 'image/png' }));
+    rendered.clearRect(0, 0, width, height); rendered.drawImage(bitmap, 0, 0); bitmap.close();
+    renderDocumentV2(accurate, scene, 0, rasters, masks);
+    const exportPixels = compare();
+    if (exportPixels.maxChannelError !== 0) throw new Error(`Export pixels differ: ${JSON.stringify(exportPixels)}`);
+    report.export = { result: 'PASS', format: 'PNG sequence', frames: files.length, firstFrame: 'Exact pixels', ...exportPixels };
+    results.textContent = JSON.stringify(report, null, 2);
+    status.textContent = `PASS — ${report.worker.length} exact worker checks and PNG export complete.`;
+  } catch (error) {
+    status.textContent = `FAIL — ${error instanceof Error ? error.message : String(error)}`;
+    results.textContent = JSON.stringify(report, null, 2);
+  } finally {
+    clearTimeout(timeout); pending = null;
+    host?.dispose(); releaseRenderCache(accurate); releaseRenderCache(rendered);
+    button.disabled = false;
+  }
+};
+</script>

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Funky brush lab · Animated Paint</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#171c20;color:#f1eee7;font:15px system-ui,sans-serif}main{max-width:1080px;margin:auto;padding:36px 24px}header{display:flex;justify-content:space-between;align-items:end;gap:24px;margin-bottom:24px}h1{font-size:36px;letter-spacing:-1.4px;margin:4px 0 10px}.eyebrow{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#b5c5b9}p{color:#bac2c5;max-width:700px;line-height:1.55;margin:0}nav{display:flex;flex-wrap:wrap;gap:8px;margin:22px 0}button,a{font:inherit}button{border:1px solid #505c64;border-radius:8px;background:#252d33;color:#f1eee7;padding:10px 14px;cursor:pointer}button:first-child{background:#d6ee9a;color:#1a2818;border-color:transparent}button:disabled{opacity:.45;cursor:default}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}article{border:1px solid #3b454b;border-radius:14px;overflow:hidden;background:#20282d}canvas{display:block;width:100%;height:auto;touch-action:none}article section{padding:18px 20px}h2{font-size:19px;margin:0 0 7px}article p{font-size:13px;min-height:40px}small{display:block;color:#adb8bd;margin-top:12px}a{color:#d6ee9a}#status{min-height:26px;font-size:13px}pre{font-size:12px;color:#cbd8d0;white-space:pre-wrap}footer{font-size:12px;margin-top:24px;color:#97a5ad;line-height:1.6}@media(max-width:680px){.grid{grid-template-columns:1fr}header{display:block}h1{font-size:30px}}
+</style>
+<main>
+<header><div><div class="eyebrow">Animated Paint / Working brush studies</div><h1>Make a little mischief.</h1><p>Four original motion brushes. Try them in the Funky category, or compare their motion here. Each preview run stops after eight seconds.</p></div></header>
+<nav><button id="play">Play 8-second preview</button><button id="pause" disabled>Pause</button><button id="checks">Run bounded checks</button></nav>
+<div id="status" role="status">Preparing brush samples…</div><div class="grid" id="cards"></div><pre id="results"></pre>
+<footer>Studies informed by <a href="https://internet-janitor.itch.io/wigglypaint">WigglyPaint</a> and <a href="https://apps.apple.com/us/app/amberpaint-motion-brush/id6745322259">AmberPaint’s official screenshots</a>. Names and motion recipes are original. This page uses synthetic strokes and does not modify saved projects.</footer>
+</main>
+<script type="module">
+import { FUNKY_BRUSHES } from '/apps/animated-paint/web/paint/v2/funkyPresets.ts';
+import { createDocumentV2, emptyPoint } from '/apps/animated-paint/web/paint/v2/core/defaults.ts';
+import { snapshotStroke } from '/apps/animated-paint/web/paint/v2/input/sampler.ts';
+import { renderDocumentV2, strokeFrame, clearStrokeCache } from '/apps/animated-paint/web/paint/v2/render/engine.ts';
+const descriptions={candyConveyor:'Colorful segments parade along your line like a moving candy necklace.',elasticNoodles:'Three fine strands weave and sway around the path you draw.',neonFuse:'Bright dashes chase along a dim, continuous trail.',jellyBeads:'Squishy beads bob through a small sequence of hand-drawn poses.'};
+const cards=document.querySelector('#cards'), status=document.querySelector('#status'), play=document.querySelector('#play'), pause=document.querySelector('#pause'), checks=document.querySelector('#checks'), results=document.querySelector('#results');
+const samples=FUNKY_BRUSHES.map(brush=>{
+ const article=document.createElement('article'),canvas=document.createElement('canvas');canvas.width=480;canvas.height=240;canvas.setAttribute('aria-label',brush.name+' animated sample');
+ const section=document.createElement('section'),heading=document.createElement('h2'),description=document.createElement('p'),info=document.createElement('small');
+ heading.textContent=brush.name;description.textContent=descriptions[brush.id];info.textContent='';
+ section.append(heading,description,info);article.append(canvas,section);cards.append(article);
+ const doc=createDocumentV2(brush.name,480,240);doc.background=brush.id==='neonFuse'?'#111821':'#fcf4e9';
+ const points=Array.from({length:140},(_,i)=>{const t=i/139;return {...emptyPoint(28+t*424,120+48*Math.sin(t*Math.PI*3),t),pressure:.55+.3*Math.sin(t*Math.PI)};});
+ const stroke=snapshotStroke(brush,points,doc.layers[0].id,29);stroke.createdAt=0;doc.layers[0].strokes=[stroke];
+ return {canvas,context:canvas.getContext('2d'),doc,brush,stroke,info,rasters:new Map()};
+});
+let raf=0,timer=0,started=0,time=0;
+function paint(ms){for(const sample of samples){const stats=renderDocumentV2(sample.context,sample.doc,ms,sample.rasters);sample.info.textContent=`${stats.itemCount} marks · ${sample.brush.animationTiming?.mode==='stepped'?'8 held poses per second':'continuous motion'}`;}}
+function stop(){cancelAnimationFrame(raf);clearTimeout(timer);play.disabled=false;pause.disabled=true;}
+function tick(now){time=now-started;paint(time);if(time>=8000){stop();status.textContent='Preview paused. Find all four brushes under Funky in the app.';return;}timer=setTimeout(()=>{raf=requestAnimationFrame(tick)},20);}
+play.onclick=()=>{stop();started=performance.now();play.disabled=true;pause.disabled=false;status.textContent='Playing the four brush studies…';raf=requestAnimationFrame(tick)};
+pause.onclick=()=>{stop();status.textContent='Preview paused.';};
+document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
+checks.onclick=async()=>{
+ stop();checks.disabled=true;status.textContent='Checking motion and measuring a finite 50-stroke scene…';const report=[];
+ try{for(const sample of samples){
+  const first=strokeFrame(sample.stroke,0),later=strokeFrame(sample.stroke,625);
+  if(JSON.stringify(first.items)===JSON.stringify(later.items))throw new Error(sample.brush.name+' did not animate');
+  if([...first.diagnostics,...later.diagnostics].some(d=>d.code==='animate-error'))throw new Error(sample.brush.name+' failed');
+  const dense=createDocumentV2('Fifty strokes',800,600);dense.layers[0].strokes=Array.from({length:50},(_,i)=>snapshotStroke(sample.brush,sample.stroke.points.map(p=>({...p,x:p.x+(i%4)*35,y:p.y+Math.floor(i/4)*20})),dense.layers[0].id,i+1));
+  const canvas=document.createElement('canvas');canvas.width=800;canvas.height=600;const context=canvas.getContext('2d'),durations=[];let count=0;
+  for(let i=0;i<5;i++){await new Promise(resolve=>setTimeout(resolve,25));const before=performance.now();const stats=renderDocumentV2(context,dense,i*200,new Map());if(i>0)durations.push(performance.now()-before);count=stats.itemCount;}
+  report.push({brush:sample.brush.name,animated:true,marksPerDemoStroke:first.items.length,marksFor50Strokes:count,medianCpuMs:Math.round(durations.sort((a,b)=>a-b)[2]*10)/10});
+  clearStrokeCache();results.textContent=JSON.stringify(report,null,2);
+ }paint(time);status.textContent='PASS · All four animate. Timings are CPU generation/submission, not GPU completion or thermal measurements.';}
+ catch(error){status.textContent='FAIL · '+error.message;}
+ checks.disabled=false;
+};
+paint(0);status.textContent='Ready. Play to compare the motion.';
+</script>
+</html>

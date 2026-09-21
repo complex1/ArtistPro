@@ -15,7 +15,8 @@ import type {
 import { RenderError } from '../../../render/types'
 import { VideoFrameEncoder } from '../../../render/videoEncoder'
 import type { PaintDocumentV2 } from '../core/types'
-import { renderDocumentV2, type LayerSurfaces } from './engine'
+import { renderDocumentV2, releaseRenderCache, type LayerSurfaces } from './engine'
+import { prepareStampImages } from './canvas2d'
 
 export type PaintExportSettings = {
   fps: RenderFps
@@ -85,6 +86,15 @@ export async function renderPaintDocument(
 
   try {
     report(options, 'preparing', 0, schedule.frameCount)
+    try {
+      await prepareStampImages(documentSnapshot.layers
+        .filter((layer) => layer.visible)
+        .flatMap((layer) => layer.strokes.flatMap((stroke) => stroke.brushSnapshot.stamps)), options.signal)
+    } catch (error) {
+      throwIfAborted(options.signal)
+      throw renderError('rasterization-failed', 'An image stamp could not be loaded for export.', error)
+    }
+    throwIfAborted(options.signal)
     if (settings.format === 'video') {
       video = await VideoFrameEncoder.create(canvas, settings.fps, options.signal)
     } else if (settings.format === 'gif') {
@@ -196,6 +206,7 @@ export async function renderPaintDocument(
       gif?.cancel()
       sequence?.cancel()
     }
+    releaseRenderCache(context)
     canvas.width = 1
     canvas.height = 1
   }

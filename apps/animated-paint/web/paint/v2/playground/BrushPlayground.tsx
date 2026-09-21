@@ -22,7 +22,7 @@ import { navigate } from '../../../app/routes'
 import { Button, IconButton } from '../../../ui/controls'
 import { duplicateBrush, getBrushV2, saveCustomBrush } from '../brushLibrary'
 import { brushFileName, exportBrushJson, importBrushJson } from '../brushTransfer'
-import { createBrushV2, createDocumentV2, emptyPoint } from '../core/defaults'
+import { createBrushV2, createDocumentV2 } from '../core/defaults'
 import { parseBrush } from '../core/schema'
 import type { BrushV2, StrokePointV2, StrokeV2 } from '../core/types'
 import {
@@ -32,8 +32,12 @@ import {
   stabilizePoint,
 } from '../input/sampler'
 import { BUILTIN_BRUSHES } from '../presets'
-import { renderDocumentV2 } from '../render/engine'
+import { renderDocumentV2, releaseRenderCache } from '../render/engine'
+import { createPaintScheduler } from '../render/scheduler'
+import { nextDocumentFrame } from '../render/timing'
+import { onStampAssetReady } from '../render/canvas2d'
 import { BrushInspector } from '../ui/BrushInspector'
+import { brushPreviewPoints, usesClosedPreview } from '../ui/brushPreviewPath'
 import { AnimationCodeEditor } from './AnimationCodeEditor'
 import { BrushLibraryPage } from './BrushLibraryPage'
 
@@ -41,18 +45,18 @@ const CANVAS_W = 640
 const CANVAS_H = 400
 const MIN_PANEL_PERCENT = 24
 
+function demoPoints(brush: BrushV2) {
+  return brushPreviewPoints(brush, CANVAS_W, CANVAS_H)
+}
+
 function demoStroke(brush: BrushV2): StrokeV2 {
-  return snapshotStroke(
+  const stroke = snapshotStroke(
     brush,
-    [
-      emptyPoint(70, 230),
-      emptyPoint(180, 145),
-      emptyPoint(300, 250),
-      emptyPoint(430, 130),
-      emptyPoint(570, 215),
-    ],
+    demoPoints(brush),
     'playground',
   )
+  stroke.createdAt = 0
+  return stroke
 }
 
 export function BrushPlayground({ brushId }: { brushId?: string }) {
@@ -66,7 +70,7 @@ function BrushEditor({ brushId }: { brushId: string }) {
   const importRef = useRef<HTMLInputElement>(null)
   const drawing = useRef(false)
   const lastPoint = useRef<StrokePointV2 | null>(null)
-  const lastTime = useRef(0)
+  const lastTime = useRef<number | null>(null)
   const [brush, setBrush] = useState<BrushV2>(() =>
     structuredClone(
       BUILTIN_BRUSHES.find((item) => item.id === brushId) ??
@@ -75,6 +79,7 @@ function BrushEditor({ brushId }: { brushId: string }) {
     ),
   )
   const [strokes, setStrokes] = useState<StrokeV2[]>(() => [demoStroke(brush)])
+  const demoStrokeId = useRef(strokes[0]?.id)
   const [playing, setPlaying] = useState(true)
   const [message, setMessage] = useState('')
   const [previewPercent, setPreviewPercent] = useState(50)
@@ -82,14 +87,18 @@ function BrushEditor({ brushId }: { brushId: string }) {
   const strokesRef = useRef(strokes)
   const playingRef = useRef(playing)
   const timeRef = useRef(0)
+  const schedulerRef = useRef<ReturnType<typeof createPaintScheduler> | null>(null)
 
   useEffect(() => {
     let cancelled = false
     void getBrushV2(brushId).then((loaded) => {
       if (cancelled || !loaded) return
       const next = structuredClone(loaded)
+      timeRef.current = 0
       setBrush(next)
-      setStrokes([demoStroke(next)])
+      const sample = demoStroke(next)
+      demoStrokeId.current = sample.id
+      setStrokes([sample])
     })
     return () => {
       cancelled = true
@@ -99,37 +108,46 @@ function BrushEditor({ brushId }: { brushId: string }) {
   const patch = (values: Partial<BrushV2>) => {
     setBrush((current) => ({ ...current, ...values }))
     setStrokes((current) =>
-      current.map((stroke) => ({
-        ...stroke,
-        brushSnapshot: { ...stroke.brushSnapshot, ...values },
-      })),
+      current.map((stroke) => {
+        const brushSnapshot = { ...stroke.brushSnapshot, ...values }
+        const changeDemo = stroke.id === demoStrokeId.current &&
+          usesClosedPreview(stroke.brushSnapshot) !== usesClosedPreview(brushSnapshot)
+        return {
+          ...stroke,
+          points: changeDemo ? demoPoints(brushSnapshot) : stroke.points,
+          brushSnapshot,
+        }
+      }),
     )
   }
 
   useEffect(() => {
     strokesRef.current = strokes
+    schedulerRef.current?.invalidate()
   }, [strokes])
 
   useEffect(() => {
     playingRef.current = playing
+    lastTime.current = null
+    schedulerRef.current?.invalidate()
   }, [playing])
 
   useEffect(() => {
-    let frame = 0
-    const tick = (now: number) => {
-      const dt = now - lastTime.current
+    const context = canvasRef.current?.getContext('2d')
+    if (!context) return
+    const document = createDocumentV2('Playground', CANVAS_W, CANVAS_H)
+    const rasters = new Map()
+    const scheduler = createPaintScheduler((now) => {
+      const dt = lastTime.current === null ? 0 : now - lastTime.current
       lastTime.current = now
       if (playingRef.current) timeRef.current += dt
-      const context = canvasRef.current?.getContext('2d')
-      if (context) {
-        const document = createDocumentV2('Playground', CANVAS_W, CANVAS_H)
-        document.layers[0].strokes = strokesRef.current
-        renderDocumentV2(context, document, timeRef.current, new Map())
-      }
-      frame = window.requestAnimationFrame(tick)
-    }
-    frame = window.requestAnimationFrame(tick)
-    return () => window.cancelAnimationFrame(frame)
+      document.layers[0].strokes = strokesRef.current
+      renderDocumentV2(context, document, timeRef.current, rasters, undefined, undefined, timeRef.current)
+      return playingRef.current ? nextDocumentFrame(document, timeRef.current, timeRef.current) : Infinity
+    }, 30)
+    schedulerRef.current = scheduler
+    const unsubscribe = onStampAssetReady(scheduler.invalidate)
+    return () => { scheduler.dispose(); unsubscribe(); releaseRenderCache(context); schedulerRef.current = null }
   }, [])
 
   const pointFromEvent = (
@@ -156,6 +174,7 @@ function BrushEditor({ brushId }: { brushId: string }) {
     drawing.current = true
     lastPoint.current = point
     const stroke = snapshotStroke(brush, [point], 'playground', randomStrokeSeed())
+    stroke.createdAt = timeRef.current
     setStrokes((current) => [...current, stroke])
     try {
       event.currentTarget.setPointerCapture(event.pointerId)
@@ -323,6 +342,7 @@ function BrushEditor({ brushId }: { brushId: string }) {
                 label="Reset animation time"
                 onClick={() => {
                   timeRef.current = 0
+                  setStrokes((current) => current.map((stroke) => ({ ...stroke, createdAt: 0 })))
                 }}
               />
               <IconButton
@@ -410,7 +430,7 @@ function BrushEditor({ brushId }: { brushId: string }) {
             </div>
             <div className="brush-help-content">
               <p>
-                Declare <code>function animate(points, config, time)</code>. It
+                Declare <code>function animate(points, config, time, age)</code>. It
                 runs once per frame and must return an array of draw items.
               </p>
               <h3>Parameters</h3>
@@ -418,6 +438,7 @@ function BrushEditor({ brushId }: { brushId: string }) {
                 <li><code>points</code>: sampled path points with x, y, pressure, tilt, velocity, and time.</li>
                 <li><code>config</code>: the complete brush snapshot, including size, color, stamps, speed, drift, and effects.</li>
                 <li><code>time</code>: continuous seconds multiplied by the brush speed. Your code decides if and how it loops.</li>
+                <li><code>age</code>: seconds since this stroke started, multiplied by speed. Use it for effects that spread or dry once. Export replays every stroke from age zero.</li>
               </ul>
               <h3>Return value</h3>
               <p>
@@ -425,7 +446,7 @@ function BrushEditor({ brushId }: { brushId: string }) {
                 <code>size</code>. Optional fields include <code>kind</code>,
                 <code>rotation</code>, <code>opacity</code>, <code>color</code>,
                 <code>stampIndex</code>, <code>blur</code>, <code>glow</code>,
-                and <code>shadow</code>.
+                <code>shadow</code>, and <code>breakBefore</code> (start a separate line contour).
               </p>
               <pre>{`function animate(points, config, time) {
   return points.map(function (point, index) {
@@ -445,9 +466,9 @@ function BrushEditor({ brushId }: { brushId: string }) {
   });
 }`}</pre>
               <p>
-                A seeded <code>rng()</code> helper and the safe <code>Math</code>
-                object are available. DOM, network, storage, and dynamic code
-                execution APIs are unavailable.
+                A seeded <code>rng()</code> helper and <code>Math</code> are
+                available. Only run brush JavaScript you trust: it runs inside
+                the app, and long-running scripts can block the interface.
               </p>
             </div>
           </section>

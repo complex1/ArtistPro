@@ -11,7 +11,10 @@ import {
 } from '../../../render/types'
 import { Button, IconButton, Select } from '../../../ui/controls'
 import type { PaintDocumentV2 } from '../core/types'
-import { renderDocumentV2, type LayerSurfaces } from '../render/engine'
+import { renderDocumentV2, releaseRenderCache, type LayerSurfaces } from '../render/engine'
+import { createPaintScheduler } from '../render/scheduler'
+import { nextDocumentFrame } from '../render/timing'
+import { onStampAssetReady } from '../render/canvas2d'
 import {
   renderPaintDocument,
   type PaintExportSettings,
@@ -81,27 +84,20 @@ export function PaintExportModal({
   }, [onClose])
 
   useEffect(() => {
-    let frame = 0
-    let startedAt: number | null = null
-    const paint = (now: number) => {
-      const canvas = previewRef.current
-      const context = canvas?.getContext('2d')
-      if (canvas && context) {
-        if (startedAt === null) startedAt = now
-        const timeMs = (now - startedAt) % (duration * 1000)
-        renderDocumentV2(
-          context,
-          paintDocument,
-          timeMs,
-          surfaces.rasters,
-          surfaces.masks,
-        )
-      }
-      frame = window.requestAnimationFrame(paint)
-    }
-    frame = window.requestAnimationFrame(paint)
-    return () => window.cancelAnimationFrame(frame)
-  }, [duration, paintDocument, surfaces])
+    const context = previewRef.current?.getContext('2d')
+    if (!context || rendering) return
+    let startedAt: number | undefined
+    const scheduler = createPaintScheduler((now) => {
+      startedAt ??= now
+      const time = (now - startedAt) % (duration * 1000)
+      renderDocumentV2(context, paintDocument, time, surfaces.rasters, surfaces.masks)
+      const next = nextDocumentFrame(paintDocument, time)
+      return Number.isFinite(next) ? Math.min(next, duration * 1000 - time) :
+        paintDocument.layers.some(layer => layer.strokes.some(stroke => stroke.brushSnapshot.animated)) ? duration * 1000 - time : Infinity
+    }, fps)
+    const unsubscribe = onStampAssetReady(scheduler.invalidate)
+    return () => { scheduler.dispose(); unsubscribe(); releaseRenderCache(context) }
+  }, [duration, paintDocument, surfaces, rendering, fps])
 
   useEffect(
     () => () => {
@@ -302,6 +298,10 @@ export function PaintExportModal({
                 GIF works everywhere but may reduce the canvas color palette.
               </p>
             )}
+
+            <p className="paint-export-note">
+              One-shot effects such as Ink Bloom replay from the start in exports.
+            </p>
 
             {error ? <p className="preview-error">{error}</p> : null}
 

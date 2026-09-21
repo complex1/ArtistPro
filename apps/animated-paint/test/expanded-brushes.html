@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Weather, light, and ink · Animated Paint</title>
+<style>
+  *{box-sizing:border-box}body{margin:0;background:#171b24;color:#eeeae1;font:15px/1.5 system-ui,sans-serif}main{max-width:1120px;margin:auto;padding:38px 24px 48px}.eyebrow{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#b7c7dc}h1{font-size:42px;line-height:1.08;letter-spacing:-1.7px;margin:10px 0 16px}header p{max-width:760px;color:#bdc4cf;margin:0}nav{display:flex;gap:10px;flex-wrap:wrap;margin:24px 0 12px}button{font:inherit;padding:10px 15px;border:1px solid #485362;border-radius:9px;color:inherit;background:#262e3b;cursor:pointer}button.primary{background:#e8c17e;border-color:transparent;color:#2b2924}button:disabled{opacity:.45;cursor:default}.transport{display:flex;align-items:center;gap:12px;font-size:12px;color:#bbc6d6;flex-wrap:wrap}.transport input{width:240px;accent-color:#e8c17e}.transport output{font-variant-numeric:tabular-nums}#status{min-height:24px;font-size:13px;margin:15px 0 20px;color:#d4dec8}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:19px}article{background:#232b37;border:1px solid #3a4658;border-radius:14px;overflow:hidden}.preview{position:relative}article canvas{display:block;width:100%;height:auto;background:#fbf7ee}.category{position:absolute;top:13px;left:15px;color:#526071;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;pointer-events:none}article section{padding:18px 20px}h2{font-size:20px;margin:0 0 7px;letter-spacing:-.35px}article p{font-size:13px;line-height:1.55;color:#c0cad6;margin:0;min-height:41px}article small{display:block;font-size:11px;color:#8ea5bb;margin-top:12px}.verification{margin-top:30px;border-top:1px solid #394455;padding-top:22px}.verification h2{font-size:18px}.verification p,footer{font-size:12px;color:#aebaca}.comparison{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}.comparison figure{margin:0;max-width:calc(50% - 7px);width:480px}.comparison canvas{display:block;width:100%;height:auto;border:1px solid #4b5669;border-radius:7px;background:repeating-conic-gradient(#eceef1 0% 25%,#fff 0% 50%) 0 0/16px 16px}.comparison figcaption{font-size:11px;color:#9fafc1;margin-top:5px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;background:#121720;color:#b8d2c0;padding:16px;border-radius:9px;max-height:440px;overflow:auto}footer{margin-top:24px;line-height:1.7}#demo-status{color:#aebaca;font-size:12px;margin:0 0 18px}@media(max-width:650px){main{padding:24px 16px}.grid{grid-template-columns:1fr}h1{font-size:32px}.comparison figure{max-width:100%}}
+</style>
+<main>
+  <header><div class="eyebrow">Animated Paint / Brush collection 04</div><h1>Weather, light, and a little loose ink.</h1><p>Eight original brushes across Particles, FX, Reveal, and Textures. Start a short preview or scrub through time. The gallery stays still until you ask it to move.</p></header>
+  <nav><button class="primary" id="play">Play 6-second preview</button><button id="pause" disabled>Pause</button><button id="run">Run checks</button><button id="demo">Open demo in editor</button></nav>
+  <div class="transport"><label for="time">Preview time</label><input id="time" type="range" min="0" max="6000" value="750" step="25"><output id="clock">0.75 s</output><span>Reveals finish and hold. Speed Taper swells along the stroke.</span></div>
+  <p id="status" role="status">Preparing brush samples…</p><p id="demo-status" role="status">The editor demo creates a new project only when clicked.</p>
+  <div class="grid" id="cards"></div>
+  <section class="verification"><h2>Finite render checks</h2><p>The checks compare a fresh default Canvas2D surface with the render worker at 0.75, 1.5, and 4 seconds, then seek backward. GPU particle drawing is disabled for exact comparison. A cold-cache PNG export checks that smoke is present in its very first frame. Finally, a 40-stroke mixed scene measures 12 render calls after one warm-up frame.</p><div class="comparison"><figure><canvas id="reference" width="480" height="250"></canvas><figcaption>Fresh main-thread Canvas2D reference</figcaption></figure><figure><canvas id="output" width="480" height="250"></canvas><figcaption>Render worker / exported transparent PNG</figcaption></figure></div><pre id="results">No checks run yet.</pre></section>
+  <footer>Rain and smoke follow your painted emission path. They do not detect other artwork or simulate fluid collisions.<br>Checks use synthetic documents and finite runs. Timings and heat depend on the device and drawing; this gallery makes no performance claim.</footer>
+</main>
+<script type="module">
+import { createDocumentV2, createLayerV2 } from '/apps/animated-paint/web/paint/v2/core/defaults.ts';
+import { getBuiltinBrush } from '/apps/animated-paint/web/paint/v2/presets.ts';
+import { snapshotStroke } from '/apps/animated-paint/web/paint/v2/input/sampler.ts';
+import { brushPreviewPoints } from '/apps/animated-paint/web/paint/v2/ui/brushPreviewPath.ts';
+import { prepareStampImages, clearStampImages } from '/apps/animated-paint/web/paint/v2/render/canvas2d.ts';
+import { renderDocumentV2, releaseRenderCache } from '/apps/animated-paint/web/paint/v2/render/engine.ts';
+import { PaintPreviewHost } from '/apps/animated-paint/web/paint/v2/render/previewHost.ts';
+import { renderPaintDocument } from '/apps/animated-paint/web/paint/v2/render/exportEngine.ts';
+import { createPaintProjectV2, savePaintProjectV2 } from '/apps/animated-paint/web/paint/v2/library.ts';
+import { unzipSync } from 'fflate';
+
+const width = 480, height = 250;
+const ids = ['rainStreaks', 'softSmoke', 'chromaticEcho', 'iridescentRibbon', 'centerBloom', 'dustReveal', 'scatteredPencil', 'speedTaper'];
+const descriptions = {
+  rainStreaks: 'Falling drops with staggered lifetimes and a gentle wind slant. Paint above a scene to make a rain curtain.',
+  softSmoke: 'Soft puffs rise, widen, drift, and disappear. A small reusable stamp creates steam and atmospheric trails.',
+  chromaticEcho: 'Colored edge copies separate and reunite, like moving print registration around the original line.',
+  iridescentRibbon: 'A traveling highlight and restrained color shifts give a flowing line a pearlescent sheen.',
+  centerBloom: 'A line grows outward from its distance midpoint toward both ends, then holds its completed shape.',
+  dustReveal: 'Loose grains gather into the drawn path, leaving a complete solid line behind as the particles disappear.',
+  scatteredPencil: 'Closely packed pencil scratches form the whole stroke. Gentle held redraws add motion without a solid center line.',
+  speedTaper: 'A thick-to-thin swell travels along the stroke as time plays. Recorded pressure and drawing speed shape its base width.',
+};
+const notes = {
+  rainStreaks: 'Continuous · bounded falling particles', softSmoke: 'Continuous · cached soft stamps',
+  chromaticEcho: 'Continuous · selected-color palette', iridescentRibbon: 'Continuous · moving highlight',
+  centerBloom: 'One shot · finishes after drawing', dustReveal: 'One shot · temporary grains settle',
+  scatteredPencil: 'Held redraws · tightly packed scratches', speedTaper: 'Continuous · traveling width swell',
+};
+const cards = document.querySelector('#cards'), status = document.querySelector('#status'), results = document.querySelector('#results');
+const play = document.querySelector('#play'), pause = document.querySelector('#pause'), run = document.querySelector('#run'), demo = document.querySelector('#demo');
+const slider = document.querySelector('#time'), clock = document.querySelector('#clock'), demoStatus = document.querySelector('#demo-status');
+const reference = document.querySelector('#reference'), output = document.querySelector('#output');
+const referenceContext = reference.getContext('2d', { willReadFrequently: true });
+const outputContext = output.getContext('2d', { willReadFrequently: true });
+const surfaces = { rasters: new Map(), masks: new Map() };
+let ready = false, checking = false, raf = 0, playing = false, started = 0, lastPaint = -Infinity, time = 750, demoProject;
+
+function assert(condition, message) { if (!condition) throw new Error(message); }
+function makeDocument(brush, background = '#fbf7ee') {
+  const doc = createDocumentV2(brush.name, width, height);
+  doc.background = background;
+  const stroke = snapshotStroke(brush, brushPreviewPoints(brush, width, height), doc.layers[0].id, 29);
+  stroke.createdAt = 0;
+  doc.layers[0].strokes = [stroke];
+  return doc;
+}
+const samples = ids.map(id => {
+  const source = getBuiltinBrush(id);
+  assert(source.id === id, `Missing brush: ${id}`);
+  const brush = { ...source, size: source.size * 1.35 };
+  const article = document.createElement('article'), preview = document.createElement('div'), canvas = document.createElement('canvas');
+  const category = document.createElement('span'), section = document.createElement('section'), title = document.createElement('h2'), description = document.createElement('p'), info = document.createElement('small');
+  preview.className = 'preview'; category.className = 'category'; category.textContent = brush.category;
+  canvas.width = width; canvas.height = height; canvas.setAttribute('aria-label', brush.name + ' preview');
+  title.textContent = brush.name; description.textContent = descriptions[id]; info.textContent = notes[id];
+  preview.append(canvas, category); section.append(title, description, info); article.append(preview, section); cards.append(article);
+  return { brush, doc: makeDocument(brush), canvas, context: canvas.getContext('2d'), info };
+});
+
+function paint(ms) {
+  time = Math.max(0, Math.min(6000, ms));
+  for (const sample of samples) {
+    const stats = renderDocumentV2(sample.context, sample.doc, time, surfaces.rasters, surfaces.masks, undefined, time);
+    sample.info.textContent = `${notes[sample.brush.id]} · ${stats.itemCount} marks`;
+  }
+  slider.value = String(time); clock.textContent = (time / 1000).toFixed(2) + ' s';
+}
+function controls() {
+  play.disabled = !ready || checking || playing;
+  pause.disabled = !playing || checking;
+  run.disabled = !ready || checking;
+  demo.disabled = !ready || checking;
+  slider.disabled = !ready || checking;
+}
+function stop() {
+  playing = false; cancelAnimationFrame(raf); raf = 0; controls();
+}
+function tick(now) {
+  if (!playing) return;
+  const elapsed = Math.min(6000, now - started);
+  if (now - lastPaint >= 1000 / 30 || elapsed === 6000) { paint(elapsed); lastPaint = now; }
+  if (elapsed === 6000) { stop(); status.textContent = 'Preview finished. Scrub time or replay to see the reveals again.'; return; }
+  raf = requestAnimationFrame(tick);
+}
+play.onclick = () => {
+  if (!ready || checking) return;
+  stop(); playing = true; started = performance.now(); lastPaint = -Infinity; controls();
+  status.textContent = 'Playing six seconds of brush motion…'; raf = requestAnimationFrame(tick);
+};
+pause.onclick = () => { stop(); status.textContent = 'Preview paused at ' + clock.textContent + '.'; };
+slider.oninput = () => { stop(); paint(Number(slider.value)); status.textContent = 'Holding the preview at ' + clock.textContent + '.'; };
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && playing) { stop(); status.textContent = 'Preview paused while this tab is hidden.'; }
+});
+window.addEventListener('pagehide', () => { stop(); for (const sample of samples) releaseRenderCache(sample.context); });
+
+function pixels(context) { return context.getImageData(0, 0, width, height).data; }
+function difference(a, b) {
+  let changedPixels = 0, maxChannelError = 0;
+  for (let i = 0; i < a.length; i += 4) {
+    let changed = false;
+    for (let channel = 0; channel < 4; channel++) {
+      const delta = Math.abs(a[i + channel] - b[i + channel]);
+      if (delta) changed = true;
+      maxChannelError = Math.max(maxChannelError, delta);
+    }
+    if (changed) changedPixels++;
+  }
+  return { changedPixels, maxChannelError };
+}
+function alphaSummary(data) {
+  let visiblePixels = 0, transparentPixels = 0, partialAlphaPixels = 0;
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] > 0) visiblePixels++; else transparentPixels++;
+    if (data[i] > 0 && data[i] < 255) partialAlphaPixels++;
+  }
+  return { visiblePixels, transparentPixels, partialAlphaPixels };
+}
+function renderReference(scene, ms) {
+  // A fresh default context avoids repeated readbacks switching the reference
+  // raster backend while the worker continues to use its default backend.
+  const surface = new OffscreenCanvas(width, height), context = surface.getContext('2d');
+  let bitmap;
+  try {
+    const stats = renderDocumentV2(context, scene, ms, surfaces.rasters, surfaces.masks, undefined, ms);
+    bitmap = surface.transferToImageBitmap();
+    referenceContext.clearRect(0, 0, width, height); referenceContext.drawImage(bitmap, 0, 0);
+    return stats;
+  } finally { bitmap?.close(); releaseRenderCache(context); surface.width = surface.height = 1; }
+}
+
+run.onclick = async () => {
+  stop(); checking = true; controls();
+  const report = { worker: [], behavior: [], export: null, load: null };
+  let host, pending, timeout, version = 0;
+  results.textContent = 'Starting finite checks…';
+  function update() { results.textContent = JSON.stringify(report, null, 2); }
+  try {
+    await prepareStampImages(samples.flatMap(sample => sample.brush.stamps));
+    // PaintPreviewHost decodes each image stamp and sends an ImageBitmap to the
+    // worker. gpu:false below selects its accurate Canvas2D path.
+    host = new PaintPreviewHost(output, {
+      invalidate() {},
+      error(message) { pending?.reject(new Error(message)); },
+      painted(stats, threaded) { pending?.resolve({ stats, threaded }); },
+    });
+    assert(host.threaded, 'The render worker is unavailable; no parity claim was made.');
+    for (const sample of samples) {
+      const scene = makeDocument(sample.brush, 'transparent'), history = new Map();
+      for (const ms of [750, 1500, 4000, 1500, 750]) {
+        const label = `${sample.brush.name} at ${(ms / 1000).toFixed(2)}s${history.has(ms) ? ' backward seek' : ''}`;
+        status.textContent = `Checking ${label}…`;
+        const stats = renderReference(scene, ms);
+        assert(!stats.diagnostics.some(item => item.code === 'animate-error'), `${label}: main-thread recipe failed`);
+        const expected = pixels(referenceContext);
+        assert(alphaSummary(expected).visiblePixels > 0, `${label}: reference rendered no visible ink`);
+        if (history.has(ms)) assert(difference(history.get(ms), expected).maxChannelError === 0, `${label}: reference depends on playback history`);
+        else history.set(ms, expected);
+        const waiting = new Promise((resolve, reject) => {
+          pending = { resolve, reject };
+          timeout = setTimeout(() => reject(new Error(`Timed out: ${label}`)), 11000);
+        });
+        host.request({ document: scene, surfaces, time: ms, now: ms, version: ++version, gpu: false });
+        const response = await waiting;
+        clearTimeout(timeout); timeout = undefined; pending = null;
+        assert(response.threaded, `${label}: worker fell back to the main thread`);
+        assert(!response.stats.diagnostics.some(item => item.code === 'animate-error'), `${label}: worker recipe failed`);
+        const comparison = difference(expected, pixels(outputContext));
+        report.worker.push({ case: label, result: comparison.maxChannelError === 0 ? 'PASS' : 'FAIL', marks: stats.itemCount, ...comparison });
+        update();
+        assert(comparison.maxChannelError === 0, `${label}: worker pixels differ (${comparison.changedPixels} pixels, max channel error ${comparison.maxChannelError})`);
+      }
+      const changed = difference(history.get(750), history.get(1500)).changedPixels;
+      assert(changed > 0, `${sample.brush.name}: unexpected motion behavior`);
+      if (sample.brush.id === 'centerBloom' || sample.brush.id === 'dustReveal') {
+        renderReference(scene, 6000);
+        assert(difference(history.get(4000), pixels(referenceContext)).maxChannelError === 0, `${sample.brush.name}: completed reveal did not hold`);
+      }
+      report.behavior.push({ brush: sample.brush.name, result: 'PASS', changedPixelsBetween750And1500ms: changed,
+        ...(sample.brush.id === 'centerBloom' || sample.brush.id === 'dustReveal' ? { completedFrameHolds: true } : {}) });
+      update();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    host.dispose(); host = undefined;
+
+    status.textContent = 'Exporting smoke from an empty image cache…';
+    const smoke = samples.find(sample => sample.brush.id === 'softSmoke');
+    const exportScene = makeDocument(smoke.brush, 'transparent');
+    clearStampImages();
+    // Do not prepare assets here: the exporter must load the smoke before its
+    // first frame, with no earlier preview render to populate its cache.
+    const artifact = await renderPaintDocument(exportScene, surfaces, { format: 'image-sequence', fps: 12, duration: 0.25 });
+    const entries = unzipSync(new Uint8Array(await artifact.blob.arrayBuffer()));
+    const files = Object.keys(entries).filter(name => name.endsWith('.png')).sort();
+    assert(files.length === 3, `Expected 3 PNG frames; received ${files.length}`);
+    const comparisons = [];
+    for (const index of [0, 2, 0]) {
+      const bitmap = await createImageBitmap(new Blob([entries[files[index]]], { type: 'image/png' }));
+      try { outputContext.clearRect(0, 0, width, height); outputContext.drawImage(bitmap, 0, 0); }
+      finally { bitmap.close(); }
+      const actual = pixels(outputContext), alpha = alphaSummary(actual);
+      assert(alpha.visiblePixels > 100, `Smoke export frame ${index} is blank or missing its image stamp`);
+      assert(alpha.transparentPixels > 100 && alpha.partialAlphaPixels > 100, `Smoke export frame ${index} lost transparency or softness`);
+      renderReference(exportScene, index / 12 * 1000);
+      const comparison = difference(pixels(referenceContext), actual);
+      comparisons.push({ frame: index, ...comparison, ...alpha });
+      assert(comparison.maxChannelError === 0, `PNG frame ${index} differs from reference: ${JSON.stringify(comparison)}`);
+    }
+    report.export = { result: 'PASS', format: 'transparent PNG sequence', frames: files.length,
+      coldCacheFirstFrameSmokeVisible: true, comparisons };
+    update();
+
+    status.textContent = 'Preparing the finite 40-stroke mixed load check…';
+    const loadScene = createDocumentV2('Synthetic mixed brush load', 960, 600);
+    loadScene.background = '#fbf7ee';
+    loadScene.layers = ids.map((id, index) => {
+      // Five overlapping gestures in each tile exercise compositing while
+      // keeping weather's normal travel distance within the document.
+      const brush = getBuiltinBrush(id), layer = createLayerV2(brush.name);
+      layer.strokes = Array.from({ length: 5 }, (_, copy) => {
+        const points = brushPreviewPoints(brush, 440, 120).map(point => ({ ...point,
+          x: point.x + 20 + index % 2 * 480 + copy * 3,
+          y: point.y + 18 + Math.floor(index / 2) * 145 + copy * 2,
+        }));
+        const stroke = snapshotStroke(brush, points, layer.id, 29 + index * 53 + copy * 17);
+        stroke.createdAt = 0;
+        return stroke;
+      });
+      return layer;
+    });
+    loadScene.activeLayerId = loadScene.layers[0].id;
+    const loadSurface = new OffscreenCanvas(960, 600), loadContext = loadSurface.getContext('2d');
+    const round = value => Math.round(value * 100) / 100;
+    const describeStats = (stats, ms) => ({ timeSeconds: ms / 1000,
+      totalMs: round(stats.totalMs), animationMs: round(stats.animationMs),
+      reusedStrokes: stats.reusedStrokes, itemCount: stats.itemCount,
+    });
+    const durations = [750, 1000, 1250, 1500, 1750, 2000, 2250, 2500, 3000, 3500, 4000, 4500];
+    const measured = [];
+    try {
+      await prepareStampImages(loadScene.layers.flatMap(layer => layer.strokes.flatMap(stroke => stroke.brushSnapshot.stamps)));
+      const warmup = renderDocumentV2(loadContext, loadScene, 500, surfaces.rasters, surfaces.masks, undefined, 500);
+      assert(warmup.strokeCount === 40, `Load check expected 40 strokes; received ${warmup.strokeCount}`);
+      assert(!warmup.diagnostics.some(item => item.code === 'animate-error'), 'Load check warm-up recipe failed');
+      report.load = { result: 'RUNNING', scene: { width: 960, height: 600, strokes: 40, strokesPerBrush: 5, settings: 'Built-in defaults' },
+        measurement: 'Main-thread render-call time on default OffscreenCanvas2D. Excludes GPU completion; not a sustained frame-rate or thermal measurement.',
+        warmup: describeStats(warmup, 500), frames: [], summary: null };
+      update();
+      for (let index = 0; index < durations.length; index++) {
+        await new Promise(resolve => setTimeout(resolve, 0));
+        const ms = durations[index];
+        status.textContent = `Measuring mixed load frame ${index + 1} of ${durations.length} (40 strokes)…`;
+        const stats = renderDocumentV2(loadContext, loadScene, ms, surfaces.rasters, surfaces.masks, undefined, ms);
+        assert(stats.strokeCount === 40 && stats.itemCount > 0, 'Load check lost a stroke or rendered an empty frame');
+        assert(!stats.diagnostics.some(item => item.code === 'animate-error'), `Load check recipe failed at ${ms}ms`);
+        measured.push(stats);
+        report.load.frames.push(describeStats(stats, ms));
+        update();
+      }
+      const mean = key => measured.reduce((sum, frame) => sum + frame[key], 0) / measured.length;
+      const worst = key => Math.max(...measured.map(frame => frame[key]));
+      report.load.summary = { measuredFrames: measured.length,
+        averageTotalMs: round(mean('totalMs')), worstTotalMs: round(worst('totalMs')),
+        averageAnimationMs: round(mean('animationMs')), worstAnimationMs: round(worst('animationMs')),
+        averageReusedStrokes: round(mean('reusedStrokes')), maximumReusedStrokes: worst('reusedStrokes'),
+        averageItemCount: round(mean('itemCount')), maximumItemCount: worst('itemCount'),
+      };
+      report.load.result = 'PASS';
+    } finally { releaseRenderCache(loadContext); loadSurface.width = loadSurface.height = 1; }
+    update();
+    status.textContent = `PASS — ${report.worker.length} exact worker checks, ${report.behavior.length} brush behavior checks, cold-cache smoke export, and 12 finite mixed-load frames.`;
+  } catch (error) {
+    report.error = error instanceof Error ? error.message : String(error); update();
+    status.textContent = 'FAIL — ' + report.error;
+  } finally {
+    clearTimeout(timeout); pending = null; host?.dispose();
+    releaseRenderCache(referenceContext); releaseRenderCache(outputContext);
+    checking = false; controls();
+    try { await prepareStampImages(samples.flatMap(sample => sample.brush.stamps)); paint(time); }
+    catch (error) { status.textContent += ' Gallery reload: ' + (error instanceof Error ? error.message : String(error)); }
+  }
+};
+
+demo.onclick = async () => {
+  stop(); demo.disabled = true; demoStatus.textContent = 'Creating a new eight-layer brush demo…';
+  try {
+    demoProject ??= await createPaintProjectV2('Weather, light, and ink', 1000, 1100);
+    const layers = samples.map((sample, index) => {
+      const layer = createLayerV2(sample.brush.name);
+      const offsetX = index % 2 * 500 + 10, offsetY = Math.floor(index / 2) * 270 + 10;
+      const points = brushPreviewPoints(sample.brush, width, height).map(point => ({ ...point, x: point.x + offsetX, y: point.y + offsetY }));
+      layer.strokes = [snapshotStroke(sample.brush, points, layer.id, 29)];
+      return layer;
+    });
+    demoProject = await savePaintProjectV2({ ...demoProject, updatedAt: Date.now(), document: {
+      ...demoProject.document, background: '#fbf7ee', layers, activeLayerId: layers[0].id,
+    } });
+    demoStatus.textContent = 'Demo saved. Opening the editor…';
+    window.location.assign(`/#/paint/${encodeURIComponent(demoProject.id)}`);
+  } catch (error) {
+    demoStatus.textContent = 'Could not create demo: ' + (error instanceof Error ? error.message : String(error));
+    demo.disabled = false;
+  }
+};
+
+controls();
+try {
+  await prepareStampImages(samples.flatMap(sample => sample.brush.stamps));
+  ready = true; paint(750); controls();
+  status.textContent = 'Ready. Samples are held at 0.75 seconds; playback starts only when requested.';
+} catch (error) { status.textContent = 'Could not prepare brush previews: ' + (error instanceof Error ? error.message : String(error)); }
+</script>
+</html>

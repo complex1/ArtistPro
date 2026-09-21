@@ -55,9 +55,16 @@ export function resampleStroke(
   spacing: number,
   maxPoints = DEFAULT_BUDGETS.maxSampledPoints,
 ): StrokePointV2[] {
-  if (points.length === 0) return []
-  if (points.length === 1) return [points[0]]
-  const gap = Math.max(0.5, spacing)
+  const limit = Math.max(0, Math.floor(maxPoints))
+  if (points.length === 0 || limit === 0) return []
+  if (points.length === 1 || limit === 1) return [points[0]]
+  let totalLength = 0
+  for (let index = 1; index < points.length; index += 1) {
+    totalLength += Math.hypot(points[index].x - points[index - 1].x, points[index].y - points[index - 1].y)
+  }
+  // Increase spacing when needed instead of spending the budget on the front
+  // of a long stroke. Reserve one slot for its exact final point and dynamics.
+  const gap = Math.max(0.5, spacing, totalLength / (limit - 1))
   const result: StrokePointV2[] = [points[0]]
   let carry = 0
 
@@ -69,7 +76,7 @@ export function resampleStroke(
     const length = Math.hypot(dx, dy)
     if (length === 0) continue
     let traveled = gap - carry
-    while (traveled <= length && result.length < maxPoints) {
+    while (traveled <= length && result.length < limit - 1) {
       const amount = traveled / length
       result.push({
         x: start.x + dx * amount,
@@ -84,9 +91,16 @@ export function resampleStroke(
       traveled += gap
     }
     carry = length - (traveled - gap)
-    if (result.length >= maxPoints) break
+    if (result.length >= limit - 1) break
   }
 
+  const last = points[points.length - 1]
+  const sampledLast = result[result.length - 1]
+  if (result.length > 1 && Math.hypot(sampledLast.x - last.x, sampledLast.y - last.y) < 1e-9) {
+    result[result.length - 1] = last
+  } else {
+    result.push(last)
+  }
   return result
 }
 

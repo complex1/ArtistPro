@@ -19,57 +19,17 @@ import {
   saveCustomBrush,
 } from '../brushLibrary'
 import { importBrushJson } from '../brushTransfer'
-import { createBrushV2, createDocumentV2, emptyPoint } from '../core/defaults'
+import { createBrushV2 } from '../core/defaults'
 import type { BrushV2 } from '../core/types'
-import { snapshotStroke } from '../input/sampler'
-import { renderDocumentV2 } from '../render/engine'
-
-const PREVIEW_WIDTH = 240
-const PREVIEW_HEIGHT = 128
-
-function BrushCardPreview({ brush }: { brush: BrushV2 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-
-  useEffect(() => {
-    const document = createDocumentV2('Preview', PREVIEW_WIDTH, PREVIEW_HEIGHT)
-    document.background = '#ffffff'
-    document.layers[0].strokes = [
-      snapshotStroke(
-        brush,
-        [
-          emptyPoint(28, 78),
-          emptyPoint(62, 48),
-          emptyPoint(104, 82),
-          emptyPoint(150, 44),
-          emptyPoint(212, 70),
-        ],
-        document.layers[0].id,
-      ),
-    ]
-    let frame = 0
-    const paint = (time: number) => {
-      const context = canvasRef.current?.getContext('2d')
-      if (context) renderDocumentV2(context, document, time, new Map())
-      frame = window.requestAnimationFrame(paint)
-    }
-    frame = window.requestAnimationFrame(paint)
-    return () => window.cancelAnimationFrame(frame)
-  }, [brush])
-
-  return (
-    <canvas
-      ref={canvasRef}
-      width={PREVIEW_WIDTH}
-      height={PREVIEW_HEIGHT}
-      aria-hidden="true"
-    />
-  )
-}
+import { BrushPreview } from '../ui/BrushPreview'
 
 export function BrushLibraryPage() {
   const importRef = useRef<HTMLInputElement>(null)
   const [brushes, setBrushes] = useState<BrushV2[]>([])
   const [openMenu, setOpenMenu] = useState<string | null>(null)
+  const [hoveredBrush, setHoveredBrush] = useState<string | null>(null)
+  const [focusedBrush, setFocusedBrush] = useState<string | null>(null)
+  const activePreview = hoveredBrush ?? focusedBrush
   const [lastProject, setLastProject] = useState<
     Awaited<ReturnType<typeof lastPaintProjectV2>>
   >()
@@ -177,7 +137,7 @@ export function BrushLibraryPage() {
           <div>
             <p className="studio-kicker">Brush library</p>
             <h1>Build and manage brushes</h1>
-            <p>Open a brush to tune its mark and animation code.</p>
+            <p>Hover to preview motion. Open a brush to tune its mark and animation code.</p>
           </div>
           <span>{brushes.length} brushes</span>
         </div>
@@ -194,14 +154,27 @@ export function BrushLibraryPage() {
           </button>
 
           {brushes.map((brush) => (
-            <article className="brush-card" key={brush.id}>
+            <article
+              className="brush-card"
+              key={brush.id}
+              onMouseEnter={() => setHoveredBrush(brush.id)}
+              onMouseLeave={() => setHoveredBrush((current) => current === brush.id ? null : current)}
+              onFocus={(event) => {
+                if (event.target instanceof HTMLElement && event.target.matches(':focus-visible')) setFocusedBrush(brush.id)
+              }}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  setFocusedBrush((current) => current === brush.id ? null : current)
+                }
+              }}
+            >
               <button
                 type="button"
                 className="brush-card-preview"
                 onClick={() => edit(brush)}
                 aria-label={`Edit ${brush.name}`}
               >
-                <BrushCardPreview brush={brush} />
+                <BrushPreview brush={brush} active={activePreview === brush.id} />
               </button>
               <div className="brush-card-meta">
                 <div>

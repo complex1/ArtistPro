@@ -7,11 +7,14 @@ type Call = { op: string; args: number[] }
 
 function stubContext() {
   const calls: Call[] = []
+  const alphas: number[] = []
+  const savedAlpha: number[] = []
   const record = (op: string) => (...args: number[]) => {
     calls.push({ op, args })
   }
   const context = {
     calls,
+    alphas,
     globalAlpha: 1,
     lineWidth: 0,
     lineCap: '',
@@ -24,8 +27,8 @@ function stubContext() {
     shadowOffsetX: 0,
     shadowOffsetY: 0,
     widths: [] as number[],
-    save: record('save'),
-    restore: record('restore'),
+    save() { savedAlpha.push(context.globalAlpha) },
+    restore() { context.globalAlpha = savedAlpha.pop()! },
     translate: record('translate'),
     rotate: record('rotate'),
     scale: record('scale'),
@@ -35,11 +38,15 @@ function stubContext() {
     lineTo: record('lineTo'),
     arc: record('arc'),
     bezierCurveTo: record('bezierCurveTo'),
-    fill: record('fill'),
+    fill() {
+      calls.push({ op: 'fill', args: [] })
+      alphas.push(context.globalAlpha)
+    },
     drawImage: record('drawImage'),
     stroke() {
       calls.push({ op: 'stroke', args: [] })
       context.widths.push(context.lineWidth)
+      alphas.push(context.globalAlpha)
     },
   }
   return context
@@ -63,6 +70,29 @@ function item(overrides: Partial<DrawItem>): DrawItem {
 }
 
 describe('canvas2d renderer', () => {
+  it('starts a separate contour without drawing a connector', () => {
+    const context = stubContext()
+    canvas2dRenderer.paint(context as unknown as CanvasRenderingContext2D, [
+      item({ kind: 'segment', x: 0 }),
+      item({ kind: 'segment', x: 10 }),
+      item({ kind: 'segment', x: 100, breakBefore: true }),
+      item({ kind: 'segment', x: 110 }),
+    ], ['dot'])
+    expect(context.calls.filter((call) => call.op === 'moveTo').map((call) => call.args)).toEqual([[0, 0], [100, 0]])
+    expect(context.calls.filter((call) => call.op === 'lineTo').map((call) => call.args)).toEqual([[10, 0], [110, 0]])
+  })
+
+  it.each(['stamp', 'segment'] as const)('preserves parent alpha for %s marks', (kind) => {
+    const context = stubContext()
+    context.globalAlpha = 0.2
+    canvas2dRenderer.paint(context as unknown as CanvasRenderingContext2D, [
+      item({ kind, opacity: 0.5 }), item({ kind, opacity: 0.5, x: 10 }),
+      item({ kind, opacity: 0.5, x: 20 }),
+    ], ['dot'])
+    expect(context.alphas.every((alpha) => alpha === 0.1)).toBe(true)
+    expect(context.globalAlpha).toBe(0.2)
+  })
+
   it('strokes connected segments instead of stamping dots', () => {
     const context = stubContext()
     canvas2dRenderer.paint(

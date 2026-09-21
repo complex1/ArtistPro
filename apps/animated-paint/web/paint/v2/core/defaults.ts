@@ -1,6 +1,7 @@
 import type {
   BlendModeV2,
   BrushV2,
+  ImageLayerV2Data,
   LayerV2,
   PaintDocumentV2,
   ParticleConfig,
@@ -85,6 +86,8 @@ export function createBrushV2(partial: Partial<BrushV2> = {}): BrushV2 {
     preview: partial.preview,
     renderer: partial.renderer ?? 'stamp',
     animated: partial.animated ?? false,
+    closedPath: (partial.closedPath ?? false) || (partial.fill?.enabled ?? false),
+    fill: { enabled: false, outline: true, ...partial.fill },
     size: partial.size ?? 12,
     color: partial.color ?? '#111111',
     opacity: partial.opacity ?? 1,
@@ -106,6 +109,7 @@ export function createBrushV2(partial: Partial<BrushV2> = {}): BrushV2 {
     speed: partial.speed ?? 1,
     seed: partial.seed ?? 1,
     animationJs: partial.animationJs ?? STATIC_ANIMATION_JS,
+    animationTiming: partial.animationTiming,
     legacy: partial.legacy,
   }
 }
@@ -122,6 +126,7 @@ export function createLayerV2(name = 'Layer 1'): LayerV2 {
   return {
     id: crypto.randomUUID(),
     name,
+    kind: 'drawing',
     visible: true,
     opacity: 1,
     blendMode: 'source-over',
@@ -129,6 +134,10 @@ export function createLayerV2(name = 'Layer 1'): LayerV2 {
     eraseMaskDataUrl: null,
     strokes: [],
   }
+}
+
+export function createImageLayerV2(name: string, image: ImageLayerV2Data): LayerV2 {
+  return { ...createLayerV2(name), kind: 'image', image: { ...image } }
 }
 
 export function createDocumentV2(

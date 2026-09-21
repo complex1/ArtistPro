@@ -4013,9 +4013,10 @@ body.is-scrubbing { cursor: ew-resize; user-select: none; }
 
 .brush-preview-canvas {
   display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: center;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   padding: 16px;
   background:
     radial-gradient(circle, rgb(255 255 255 / 5%) 1px, transparent 1px)
@@ -4024,8 +4025,9 @@ body.is-scrubbing { cursor: ew-resize; user-select: none; }
 }
 
 .brush-preview-canvas canvas {
-  width: min(100%, 640px);
+  width: auto;
   height: auto;
+  max-width: 100%;
   max-height: 100%;
   border: 1px solid var(--border);
   border-radius: 10px;

@@ -11,10 +11,12 @@ import { canvas2dRenderer } from './canvas2d'
 function contextStub() {
   const composites: string[] = []
   const drawn: unknown[] = []
+  const drawAlphas: number[] = []
   return {
     canvas: { tag: 'scratch' },
     composites,
     drawn,
+    drawAlphas,
     globalAlpha: 1,
     fillStyle: '',
     get globalCompositeOperation() {
@@ -30,11 +32,62 @@ function contextStub() {
     clearRect() {},
     drawImage(source: unknown) {
       drawn.push(source)
+      drawAlphas.push(this.globalAlpha)
     },
   }
 }
 
 describe('v2 canvas renderer contracts', () => {
+  it('passes a separate stroke age and scales it with speed', () => {
+    const stroke = snapshotStroke(createBrushV2({
+      animated: true, speed: 2,
+      animationJs: 'function animate(points, config, time, age) { return [{ x: time, y: age }]; }',
+    }), [emptyPoint(0, 0)], 'layer')
+    expect(strokeFrame(stroke, 90000, 500).items[0]).toMatchObject({ x: 180, y: 1 })
+    expect(strokeFrame(stroke, 90000, -500).items[0].y).toBe(0)
+    expect(strokeFrame(stroke, 1000).items[0]).toMatchObject({ x: 2, y: 2 })
+  })
+
+  it('uses creation time live, and replays strokes from zero for export', () => {
+    const document = createDocumentV2()
+    const layer = document.layers[0]
+    const brush = createBrushV2({ animated: true,
+      animationJs: 'function animate(points, config, time, age) { return [{ x: age, y: 0 }]; }',
+    })
+    layer.strokes = [snapshotStroke(brush, [emptyPoint(0, 0)], layer.id)]
+    layer.strokes[0].createdAt = 100000
+    const painted: number[] = []
+    const renderer = { paint: (_context: CanvasRenderingContext2D, items: DrawItem[]) => { painted.push(items[0].x) } }
+    const context = contextStub() as unknown as CanvasRenderingContext2D
+    renderDocumentV2(context, document, 9000, new Map(), undefined, renderer, 100500)
+    renderDocumentV2(context, document, 0, new Map(), undefined, renderer)
+    renderDocumentV2(context, document, 500, new Map(), undefined, renderer)
+    expect(painted).toEqual([0.5, 0, 0.5])
+  })
+
+  it('fades an unmasked layer once after painting all its grain', () => {
+    const document = createDocumentV2()
+    const layer = document.layers[0]
+    layer.opacity = 0.2
+    layer.strokes = [snapshotStroke(createBrushV2(), [emptyPoint(0, 0)], layer.id)]
+    const page = contextStub()
+    const scratch = contextStub()
+    const originalDocument = globalThis.document
+    Object.defineProperty(globalThis, 'document', { configurable: true,
+      value: { createElement: () => ({ getContext: () => scratch }) },
+    })
+    const alphas: number[] = []
+    try {
+      renderDocumentV2(page as unknown as CanvasRenderingContext2D, document, 0, new Map(), undefined,
+        { paint: (context) => { alphas.push(context.globalAlpha) } })
+    } finally {
+      Object.defineProperty(globalThis, 'document', { configurable: true, value: originalDocument })
+    }
+    expect(alphas).toEqual([1])
+    expect(page.drawn).toContain(scratch.canvas)
+    expect(page.drawAlphas).toEqual([0.2])
+  })
+
   it('emits packed draw commands for a static stroke', () => {
     const brush = createBrushV2({ renderer: 'stamp', spacing: 8, size: 6 })
     const stroke = snapshotStroke(

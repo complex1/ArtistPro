@@ -1,0 +1,13 @@
+.paint-layer-add-menu { position: fixed; inset: 50% auto auto 50%; transform: translate(-50%, -50%); margin: 0; width: 270px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; color: var(--text); background: var(--panel); box-shadow: 0 8px 30px #0005; display: grid; gap: 5px; }
+.paint-layer-add-menu:not([open]) { display: none; }
+.paint-layer-add-menu::backdrop { background: #0006; }
+.paint-layer-add-menu h3 { margin: 0 0 6px; font-size: 14px; }
+.paint-layer-add-menu button { display: flex; gap: 9px; align-items: center; border: 0; border-radius: 5px; background: transparent; color: var(--text); padding: 10px; text-align: left; font: inherit; font-size: 12px; cursor: pointer; }
+.paint-layer-add-menu button:hover, .paint-layer-add-menu button:focus-visible { background: var(--control); outline: 1px solid var(--accent); }
+.paint-image-controls { display: grid; gap: 12px; padding: 12px; }
+.paint-image-controls p { color: var(--text-muted); font-size: 11px; line-height: 1.6; margin: 0; }
+.paint-image-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.paint-image-fields label { display: grid; gap: 5px; color: var(--text-muted); font-size: 10px; }
+.paint-image-fields input { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 4px; padding: 7px; background: var(--control); color: var(--text); font: inherit; font-size: 12px; }
+.paint-image-notice, .paint-image-error { position: fixed; bottom: 18px; left: 50%; z-index: 30; transform: translateX(-50%); border: 1px solid var(--border); border-radius: 6px; background: var(--panel); padding: 10px 14px; margin: 0; color: var(--text-muted); font-size: 12px; }
+.paint-image-error { color: #df746c; }

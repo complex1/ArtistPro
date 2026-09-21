@@ -97,8 +97,11 @@ Values below are **as stored in the file** (not the 0–100 labels in some slide
 | `name` | string | `"Untitled brush"` | — | Display name. |
 | `category` | string | `"Custom"` | — | Library grouping. Reset to `"Custom"` on import. |
 | `preview` | string | omitted | — | Optional preview data URL. Unused by import itself. |
-| `renderer` | string | `"stamp"` | `stamp`, `line`, `ribbon`, `particle` | How draw items are painted. If `renderer` is `stamp` or `particle`, `segment` items are converted to stamps/particles before paint. |
+| `renderer` | string | `"stamp"` | `stamp`, `line`, `ribbon`, `particle` | How static draw items are built. A `stamp` renderer also converts animated `segment` items to stamps before paint. Other renderers preserve the animation's item kinds. |
 | `animated` | boolean | `false` | — | `false`: engine builds a static draw list from the path. `true`: `animationJs` runs every frame. |
+| `closedPath` | boolean | `false` | supported brushes only | Connect the last point back to the first, with continuous motion around the join. |
+| `fill.enabled` | boolean | `false` | supported brushes only | Fill the closed interior. Enabling fill also enables `closedPath`. |
+| `fill.outline` | boolean | `true` | — | Keep the brush border when filling. |
 | `size` | number | `12` | 0.5–400 | Mark size in pixels. |
 | `color` | string | `"#111111"` | — | Fill / stroke color. `#RRGGBB` or any canvas color string (e.g. `hsl(...)`). |
 | `opacity` | number | `1` | 0–1 | Base opacity. |
@@ -138,6 +141,25 @@ Values below are **as stored in the file** (not the 0–100 labels in some slide
 | `color` | `"#000000"` | string |
 | `opacity` | `0` | 0–1 |
 
+## Closed paths and fills
+
+In the brush inspector, enable **Closed path** to join the ends, or **Fill enabled** to close and fill together. **Show outline** controls the border independently. These settings work for new strokes and for an existing stroke selected in the editor. Filled interiors can be clicked with Select, including textured gaps. Opening the path disables its fill.
+
+The initial supported brushes are **Round, Flat Marker, Wiggle, Wave, Line Boil, Textured Boil, and Graphite Crawl**. Static line/ribbon brushes use a solid color fill. The animated line brushes use periodic closed-loop variants of their motion, so the join has no disconnected endpoints. Textured Boil and Graphite Crawl use seeded texture tiles clipped to the animated contour, with transparent grain gaps and the brush color. Texture tiles are bounded to 96×96 pixels and held at the recipe's frame rate; their grain-generation cost does not grow with the filled area.
+
+Support for animated brushes is matched against the exact built-in animation source and renderer, not the brush id. Copies and exported/imported versions retain support. Editing the animation source, switching to an unsupported renderer, or replacing a texture brush's original dot stamp disables these controls; arbitrary particle and multi-contour scripts are not inferred as filled polygons. The original open-stroke behavior remains available for all brushes.
+
+```json
+{
+  "renderer": "line",
+  "animated": false,
+  "closedPath": true,
+  "fill": { "enabled": true, "outline": false }
+}
+```
+
+Self-crossing shapes use the even-odd fill rule. Fewer than three non-collinear points fall back to a normal visible stroke. Existing brush files without these fields remain open and unfilled. Saving projects, brush export/import, undo/redo, worker preview, and image/video export all use the same settings. Browser software and accelerated canvas backends can differ in edge antialiasing.
+
 ## Stamps
 
 `stamps` is an array of strings. The renderer picks `stamps[stampIndex]`.
@@ -161,7 +183,7 @@ For stamp-looking marks, set `"renderer": "stamp"` (or `"particle"`). If animati
 When `animated` is `true`, every frame the engine:
 
 1. Resamples the stroke with `spacing` and `scatter`.
-2. Calls `animate(points, config, time)`.
+2. Calls `animate(points, config, time, age)` (the fourth argument is optional for existing scripts).
 3. Validates the return value into a draw list (max **12_000** items).
 4. Applies renderer kind, `stampsPerPoint`, `rotationDegrees`, `drift`, and `distortion`.
 5. Paints with Canvas2D.
@@ -171,7 +193,7 @@ If `animate` throws, the last good draw list is reused (or a static fallback).
 ### Signature
 
 ```js
-function animate(points, config, time) {
+function animate(points, config, time, age) {
   return items;
 }
 ```
@@ -183,6 +205,9 @@ The name **must** be `animate`. Arrow functions assigned to another name will fa
 | `points` | Sampled path. Each point: `x`, `y`, `t`, `pressure` (0–1), `tiltX`, `tiltY`, `altitude`, `velocity`. |
 | `config` | Full brush snapshot (same fields as this file). Use `config.size`, `config.color`, `config.stamps`, `config.particle`, etc. |
 | `time` | Continuous seconds × `config.speed`. Not wrapped. Loop yourself, e.g. `var progress = time % 1`. |
+| `age` | Seconds since this stroke started × `config.speed`, clamped to zero. Live strokes use their saved creation time; Playground uses its pausable preview clock. Export and export preview replay all strokes from age zero. |
+
+For a one-shot drying effect, use `Math.min(1, age / 3)`. For ink that dries separately at each point, subtract `(p.t - points[0].t) * config.speed` from `age` first and clamp to zero. Reset animation time in the Playground restarts every preview stroke together. Library cards replay one-shot effects every six seconds.
 
 Also in scope (not parameters):
 
@@ -190,9 +215,9 @@ Also in scope (not parameters):
 - `seed` — numeric seed for this stroke. Every stroke drawn on the canvas or in the playground gets its own random seed, saved with the stroke, so hashing `seed` is how a script varies one stroke from the next without ever changing what an existing stroke looks like. Previews and tests pass a fixed seed instead.
 - `Math` — standard Math.
 
-### Sandbox
+### Runtime and trust
 
-Animation JS cannot use `window`, `document`, `fetch`, `Worker`, `importScripts`, `localStorage`, `sessionStorage`, `indexedDB`, `XMLHttpRequest`, `Function`, or `eval`. Stay in pure number/string/array work. Budget is about **24ms** per stroke per frame; over budget still draws but is flagged.
+Animation JavaScript runs synchronously in the app. A few global names are shadowed, but this is **not a security sandbox**: globals and dynamic code remain reachable. Only import scripts you trust, and keep animation code to pure number/string/array work. The **24ms** budget reports overruns after execution; it cannot interrupt a stuck script. Compiled functions are cached in a bounded cache, with fresh script-local variables and seeded randomness for every frame.
 
 Use classic `function` / `var` if you want the same style as built-in brushes. ES5 is enough.
 
@@ -205,6 +230,7 @@ Return an **array**. Each item needs numeric `x` and `y`. Invalid entries are dr
 | `x`, `y` | yes | — | Position. |
 | `size` | no | `8` | 0.25–400. |
 | `kind` | no | `"stamp"` | `stamp`, `segment`, or `particle`. `segment` strokes as a polyline between consecutive segment items. |
+| `breakBefore` | no | `false` | Set `true` on the first segment of each separate contour to avoid connecting it to the previous contour. Preserved through draw-list packing. |
 | `rotation` | no | `0` | Radians. |
 | `opacity` | no | `1` | 0–1. |
 | `color` | no | `"#111111"` | |
@@ -272,11 +298,25 @@ The `textureBoil` built-in (**Textured Boil**, Texture) combines this with the b
 
 **Empty list** — nothing is drawn for that frame. For a static brush, set `"animated": false` and omit custom JS.
 
+### Organic brush recipes
+
+The **Organic** category contains five self-contained scripts in `organicPresets.ts`. Each recipe respects size, color, opacity, speed, and pressure, uses seeded randomness, and limits its output to 12,000 items while covering the full sampled path.
+
+| Brush | Behavior | Starting point for customization |
+| --- | --- | --- |
+| Dry Bristle | Six narrow ink trails with fixed dry gaps and gently flexing bristles. | Change the coverage threshold and flex amplitude. |
+| Graphite Crawl | Dense pencil grain with small redraws at 7 fps. | Change grain spread and redraw rate. |
+| Breathing Ink | An anchored core surrounded by slowly breathing feathered edges. | Change edge reach and breathing amplitude. |
+| Ink Bloom | Ink spreads for three seconds per point, then stays dry. | Change the drying duration and pooling width; uses `age`. |
+| Sketch Echo | A steady primary contour with a faint secondary contour redrawn at 6 fps. | Change echo distance and opacity; uses `breakBefore`. |
+
+These are procedural marks, with no image downloads or extra assets. They can be duplicated, edited, exported, and imported like other brushes. Layer opacity fades the completed layer as a group so overlapping grain retains its texture.
+
 ## After `animate`: engine dynamics
 
 These run on the draw list even if you did not mention them in JS:
 
-- **Renderer kind** — stamp/particle brushes force non-segment kinds so images and named stamps actually paint.
+- **Renderer kind** — stamp brushes convert segment items to stamps so images and named stamps actually paint.
 - **Stamps per point** — duplicates stamp/particle items and cycles stamp indices.
 - **Angle** — adds `rotationDegrees` (converted to radians).
 - **Drift** — `x += cos(elapsed + phase) * drift`, same for `y` with `sin`.
@@ -301,7 +341,7 @@ So a file can animate in JS **and** still use speed / drift / distortion sliders
 3. Recipient: Playground → **Import brush** (or editor **Import**).
 4. They get a Custom copy; they can rename and save.
 
-Imported brushes live in the same local brush library as editor-created ones (`localStorage`). They are available in the main Animated Paint canvas brush list after save.
+Imported brushes live in the same app brush library as editor-created ones, saved through the local API. Older `localStorage` libraries are migrated automatically. Brushes are available in the main Animated Paint canvas brush list after save.
 
 ## Related code
 
@@ -311,5 +351,15 @@ Imported brushes live in the same local brush library as editor-created ones (`l
 | Validation and clamps | `apps/animated-paint/web/paint/v2/core/schema.ts` |
 | Defaults | `apps/animated-paint/web/paint/v2/core/defaults.ts` |
 | Built-in animation examples | `apps/animated-paint/web/paint/v2/presets.ts` |
-| Sandbox | `apps/animated-paint/web/paint/v2/animation/evaluate.ts` |
+| Organic brush recipes | `apps/animated-paint/web/paint/v2/organicPresets.ts` |
+| Animation runtime | `apps/animated-paint/web/paint/v2/animation/evaluate.ts` |
 | Frame pipeline | `apps/animated-paint/web/paint/v2/render/engine.ts` |
+
+
+### Animation timing and preview performance
+
+Brushes may include `animationTiming` metadata for a stepped recipe (`mode: "stepped"`, `fps`), a finite effect (`mode: "once"`, `settleSeconds`), or a recipe whose output depends only on the input and settings (`mode: "static"`). All require `sourceHash`, produced by `animationSourceHash(animationJs)` in `paint/v2/core/animationTiming.ts`. The metadata describes the existing recipe; it does not change how `time` or `age` is evaluated. It must accurately describe every time-dependent output. One-shot settle time is measured after the final input point and is scaled by brush speed. A static recipe still uses `animated: true` so its JavaScript runs when the stroke or settings change; its frame does not request animation ticks.
+
+The engine ignores stale metadata after the source changes, and treats unknown animated recipes as continuous. Drift also prevents a stepped/settled cache from freezing motion. Editing point coordinates in place requires incrementing the stroke's transient `geometryRevision`; replacing the points array or appending points invalidates geometry automatically.
+
+Live editor rendering runs in a worker when available. Keep scripts deterministic and return draw items without relying on DOM APIs or mutating external state. A worker provides scheduling isolation, not a secure sandbox for untrusted JavaScript. GPU grain preview is optional; custom scripts still run as JavaScript and exports retain Canvas2D rendering.

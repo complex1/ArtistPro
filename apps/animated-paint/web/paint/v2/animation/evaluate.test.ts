@@ -4,6 +4,14 @@ import { emptyPoint } from '../core/defaults'
 import { compileAnimation, runAnimationSync } from './evaluate'
 
 describe('v2 animation runtime', () => {
+  it('reuses compiled code without carrying local state between frames', () => {
+    const source = 'var counter = 0; function animate() { counter++; return [{ x: counter, y: age }]; }'
+    expect(compileAnimation(source)).toBe(compileAnimation(source))
+    const request = { source, points: [], config: createBrushV2(), time: 10, age: 0.5, seed: 7 }
+    expect(runAnimationSync(request).items[0]).toMatchObject({ x: 1, y: 0.5 })
+    expect(runAnimationSync(request).items[0]).toMatchObject({ x: 1, y: 0.5 })
+  })
+
   it('returns a validated draw list from animate()', () => {
     const result = runAnimationSync({
       source: `function animate(points, config, time) {

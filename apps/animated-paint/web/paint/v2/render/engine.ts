@@ -11,21 +11,50 @@ import type {
 import { DEFAULT_BUDGETS } from '../core/types'
 import { runAnimationSync } from '../animation/evaluate'
 import { staticDrawList } from '../animation/staticDrawList'
-import { sampleStroke } from '../input/sampler'
-import { canvas2dRenderer, paintDocumentBackground, type PaintRenderer } from './canvas2d'
+import { canvas2dRenderer, paintDocumentBackground, stampAssetVersion, type PaintRenderer } from './canvas2d'
+import { createSurface, context2d, type PaintContext, type PaintSurface } from './surfaces'
+import { strokeTiming } from './timing'
+import { RenderCache } from './renderCache'
+import { closedStrokeFrame, sampleStrokeForFrame, type StrokeFill } from './fill'
 
 export type StrokeFrame = {
   items: DrawItem[]
   packed: PackedDrawList
   durationMs: number
   diagnostics: EngineDiagnostic[]
+  fill?: StrokeFill
 }
 
-const lastGood = new Map<string, DrawItem[]>()
+let lastGood = new WeakMap<StrokeV2, DrawItem[]>()
+// Strongly hold only a bounded window of fallbacks; WeakRefs do not retain
+// deleted strokes or closed projects just to keep an error preview alive.
+const fallbackWindow: { stroke: WeakRef<StrokeV2>; items: WeakRef<DrawItem[]>; count: number }[] = []
+let fallbackItems = 0
+function rememberGood(stroke: StrokeV2, items: DrawItem[]) {
+  lastGood.set(stroke, items)
+  fallbackWindow.push({ stroke: new WeakRef(stroke), items: new WeakRef(items), count: items.length })
+  fallbackItems += items.length
+  while (fallbackItems > 100_000 || fallbackWindow.length > 256) {
+    const entry = fallbackWindow.shift()!
+    const old = entry.stroke.deref()
+    if (old && lastGood.get(old) === entry.items.deref()) lastGood.delete(old)
+    fallbackItems -= entry.count
+  }
+}
 
-export function strokeFrame(stroke: StrokeV2, timeMs: number): StrokeFrame {
+export function strokeFrame(stroke: StrokeV2, timeMs: number, ageMs = timeMs, sampledPoints?: StrokeV2['points']): StrokeFrame {
   const brush = stroke.brushSnapshot
-  const sampled = sampleStroke(stroke.points, brush, stroke.seed)
+  const sampled = sampledPoints ?? sampleStrokeForFrame(stroke)
+  const closedStart = performance.now()
+  const closed = closedStrokeFrame(stroke, sampled, timeMs)
+  if (closed) {
+    // The cyclic contour already includes coherent drift. Stamp-only dynamics
+    // still apply to the texture border without displacing its fill twice.
+    const items = applyBrushDynamics(closed.items, { ...brush, drift: 0 }, stroke.seed, timeMs)
+    let packed: PackedDrawList | undefined
+    return { ...closed, items, get packed() { return packed ??= packDrawList(items) },
+      durationMs: performance.now() - closedStart, diagnostics: [] }
+  }
   const diagnostics: EngineDiagnostic[] = []
   let items: DrawItem[]
   let durationMs = 0
@@ -36,25 +65,27 @@ export function strokeFrame(stroke: StrokeV2, timeMs: number): StrokeFrame {
     const time = (timeMs / 1000) * brush.speed
     const result = runAnimationSync({
       source: brush.animationJs,
-      points: sampled,
+      points: sampledPoints ? sampled.map(point => ({ ...point })) : sampled,
       config: brush,
       time,
+      age: (Math.max(0, ageMs) / 1000) * brush.speed,
       seed: stroke.seed,
     })
     durationMs = result.durationMs
     diagnostics.push(...result.diagnostics)
     if (result.diagnostics.some((item) => item.code === 'animate-error')) {
-      items = lastGood.get(stroke.id) ?? staticDrawList(sampled, brush, stroke.seed)
+      items = lastGood.get(stroke) ?? staticDrawList(sampled, brush, stroke.seed)
     } else {
       items = result.items
-      lastGood.set(stroke.id, items)
+      rememberGood(stroke, items)
     }
   }
 
   const finalItems = applyBrushDynamics(applyRendererKind(items, brush), brush, stroke.seed, timeMs)
+  let packed: PackedDrawList | undefined
   return {
     items: finalItems,
-    packed: packDrawList(finalItems),
+    get packed() { return packed ??= packDrawList(finalItems) },
     durationMs,
     diagnostics: diagnostics.map((item) => ({ ...item, strokeId: stroke.id })),
   }
@@ -66,6 +97,8 @@ function applyBrushDynamics(
   seed: number,
   timeMs: number,
 ): DrawItem[] {
+  if (brush.drift === 0 && brush.distortion === 0 && brush.rotationDegrees === 0 && brush.stampsPerPoint === 1 &&
+      items.every(item => item.stampIndex < Math.max(1, brush.stamps.length))) return items
   const output: DrawItem[] = []
   const rotation = (brush.rotationDegrees * Math.PI) / 180
   const elapsed = (timeMs / 1000) * brush.speed
@@ -113,6 +146,9 @@ export type FrameStats = {
   itemCount: number
   animationMs: number
   diagnostics: EngineDiagnostic[]
+  totalMs: number
+  reusedStrokes: number
+  cacheBytes: number
 }
 
 /** Off-document pixels a layer needs at paint time. */
@@ -127,24 +163,37 @@ export function emptySurfaces(): LayerSurfaces {
 
 const NO_MASKS: Map<string, HTMLCanvasElement> = new Map()
 
-// Masked layers composite through a scratch canvas so the mask can punch
-// through the vector strokes as well as the raster. One canvas is reused
-// because a render pass never interleaves with another.
-let scratch: HTMLCanvasElement | null = null
+// Composite layers as a group when masking, fading, or blending. Applying layer
+// opacity per grain makes overlaps darker and changes the texture of the brush.
+// Each destination reuses one surface without retaining closed canvases.
+const scratchSurfaces = new WeakMap<PaintContext, PaintSurface>()
+let renderCaches = new WeakMap<PaintContext, RenderCache>()
+
+export function releaseRenderCache(context: PaintContext) {
+  renderCaches.get(context)?.clear()
+  renderCaches.delete(context)
+  scratchSurfaces.delete(context)
+}
 
 function scratchContext(
+  destination: PaintContext,
   width: number,
   height: number,
-): CanvasRenderingContext2D | null {
-  if (typeof globalThis.document === 'undefined') return null
-  if (!scratch) scratch = globalThis.document.createElement('canvas')
+): PaintContext | null {
+  let scratch = scratchSurfaces.get(destination)
+  if (!scratch) {
+    const surface = createSurface(width, height)
+    if (!surface) return null
+    scratch = surface
+    scratchSurfaces.set(destination, scratch)
+  }
   const resized = scratch.width !== width || scratch.height !== height
   if (resized) {
     // Resizing already clears the canvas, so skip the redundant clear.
     scratch.width = width
     scratch.height = height
   }
-  const context = scratch.getContext('2d')
+  const context = context2d(scratch)
   if (context && !resized) {
     context.setTransform(1, 0, 0, 1, 0, 0)
     context.globalCompositeOperation = 'source-over'
@@ -155,68 +204,93 @@ function scratchContext(
 }
 
 export function renderDocumentV2(
-  context: CanvasRenderingContext2D,
+  context: PaintContext,
   document: PaintDocumentV2,
   timeMs: number,
-  rasters: Map<string, HTMLCanvasElement>,
-  masks: Map<string, HTMLCanvasElement> = NO_MASKS,
+  rasters: ReadonlyMap<string, PaintSurface>,
+  masks: ReadonlyMap<string, PaintSurface> = NO_MASKS,
   renderer: PaintRenderer = canvas2dRenderer,
+  // Live drawing uses a clock paired with stroke.createdAt. Exports omit it so
+  // all strokes replay from age zero on the deterministic export timeline.
+  strokeNowMs?: number,
 ): FrameStats {
+  const start = performance.now()
+  let cache = renderCaches.get(context)
+  if (!cache) { cache = new RenderCache(); renderCaches.set(context, cache) }
+  cache.begin(context.canvas.width, context.canvas.height)
   paintDocumentBackground(context, document.width, document.height, document.background)
   const stats: FrameStats = {
     strokeCount: 0,
     itemCount: 0,
     animationMs: 0,
     diagnostics: [],
+    totalMs: 0,
+    reusedStrokes: 0,
+    cacheBytes: 0,
   }
 
   for (const layer of document.layers) {
     if (!layer.visible) continue
     const mask = masks.get(layer.id)
-    const masked = mask
-      ? scratchContext(document.width, document.height)
+    const isolated = mask || layer.opacity !== 1 || layer.blendMode !== 'source-over'
+      ? scratchContext(context, document.width, document.height)
       : null
-    const target = masked ?? context
+    const target = isolated ?? context
 
     target.save()
-    if (!masked) {
+    if (!isolated) {
       target.globalAlpha = layer.opacity
       target.globalCompositeOperation = layer.blendMode
     }
     const raster = rasters.get(layer.id)
-    if (raster) target.drawImage(raster, 0, 0)
+    if (raster) {
+      const image = layer.kind === 'image' ? layer.image : undefined
+      if (image) target.drawImage(raster, image.x, image.y, image.width, image.height)
+      else target.drawImage(raster, 0, 0)
+    }
     for (const stroke of layer.strokes) {
-      const frame = strokeFrame(stroke, timeMs)
+      const age = strokeNowMs === undefined ? timeMs : strokeNowMs - stroke.createdAt
+      const timing = strokeTiming(stroke, timeMs, age)
+      const entry = cache.frame(stroke, timing.key, sampled => strokeFrame(stroke, timeMs, age, sampled))
+      const frame = entry.frame
+      if (entry.reused) stats.reusedStrokes += 1
       stats.strokeCount += 1
       stats.itemCount += frame.items.length
-      stats.animationMs += frame.durationMs
+      if (!entry.reused) stats.animationMs += frame.durationMs
       stats.diagnostics.push(...frame.diagnostics)
       target.save()
       if (stroke.brushSnapshot.blendMode !== 'source-over') {
         target.globalCompositeOperation = stroke.brushSnapshot.blendMode
       }
-      renderer.paint(target, frame.items, stroke.brushSnapshot.stamps)
+      cache.paint(target, entry, stroke.brushSnapshot.stamps, renderer, timing.delay > 0, stampAssetVersion())
       target.restore()
     }
     target.restore()
 
-    if (masked && mask) {
-      masked.save()
-      masked.globalCompositeOperation = 'destination-out'
-      masked.drawImage(mask, 0, 0)
-      masked.restore()
+    if (isolated) {
+      if (mask) {
+        isolated.save()
+        isolated.globalCompositeOperation = 'destination-out'
+        isolated.drawImage(mask, 0, 0)
+        isolated.restore()
+      }
       context.save()
       context.globalAlpha = layer.opacity
       context.globalCompositeOperation = layer.blendMode
-      context.drawImage(masked.canvas, 0, 0)
+      context.drawImage(isolated.canvas, 0, 0)
       context.restore()
     }
   }
 
+  cache.end()
+  stats.totalMs = performance.now() - start
+  stats.cacheBytes = cache.bytes
   return stats
 }
 
-export function clearStrokeCache(strokeId?: string): void {
-  if (strokeId) lastGood.delete(strokeId)
-  else lastGood.clear()
+export function clearStrokeCache(): void {
+  lastGood = new WeakMap()
+  fallbackWindow.length = 0
+  fallbackItems = 0
+  renderCaches = new WeakMap()
 }

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { Pencil, Plus } from 'lucide-react'
 import { Button, Select } from '../../../ui/controls'
 import { ColorField, PropertyRow, SliderField, TextField } from '../../../ui/fields'
@@ -17,6 +17,8 @@ import type {
 } from '../core/types'
 import { StampConfigModal, type StampDraft } from './StampConfigModal'
 import { readStampFile } from './stampFile'
+import { getBrushFillKind } from '../core/fill'
+import './BrushShapeControls.css'
 
 function StampThumb({ stamp }: { stamp: string }) {
   const preview = stampPreviewSrc(stamp)
@@ -46,6 +48,10 @@ export function BrushInspector({
   const authoring = mode === 'authoring'
   const uploadRef = useRef<HTMLInputElement>(null)
   const [stampDraft, setStampDraft] = useState<StampDraft | null>(null)
+  const fillDescriptionId = useId()
+  const fillKind = getBrushFillKind(brush)
+  const supportsFill = fillKind !== null
+  const fillEnabled = supportsFill && brush.fill.enabled
 
   const addStamp = (stamp: string) => {
     onChange({
@@ -175,6 +181,59 @@ export function BrushInspector({
           onValue={(color) => onChange({ color })}
         />
       </PropertyRow>
+      <div className="paint-shape-options">
+        <label className="paint-shape-toggle">
+          <span>Closed path</span>
+          <input
+            type="checkbox"
+            checked={supportsFill && brush.closedPath}
+            disabled={!supportsFill}
+            aria-describedby={fillDescriptionId}
+            onChange={(event) => {
+              const closedPath = event.target.checked
+              onChange({
+                closedPath,
+                fill: { ...brush.fill, enabled: closedPath && brush.fill.enabled },
+              })
+            }}
+          />
+        </label>
+        <label className="paint-shape-toggle">
+          <span>Fill enabled</span>
+          <input
+            type="checkbox"
+            checked={fillEnabled}
+            disabled={!supportsFill}
+            aria-describedby={fillDescriptionId}
+            onChange={(event) => {
+              const enabled = event.target.checked
+              onChange({
+                closedPath: enabled || brush.closedPath,
+                fill: { ...brush.fill, enabled },
+              })
+            }}
+          />
+        </label>
+        {fillEnabled ? (
+          <label className="paint-shape-toggle">
+            <span>Show outline</span>
+            <input
+              type="checkbox"
+              checked={brush.fill.outline}
+              onChange={(event) =>
+                onChange({ fill: { ...brush.fill, outline: event.target.checked } })
+              }
+            />
+          </label>
+        ) : null}
+        <p id={fillDescriptionId} className="paint-shape-description">
+          {!supportsFill
+            ? 'Closed shapes and fills are not available for this brush.'
+            : fillKind === 'solid'
+              ? 'Solid fill uses the brush color.'
+              : 'Textured fill uses the brush color and grain.'}
+        </p>
+      </div>
       <PropertyRow label="Size">
         <SliderField
           label="Size"
@@ -440,75 +499,75 @@ export function BrushInspector({
               <option value="lighten">Lighten</option>
             </Select>
           </PropertyRow>
-          {brush.renderer === 'particle' ? (
-            <>
-              <PropertyRow label="Particles">
-                <SliderField
-                  label="Particle count"
-                  value={brush.particle.count}
-                  min={1}
-                  max={32}
-                  step={1}
-                  display={`${Math.round(brush.particle.count)}`}
-                  onValue={(count) =>
-                    onChange({ particle: { ...brush.particle, count } })
-                  }
-                />
-              </PropertyRow>
-              <PropertyRow label="Lifetime">
-                <SliderField
-                  label="Particle lifetime"
-                  value={brush.particle.lifetime}
-                  min={0.1}
-                  max={10}
-                  step={0.1}
-                  display={`${brush.particle.lifetime.toFixed(1)}s`}
-                  onValue={(lifetime) =>
-                    onChange({ particle: { ...brush.particle, lifetime } })
-                  }
-                />
-              </PropertyRow>
-              <PropertyRow label="Velocity">
-                <SliderField
-                  label="Particle velocity"
-                  value={brush.particle.velocity}
-                  min={0}
-                  max={200}
-                  step={1}
-                  display={`${Math.round(brush.particle.velocity)}`}
-                  onValue={(velocity) =>
-                    onChange({ particle: { ...brush.particle, velocity } })
-                  }
-                />
-              </PropertyRow>
-              <PropertyRow label="Gravity">
-                <SliderField
-                  label="Particle gravity"
-                  value={brush.particle.gravity}
-                  min={-200}
-                  max={200}
-                  step={1}
-                  display={`${Math.round(brush.particle.gravity)}`}
-                  onValue={(gravity) =>
-                    onChange({ particle: { ...brush.particle, gravity } })
-                  }
-                />
-              </PropertyRow>
-              <PropertyRow label="Spawn">
-                <SliderField
-                  label="Particle spawn"
-                  value={brush.particle.spawn}
-                  min={0}
-                  max={8}
-                  step={0.1}
-                  display={brush.particle.spawn.toFixed(1)}
-                  onValue={(spawn) =>
-                    onChange({ particle: { ...brush.particle, spawn } })
-                  }
-                />
-              </PropertyRow>
-            </>
-          ) : null}
+        </>
+      ) : null}
+      {brush.renderer === 'particle' ? (
+        <>
+          <PropertyRow label="Particles">
+            <SliderField
+              label="Particle count"
+              value={brush.particle.count}
+              min={1}
+              max={32}
+              step={1}
+              display={`${Math.round(brush.particle.count)}`}
+              onValue={(count) =>
+                onChange({ particle: { ...brush.particle, count } })
+              }
+            />
+          </PropertyRow>
+          <PropertyRow label="Lifetime">
+            <SliderField
+              label="Particle lifetime"
+              value={brush.particle.lifetime}
+              min={0.1}
+              max={10}
+              step={0.1}
+              display={`${brush.particle.lifetime.toFixed(1)}s`}
+              onValue={(lifetime) =>
+                onChange({ particle: { ...brush.particle, lifetime } })
+              }
+            />
+          </PropertyRow>
+          <PropertyRow label="Velocity">
+            <SliderField
+              label="Particle velocity"
+              value={brush.particle.velocity}
+              min={0}
+              max={200}
+              step={1}
+              display={`${Math.round(brush.particle.velocity)}`}
+              onValue={(velocity) =>
+                onChange({ particle: { ...brush.particle, velocity } })
+              }
+            />
+          </PropertyRow>
+          <PropertyRow label="Gravity">
+            <SliderField
+              label="Particle gravity"
+              value={brush.particle.gravity}
+              min={-200}
+              max={200}
+              step={1}
+              display={`${Math.round(brush.particle.gravity)}`}
+              onValue={(gravity) =>
+                onChange({ particle: { ...brush.particle, gravity } })
+              }
+            />
+          </PropertyRow>
+          <PropertyRow label="Spawn">
+            <SliderField
+              label="Particle spawn"
+              value={brush.particle.spawn}
+              min={0}
+              max={8}
+              step={0.1}
+              display={brush.particle.spawn.toFixed(1)}
+              onValue={(spawn) =>
+                onChange({ particle: { ...brush.particle, spawn } })
+              }
+            />
+          </PropertyRow>
         </>
       ) : null}
       <PropertyRow label="Seed">
