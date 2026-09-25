@@ -1,3 +1,4 @@
+import { shortcutBlocked, useShortcuts } from '@artist-studio/ui-component'
 import {
   useCallback,
   useEffect,
@@ -518,6 +519,8 @@ function LiveCharacterStudio({ project }: { project: ProjectRecord }) {
   }
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
+      if (shortcutBlocked(event) || event.altKey) return
+      if (event.repeat && !['ArrowLeft', 'ArrowRight', '[', ']'].includes(event.key)) { event.preventDefault(); return }
       const target = event.target as HTMLElement
       if (
         target.closest('input,textarea,select,[contenteditable="true"]') ||
@@ -609,6 +612,8 @@ function LiveCharacterStudio({ project }: { project: ProjectRecord }) {
     return result
   }
   void historyVersion
+  useShortcuts([{ keys: 'Mod+Shift+e', label: 'Export character', run: () => setExportOpen(true) }, { keys: 'Mod+y', label: 'Redo', run: redo }])
+
   return (
     <div className="lc-studio">
       <input

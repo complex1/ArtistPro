@@ -28,8 +28,16 @@ import { createPaintProjectV2, savePaintProjectV2 } from '/apps/animated-paint/w
 import { unzipSync } from 'fflate';
 
 const width = 480, height = 250;
-const ids = ['rainStreaks', 'softSmoke', 'chromaticEcho', 'iridescentRibbon', 'centerBloom', 'dustReveal', 'scatteredPencil', 'speedTaper'];
+const concepts = new URLSearchParams(location.search).get('collection') === 'concept';
+const playful = new URLSearchParams(location.search).get('collection') === 'playful';
+const corrections = new URLSearchParams(location.search).get('collection') === 'corrections';
+const ids = corrections ? ['scribble', 'dryBristle'] : playful ? ['scribble', 'gooBlobs', 'particle', 'glitter', 'cascade', 'charcoal', 'faded', 'dashed', 'pencil'] : concepts ? ['zipperInk', 'livingStitch', 'fireflyTrail', 'pixelMelt'] : ['rainStreaks', 'softSmoke', 'chromaticEcho', 'iridescentRibbon', 'centerBloom', 'dustReveal', 'scatteredPencil', 'speedTaper'];
 const descriptions = {
+  dryBristle: 'Short bristle chunks swap heights and switch on and off in held redraws.', scribble: 'Irregular crossing contours are independently redrawn in held poses.', gooBlobs: 'Squishy liquid blobs orbit a waving line.', particle: 'Sparks scatter and swirl away from the path.', glitter: 'Individual flakes flash independently.', cascade: 'Distinct dots flow along the path while their colors cycle.', charcoal: 'Rough charcoal grain pulses and drifts softly upward.', faded: 'Chipped paint patches appear and disappear.', dashed: 'Separate dashes travel along your line.', pencil: 'Fine textured contours move in subtle held redraws.',
+  zipperInk: 'Hooked teeth interlock and open as a traveling wave unzips the line.',
+  livingStitch: 'Separate anchored threads pull taut and relax in sequence, like living embroidery.',
+  fireflyTrail: 'Small soft lights wander around your path and blink independently.',
+  pixelMelt: 'Square blocks fall, fade, and rebuild the original pixelated stroke in a repeating wave.',
   rainStreaks: 'Falling drops with staggered lifetimes and a gentle wind slant. Paint above a scene to make a rain curtain.',
   softSmoke: 'Soft puffs rise, widen, drift, and disappear. A small reusable stamp creates steam and atmospheric trails.',
   chromaticEcho: 'Colored edge copies separate and reunite, like moving print registration around the original line.',
@@ -40,11 +48,41 @@ const descriptions = {
   speedTaper: 'A thick-to-thin swell travels along the stroke as time plays. Recorded pressure and drawing speed shape its base width.',
 };
 const notes = {
+  dryBristle: '9 fps chunk jiggle',
+  scribble: '12 fps held redraws', gooBlobs: '4-second liquid loop', particle: 'Bounded emitting sparks', glitter: 'Independent flake shimmer', cascade: '4-second flowing color loop', charcoal: 'Cached grain · soft drift', faded: '12 fps chipped-paint poses', dashed: '2-second traveling dashes', pencil: '12 fps fine line redraws',
+  zipperInk: '4-second loop · disconnected teeth', livingStitch: '3-second loop · anchored thread arcs',
+  fireflyTrail: '3-second loop · cached soft stamps', pixelMelt: '4-second loop · bounded square stamps',
   rainStreaks: 'Continuous · bounded falling particles', softSmoke: 'Continuous · cached soft stamps',
   chromaticEcho: 'Continuous · selected-color palette', iridescentRibbon: 'Continuous · moving highlight',
   centerBloom: 'One shot · finishes after drawing', dustReveal: 'One shot · temporary grains settle',
   scatteredPencil: 'Held redraws · tightly packed scratches', speedTaper: 'Continuous · traveling width swell',
 };
+if (concepts) {
+  document.title = 'Threads, lights, and pixels · Animated Paint';
+  document.querySelector('.eyebrow').textContent = 'Animated Paint / Brush collection 05';
+  document.querySelector('h1').textContent = 'Threads, lights, and falling pixels.';
+  document.querySelector('header p').textContent = 'Four original animated brushes. Start a short preview or scrub time to inspect the motion. Samples stay still until requested.';
+  document.querySelector('.transport span').textContent = 'All four repeat continuously and obey animation speed.';
+  document.querySelector('.verification p').textContent = 'Finite checks compare main-thread and worker pixels, seek backward, export fireflies from an empty stamp cache, and measure 20 mixed strokes.';
+  document.querySelector('footer').textContent = 'Bounded segments and cached stamps keep work predictable. Measurements are render-call timings, not sustained frame-rate or heat claims.';
+}
+if (playful) {
+  document.title = 'Playful ink · Animated Paint';
+  document.querySelector('.eyebrow').textContent = 'Animated Paint / Brush collection 06';
+  document.querySelector('h1').textContent = 'Nine ways to bring ink to life.';
+  document.querySelector('header p').textContent = 'Scribbles, liquid blobs, sparks, glitter, flowing color, and moving textures. Previews stay still until played.';
+  document.querySelector('.transport span').textContent = 'Continuous motion and held hand-drawn poses.';
+  document.querySelector('.verification p').textContent = 'Checks compare main-thread and worker pixels, backward seeking, a cold-cache charcoal PNG export, and 45 mixed strokes.';
+  document.querySelector('footer').textContent = 'Bounded recipes and reusable texture stamps. Timings do not measure sustained frame rate or heat.';
+}
+if (corrections) {
+  document.title = 'Scribble and Dry Bristle · Animated Paint';
+  document.querySelector('h1').textContent = 'Hand-redrawn ink and moving bristles.';
+  document.querySelector('header p').textContent = 'Two revised brushes. Play or scrub to compare their motion.';
+  document.querySelector('.transport span').textContent = 'Scribble redraws at 12 fps; Dry Bristle jiggles in short broken chunks.';
+  document.querySelector('.verification p').textContent = 'Checks compare worker rendering, backward seeking, transparent export, and ten mixed strokes.';
+  document.querySelector('footer').textContent = 'Finite rendering checks do not establish sustained frame rate or thermal performance.';
+}
 const cards = document.querySelector('#cards'), status = document.querySelector('#status'), results = document.querySelector('#results');
 const play = document.querySelector('#play'), pause = document.querySelector('#pause'), run = document.querySelector('#run'), demo = document.querySelector('#demo');
 const slider = document.querySelector('#time'), clock = document.querySelector('#clock'), demoStatus = document.querySelector('#demo-status');
@@ -202,8 +240,8 @@ run.onclick = async () => {
     }
     host.dispose(); host = undefined;
 
-    status.textContent = 'Exporting smoke from an empty image cache…';
-    const smoke = samples.find(sample => sample.brush.id === 'softSmoke');
+    status.textContent = 'Exporting soft stamps from an empty image cache…';
+    const smoke = samples.find(sample => sample.brush.id === (corrections ? 'dryBristle' : playful ? 'charcoal' : concepts ? 'fireflyTrail' : 'softSmoke'));
     const exportScene = makeDocument(smoke.brush, 'transparent');
     clearStampImages();
     // Do not prepare assets here: the exporter must load the smoke before its
@@ -218,19 +256,21 @@ run.onclick = async () => {
       try { outputContext.clearRect(0, 0, width, height); outputContext.drawImage(bitmap, 0, 0); }
       finally { bitmap.close(); }
       const actual = pixels(outputContext), alpha = alphaSummary(actual);
-      assert(alpha.visiblePixels > 100, `Smoke export frame ${index} is blank or missing its image stamp`);
-      assert(alpha.transparentPixels > 100 && alpha.partialAlphaPixels > 100, `Smoke export frame ${index} lost transparency or softness`);
+      assert(alpha.visiblePixels > 100, `Soft stamp export frame ${index} is blank or missing its image stamp`);
+      assert(alpha.transparentPixels > 100 && alpha.partialAlphaPixels > 100, `Soft stamp export frame ${index} lost transparency or softness`);
       renderReference(exportScene, index / 12 * 1000);
       const comparison = difference(pixels(referenceContext), actual);
       comparisons.push({ frame: index, ...comparison, ...alpha });
       assert(comparison.maxChannelError === 0, `PNG frame ${index} differs from reference: ${JSON.stringify(comparison)}`);
     }
     report.export = { result: 'PASS', format: 'transparent PNG sequence', frames: files.length,
-      coldCacheFirstFrameSmokeVisible: true, comparisons };
+      coldCacheFirstFrameStampVisible: true, comparisons };
     update();
 
-    status.textContent = 'Preparing the finite 40-stroke mixed load check…';
-    const loadScene = createDocumentV2('Synthetic mixed brush load', 960, 600);
+    const strokeCount = ids.length * 5;
+    status.textContent = `Preparing the finite ${strokeCount}-stroke mixed load check…`;
+    const loadHeight = Math.ceil(ids.length / 2) * 145 + 20;
+    const loadScene = createDocumentV2('Synthetic mixed brush load', 960, loadHeight);
     loadScene.background = '#fbf7ee';
     loadScene.layers = ids.map((id, index) => {
       // Five overlapping gestures in each tile exercise compositing while
@@ -248,7 +288,7 @@ run.onclick = async () => {
       return layer;
     });
     loadScene.activeLayerId = loadScene.layers[0].id;
-    const loadSurface = new OffscreenCanvas(960, 600), loadContext = loadSurface.getContext('2d');
+    const loadSurface = new OffscreenCanvas(960, loadHeight), loadContext = loadSurface.getContext('2d');
     const round = value => Math.round(value * 100) / 100;
     const describeStats = (stats, ms) => ({ timeSeconds: ms / 1000,
       totalMs: round(stats.totalMs), animationMs: round(stats.animationMs),
@@ -259,18 +299,18 @@ run.onclick = async () => {
     try {
       await prepareStampImages(loadScene.layers.flatMap(layer => layer.strokes.flatMap(stroke => stroke.brushSnapshot.stamps)));
       const warmup = renderDocumentV2(loadContext, loadScene, 500, surfaces.rasters, surfaces.masks, undefined, 500);
-      assert(warmup.strokeCount === 40, `Load check expected 40 strokes; received ${warmup.strokeCount}`);
+      assert(warmup.strokeCount === strokeCount, `Load check expected ${strokeCount} strokes; received ${warmup.strokeCount}`);
       assert(!warmup.diagnostics.some(item => item.code === 'animate-error'), 'Load check warm-up recipe failed');
-      report.load = { result: 'RUNNING', scene: { width: 960, height: 600, strokes: 40, strokesPerBrush: 5, settings: 'Built-in defaults' },
+      report.load = { result: 'RUNNING', scene: { width: 960, height: loadHeight, strokes: strokeCount, strokesPerBrush: 5, settings: 'Built-in defaults' },
         measurement: 'Main-thread render-call time on default OffscreenCanvas2D. Excludes GPU completion; not a sustained frame-rate or thermal measurement.',
         warmup: describeStats(warmup, 500), frames: [], summary: null };
       update();
       for (let index = 0; index < durations.length; index++) {
         await new Promise(resolve => setTimeout(resolve, 0));
         const ms = durations[index];
-        status.textContent = `Measuring mixed load frame ${index + 1} of ${durations.length} (40 strokes)…`;
+        status.textContent = `Measuring mixed load frame ${index + 1} of ${durations.length} (${strokeCount} strokes)…`;
         const stats = renderDocumentV2(loadContext, loadScene, ms, surfaces.rasters, surfaces.masks, undefined, ms);
-        assert(stats.strokeCount === 40 && stats.itemCount > 0, 'Load check lost a stroke or rendered an empty frame');
+        assert(stats.strokeCount === strokeCount && stats.itemCount > 0, 'Load check lost a stroke or rendered an empty frame');
         assert(!stats.diagnostics.some(item => item.code === 'animate-error'), `Load check recipe failed at ${ms}ms`);
         measured.push(stats);
         report.load.frames.push(describeStats(stats, ms));
@@ -287,7 +327,7 @@ run.onclick = async () => {
       report.load.result = 'PASS';
     } finally { releaseRenderCache(loadContext); loadSurface.width = loadSurface.height = 1; }
     update();
-    status.textContent = `PASS — ${report.worker.length} exact worker checks, ${report.behavior.length} brush behavior checks, cold-cache smoke export, and 12 finite mixed-load frames.`;
+    status.textContent = `PASS — ${report.worker.length} exact worker checks, ${report.behavior.length} brush behavior checks, cold-cache soft-stamp export, and 12 finite mixed-load frames.`;
   } catch (error) {
     report.error = error instanceof Error ? error.message : String(error); update();
     status.textContent = 'FAIL — ' + report.error;
@@ -301,9 +341,9 @@ run.onclick = async () => {
 };
 
 demo.onclick = async () => {
-  stop(); demo.disabled = true; demoStatus.textContent = 'Creating a new eight-layer brush demo…';
+  stop(); demo.disabled = true; demoStatus.textContent = 'Creating a new brush demo…';
   try {
-    demoProject ??= await createPaintProjectV2('Weather, light, and ink', 1000, 1100);
+    demoProject ??= await createPaintProjectV2(playful ? 'Playful ink' : concepts ? 'Threads, lights, and pixels' : 'Weather, light, and ink', 1000, Math.ceil(ids.length / 2) * 270 + 30);
     const layers = samples.map((sample, index) => {
       const layer = createLayerV2(sample.brush.name);
       const offsetX = index % 2 * 500 + 10, offsetY = Math.floor(index / 2) * 270 + 10;

@@ -112,3 +112,28 @@ This batch gives two distinct examples in every requested category. Snow Drift, 
 - The optional GPU renderer accelerates eligible plain hex-color dot/ellipse batches. Paths, soft image sprites, effects, and unsupported blends use Canvas2D; do not describe every new particle brush as GPU accelerated.
 - Verify fixed seed/time determinism, backward export seeks, long strokes, mixed brush scenes, transparent export, low-speed/zero-speed behavior, and tiny/empty paths.
 - Preserve the current hover-only gallery previews. Benchmark representative scenes on the actual system before making speed or thermal claims.
+
+## Concept collection — implemented 2026-09-22
+
+The first four of the unique-concept proposals are built in and available in the editor and playground:
+
+| Brush | Category | Motion | Maximum draw items per stroke |
+| --- | --- | --- | --- |
+| Zipper Ink | Funky | Hooked teeth open and interlock in a traveling 4-second wave | 768 |
+| Living Stitch | Texture | Separate anchored thread arcs tighten and relax in a 3-second wave | 576 |
+| Firefly Trail | Particles | Independently phased lights blink and wander; default loop 3 seconds | 96 |
+| Pixel Melt | FX | Square blocks drop, fade, and reform in a 4-second wave | 192 |
+
+Recipes are self-contained, seeded, and sampled by path distance. The shared engine applies Speed, including zero to freeze. Each brush uses selected ink, opacity, and pressure. Zipper and stitch contours are disconnected; neither has a solid center line. Fireflies use one cached alpha-stamp dimension per stroke rather than live blur; count/spawn control density, lifetime sets the loop period, velocity sets wandering distance, and gravity adds a bounded vertical bias. Pixel Melt uses a reusable square alpha stamp with smooth scale changes. These brushes do not support area fill. Existing hover-only gallery behavior applies unchanged.
+
+The remaining ideas—Bubble Pop, Origami Ribbon, Orbit Threads, and Flock Trail—are still proposals.
+
+Verification: `npx vitest run apps/animated-paint` passed 387 tests across 36 files; TypeScript and targeted lint passed. The browser fixture at `/apps/animated-paint/test/expanded-brushes.html?collection=concept` passed 20 exact main-thread/worker pixel comparisons including backward seeks, four visible-motion checks, and a cold-cache transparent firefly PNG sequence export. A finite 20-stroke default-settings sample at 960×600 used 3,010 draw items; 12 render calls after warm-up averaged 6.74 ms (worst 18.4 ms). Those timings exclude GPU completion and do not measure sustained frame rate or heat.
+
+## Playful ink collection
+
+Nine additional built-ins are registered in `playfulPresets.ts`: Scribble and Dashed (Motion), Goo Blobs (Funky), Particle and Glitter (Particles), Cascade (FX), and Charcoal, Faded, and Pencil (Texture). Each recipe is self-contained for brush JSON sharing, uses seeded analytic animation for repeatable seeking/export, and honors the shared timeline speed. Scribble, Faded, and Pencil hold poses at 12 fps; the others animate continuously. Cascade cycles a palette derived from the selected color.
+
+Per-stroke item caps are 480, 224, 160, 240, 128, 160, 192, 738, and 540 respectively. Charcoal and Faded reuse alpha textures with fixed stamp sizes; Glitter uses a reusable four-point flake. No new fill support is enabled. Goo is a stylized liquid animation, not a fluid simulation.
+
+The finite gallery at `/apps/animated-paint/test/expanded-brushes.html?collection=playful` provides all nine previews and optional demo creation. Browser validation passed 45 exact main-thread/worker frame comparisons, motion checks for every brush, backward seeking, and a cold-cache transparent charcoal PNG sequence export. The synthetic 45-stroke scene rendered 12 measured frames (6,244–6,246 marks), averaging about 12 ms per main-thread render call on the test device; this excludes GPU completion and does not establish sustained frame rate or thermal performance. Automated tests cover portability, bounds, sparse/duplicate inputs, pressure, speed/freeze, particle controls, separate dashes, and independent color/shimmer.

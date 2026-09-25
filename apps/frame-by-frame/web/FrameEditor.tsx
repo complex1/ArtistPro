@@ -1,3 +1,4 @@
+import { shortcutBlocked, useShortcuts } from '@artist-studio/ui-component'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { ArrowLeft, ArrowDown, ArrowUp, Brush, Check, ChevronLeft, ChevronRight, Circle, Clapperboard, Copy, Download, Eraser, Eye, Hand, ImagePlus, Lasso, Layers, Lock, Maximize, Minus, MousePointer2, PaintBucket, Pause, Pipette, Play, Plus, Redo2, Repeat2, Save, ScanLine, SkipBack, SkipForward, Square, Trash2, Undo2, X } from 'lucide-react'
 import { getProject, type ProjectRecord } from './library'
@@ -265,6 +266,8 @@ function AnimationDesk({ record }: { record: ProjectRecord }) {
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
+      if (shortcutBlocked(event) || event.altKey) return
+      if (event.repeat && !['ArrowLeft', 'ArrowRight', '[', ']'].includes(event.key)) { event.preventDefault(); return }
       if ((event.target as HTMLElement)?.closest('input, select, textarea, [contenteditable=true]') || exportAbort.current || inbetween) return
       const key = event.key.toLowerCase(), command = event.metaKey || event.ctrlKey
       if (command) {
@@ -341,6 +344,8 @@ function AnimationDesk({ record }: { record: ProjectRecord }) {
   const transformQuad = showTransform && transformBounds ? gesture?.transform?.quad ?? boundsCorners(transformBounds) : null
   const onions = !playing && onion && layer.visible ? onionCels(layer, frame, before, after) : []
   const updateLayer = (patch: Partial<typeof layer>) => change({ ...doc, layers: doc.layers.map(item => item.id === layer.id ? { ...item, ...patch } : item) })
+
+  useShortcuts([{ keys: 'Mod+Shift+e', label: 'Export animation', run: () => { cancelGesture(); setPlaying(false); setExportOpen(true) } }])
 
   return <div className="fbf-editor" style={{ '--fbf-timeline-height': `${timelineHeight}px` } as React.CSSProperties}>
     <header className="fbf-editor-header"><button className="fbf-back" aria-label="Back to shots" onClick={() => void leave('#/frame-by-frame')}><ArrowLeft size={16} /><span>Shots</span></button><span className="fbf-header-divider" /><Clapperboard className="fbf-brand-icon" size={21} /><div className="fbf-shot-name"><input aria-label="Shot name" value={doc.name} maxLength={120} onChange={event => { if (event.target.value.trim()) run(() => session.commit({ ...doc, name: event.target.value })) }} /><button className={session.error ? 'has-error' : ''} title="Save shot" onClick={() => void session.save().catch(e => setError(message(e)))}>{session.error ? 'Save failed · retry' : session.saving ? 'Saving…' : session.dirty ? 'Unsaved changes' : <><Check size={10} />Saved on this device</>}</button></div><div className="fbf-header-actions"><button aria-label="Undo" title="Undo (⌘/Ctrl Z)" disabled={!session.canUndo} onClick={() => { cancelGesture(); setPlaying(false); session.undo() }}><Undo2 size={16} /></button><button aria-label="Redo" title="Redo (⌘/Ctrl Shift Z)" disabled={!session.canRedo} onClick={() => { cancelGesture(); setPlaying(false); session.redo() }}><Redo2 size={16} /></button><span /><button className="fbf-import-button" disabled={!mutable} onClick={() => imageInput.current?.click()}><ImagePlus size={15} /><span>Import images</span></button><button aria-label="Save project" title="Save (⌘/Ctrl S)" onClick={() => void session.save().catch(e => setError(message(e)))}><Save size={16} /></button><div className="fbf-export-wrap"><button className="fbf-primary" onClick={() => setExportOpen(value => !value)}><Download size={15} />Export</button>{exportOpen && <div className="fbf-export-menu">{([['project', 'Editable project'], ['png', 'Current frame · PNG'], ['sequence', 'PNG sequence · ZIP'], ['gif', 'Animated GIF'], ['video', 'Video · MP4 / WebM']] as const).map(([format, label]) => <button key={format} onClick={() => void exportFile(format)}>{label}</button>)} </div>}</div></div></header>

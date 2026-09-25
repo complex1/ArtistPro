@@ -1,0 +1,149 @@
+@import './PaintScrollbars.css';
+
+.paint-workspace.paint-pen-workspace {
+  grid-template: 'header header header' 58px 'brushes stage layers' minmax(0, 1fr) 'brushes quick layers' auto / var(--brush-width, 260px) minmax(280px, 1fr) var(--layers-width, 280px);
+  gap: 10px; padding: 0 10px 10px; color: var(--text);
+}
+.paint-pen-workspace button { touch-action: manipulation; }
+.paint-pen-workspace button:focus-visible, .paint-pen-workspace input:focus-visible, .paint-pen-workspace summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.paint-pen-workspace .button, .paint-pen-workspace .icon-button { min-height: 40px; min-width: 40px; font-size: 12px; }
+.paint-pen-workspace input[type=range] { min-height: 36px; accent-color: var(--accent); cursor: pointer; touch-action: none; }
+.paint-pen-workspace input[type=range]::-webkit-slider-thumb { min-width: 20px; min-height: 20px; }
+.paint-pen-workspace .paint-v2-header { grid-area: header; margin: 0 -10px; padding: 0 16px; border-bottom: 1px solid var(--border); }
+.paint-pen-workspace .paint-v2-header .brand { font-size: 13px; }
+.paint-pen-workspace .paint-v2-header .canvas-size { display: none; }
+.paint-pen-workspace .paint-v2-header-actions { gap: 6px; }
+.paint-pen-workspace .paint-v2-brushes { display: flex; flex-direction: column; gap: 10px; padding: 12px; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; }
+.paint-pen-workspace .paint-v2-sidebar-title { align-items: center; margin: 0; flex-shrink: 0; }
+.paint-pen-workspace .paint-v2-sidebar-title strong { font-size: 15px; }
+.paint-pen-workspace .paint-v2-sidebar-title small { font-size: 11px; }
+.paint-pen-workspace .paint-search { width: 100%; min-height: 40px; padding: 10px; flex-shrink: 0; font-size: 12px; }
+.paint-category-tabs { display: flex; overflow-x: scroll; gap: 5px; padding-bottom: 5px; flex-shrink: 0; scrollbar-gutter: stable; }
+.paint-category-tabs button { min-height: 36px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; color: var(--text-muted); background: var(--control); font-size: 11px; cursor: pointer; }
+.paint-category-tabs button[aria-pressed=true] { background: var(--accent); color: white; }
+.paint-pen-workspace .paint-brush-groups { display: block; overflow-y: scroll; scrollbar-gutter: stable; flex: 1; min-height: 0; margin: 0; padding-right: 5px; }
+.paint-pen-workspace .paint-brush-groups details { border: 0; margin-bottom: 14px; background: none; }
+.paint-pen-workspace .paint-brush-groups summary { display: flex; justify-content: space-between; min-height: 40px; padding: 0 3px; font-size: 12px; }
+.paint-pen-workspace .paint-brush-groups summary::after { content: '−'; font-size: 18px; }
+.paint-pen-workspace .paint-brush-groups details:not([open]) summary::after { content: '+'; }
+.paint-pen-workspace .paint-brush-groups details > div { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; padding: 6px 0; }
+.paint-pen-workspace .paint-brush-groups details button { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: var(--control); }
+.paint-pen-workspace .paint-brush-groups details button.is-active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); color: var(--text); }
+.paint-pen-workspace .paint-brush-groups details button canvas { width: 100%; height: auto; aspect-ratio: 1.8; object-fit: cover; pointer-events: none; }
+.paint-pen-workspace .paint-brush-groups details button > span { width: auto; height: auto; border-radius: 0; background: none; font-size: 11px; padding: 8px 6px; line-height: 1.3; min-height: 30px; }
+.paint-empty { padding: 16px 5px; font-size: 12px; color: var(--text-muted); }
+.paint-stage-shell { grid-area: stage; min-height: 0; min-width: 0; position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; }
+.paint-pen-workspace .paint-v2-stage { width: 100%; height: 100%; overflow: scroll; scrollbar-gutter: stable; background: var(--bg); }
+.paint-pen-workspace .paint-canvas-wrap { padding: 32px 24px 32px 88px; }
+.paint-floating-tools { position: absolute; z-index: 4; left: 12px; top: 16px; display: flex; flex-direction: column; gap: 5px; padding: 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); box-shadow: 0 6px 24px #0003; max-height: calc(100% - 48px); overflow-y: auto; }
+.paint-floating-tools button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-width: 50px; min-height: 60px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--text-muted); font-size: 10px; cursor: pointer; }
+.paint-floating-tools button[aria-pressed=true] { color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); border-color: var(--accent); }
+.paint-quick-bar { grid-area: quick; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 14px; min-width: 0; padding: 8px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
+.paint-quick-bar label { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); }
+.paint-quick-bar input[type=range] { width: clamp(65px, 7vw, 130px); }
+.paint-quick-bar output { width: 36px; font-size: 10px; font-variant-numeric: tabular-nums; }
+.paint-quick-color input { width: 38px; height: 38px; padding: 2px; border: 1px solid var(--border); border-radius: 50%; background: none; cursor: pointer; }
+.paint-quick-color input::-webkit-color-swatch { border-radius: 50%; border: 0; }
+.paint-pen-workspace .paint-zoom-controls { position: static; margin: 0; box-shadow: none; border: 0; background: none; display: flex; flex-shrink: 0; align-items: center; }
+.paint-pen-workspace .paint-v2-bottom { grid-area: layers; display: flex; flex-direction: column; min-height: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
+.paint-pen-workspace .paint-v2-layers { display: flex; flex-direction: column; flex: 1; min-height: 0; border: 0; }
+.paint-pen-workspace .panel-tabs { min-height: 48px; align-items: center; padding: 8px 12px; flex-shrink: 0; }
+.paint-pen-workspace .panel-tabs > span { font-size: 13px; letter-spacing: 0; text-transform: none; }
+.paint-pen-workspace .paint-layer-toolbar { gap: 5px; padding: 8px; flex-shrink: 0; }
+.paint-pen-workspace .paint-layer-list { flex: 1; min-height: 0; overflow-y: scroll; scrollbar-gutter: stable; padding: 6px; }
+.paint-pen-workspace .paint-layer-row { grid-template-columns: 40px minmax(0, 1fr); min-height: 76px; margin-bottom: 8px; padding: 5px; border: 1px solid var(--border); border-radius: 9px; background: var(--control); }
+.paint-pen-workspace .paint-layer-row.is-active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.paint-pen-workspace .paint-layer-row.is-selected:not(.is-active) { border-color: var(--text-muted); }
+.paint-pen-workspace .paint-layer-row button { min-height: 44px; }
+.paint-pen-workspace .paint-layer-row-action svg { width: 18px; height: 18px; }
+.paint-pen-workspace .paint-layer-name { flex-direction: column; align-items: flex-start; justify-content: center; padding: 8px; gap: 7px; text-align: left; }
+.paint-pen-workspace .paint-layer-name span { font-size: 13px; max-width: 100%; }
+.paint-pen-workspace .paint-layer-name small { font-size: 11px; }
+.paint-pen-workspace .paint-layer-inspector { display: block; flex-shrink: 0; padding-bottom: 12px; border-top: 1px solid var(--border); max-height: 40%; overflow-y: auto; }
+.paint-pen-workspace .paint-layer-inspector-title { flex-wrap: wrap; gap: 6px; }
+.paint-pen-workspace .paint-layer-inspector-fields { max-width: none; gap: 8px; }
+.paint-multi-select { margin-left: auto; min-height: 36px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--control); color: var(--text-muted); font-size: 10px; cursor: pointer; }
+.paint-multi-select[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }
+.paint-settings-dialog { margin: auto; padding: 0; width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); border: 1px solid var(--border); border-radius: 14px; background: var(--panel); color: var(--text); overflow-y: scroll; scrollbar-gutter: stable; }
+.paint-settings-dialog::backdrop { background: #0008; backdrop-filter: blur(3px); }
+.paint-pen-workspace .paint-settings-dialog .paint-v2-inspector { display: block; width: 100%; border: 0; overflow: visible; }
+.paint-settings-dialog .paint-v2-sidebar-title { position: sticky; top: 0; z-index: 4; background: var(--panel); padding: 12px !important; }
+.paint-settings-dialog .paint-v2-fields { padding: 8px; }
+.paint-settings-dialog .property-row { min-height: 44px; }
+.paint-settings-dialog select, .paint-settings-dialog input:not([type=checkbox]):not([type=range]) { min-height: 36px; }
+@media (max-width: 1150px) {
+  .paint-workspace.paint-pen-workspace { grid-template-columns: var(--brush-width, 224px) minmax(240px, 1fr) var(--layers-width, 234px); gap: 6px; padding: 0 6px 6px; }
+  .paint-pen-workspace .paint-v2-header .brand > .studio-crumb:first-child, .paint-pen-workspace .paint-v2-header .brand > b:first-of-type { display: none; }
+  .paint-pen-workspace .paint-v2-header { margin: 0 -6px; }
+}
+@media (max-width: 780px) {
+  .paint-workspace.paint-pen-workspace { grid-template-columns: var(--brush-width, 190px) minmax(260px, 1fr) var(--layers-width, 220px); overflow-x: scroll; }
+  .paint-pen-workspace .paint-v2-header { min-width: 680px; }
+  .paint-pen-workspace .paint-v2-brushes { display: flex; padding: 8px; }
+}
+.paint-brush-card { position: relative; min-width: 0; }
+.paint-pen-workspace .paint-brush-card > button:first-child { width: 100%; height: 100%; }
+.paint-pen-workspace .paint-brush-groups .paint-favorite-toggle { position: absolute; right: 2px; top: 2px; width: 30px; min-height: 30px; display: grid; place-content: center; border: 0; border-radius: 6px; color: var(--text-muted); background: var(--panel); opacity: .9; }
+.paint-pen-workspace .paint-brush-groups .paint-favorite-toggle[aria-pressed=true] { color: #e9af4b; }
+.paint-pen-workspace .layer-row-action svg { width: 20px; height: 20px; }
+.paint-pen-workspace .paint-v2-header { grid-template-columns: minmax(0, 1fr) auto; }
+.paint-pen-workspace .paint-layer-name { display: grid; grid-template-columns: 48px minmax(0, 1fr); grid-template-rows: auto auto; align-content: center; align-items: center; gap: 4px 8px; }
+.paint-layer-thumbnail { grid-row: 1 / 3; width: 48px; height: 48px; background: white; border-radius: 5px; object-fit: contain; }
+.paint-pen-workspace .paint-layer-name span, .paint-pen-workspace .paint-layer-name small { grid-column: 2; }
+.paint-settings-dialog .paint-v2-sidebar-title small { margin-left: auto; margin-right: 12px; }
+.paint-settings-dialog .property-row > label { font-size: 12px; }
+.paint-settings-dialog .paint-shape-toggle { min-height: 40px; }
+.paint-settings-dialog input[type=checkbox] { width: 24px; height: 24px; }
+
+.paint-pen-workspace.is-brushes-hidden { --brush-width: 0px; }
+.paint-pen-workspace.is-layers-hidden { --layers-width: 0px; }
+.paint-pen-workspace.is-brushes-hidden .paint-v2-brushes, .paint-pen-workspace.is-layers-hidden .paint-v2-bottom { display: none; }
+.paint-quick-bar input[type=range] { appearance: none; background: transparent; }
+.paint-quick-bar input[type=range]::-webkit-slider-runnable-track { height: 5px; background: var(--border); border-radius: 4px; }
+.paint-quick-bar input[type=range]::-webkit-slider-thumb { appearance: none; width: 20px; height: 20px; margin-top: -7.5px; border: 2px solid var(--accent); border-radius: 50%; background: #fff; }
+.paint-pen-workspace .paint-layer-toolbar button { flex-shrink: 0; }
+.paint-pen-workspace .paint-v2-header > .paint-save-error { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); z-index: 10; background: var(--panel); padding: 10px; border: 1px solid currentColor; border-radius: 6px; }
+
+/* The sidebar owns both panels; only the selected panel participates in layout. */
+.paint-sidebar-tabs { display: flex; flex: none; padding: 6px; gap: 4px; border-bottom: 1px solid var(--border); }
+.paint-sidebar-tabs button { flex: 1; min-height: 42px; padding: 6px; border: 1px solid transparent; border-radius: 7px; background: none; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.paint-sidebar-tabs button[aria-selected=true] { color: var(--text); background: var(--control); border-color: var(--accent); }
+.paint-sidebar-panel { flex: 1; min-height: 0; min-width: 0; }
+.paint-sidebar-panel[hidden] { display: none !important; }
+.paint-layers-content { display: flex; flex-direction: column; overflow: hidden; }
+.paint-advanced-scroll { overflow-y: scroll; scrollbar-gutter: stable; }
+.paint-pen-workspace .paint-advanced-panel { display: block; width: 100%; overflow: visible; border: 0; }
+.paint-advanced-panel .property-row { min-height: 44px; }
+.paint-advanced-panel .paint-v2-fields { padding: 4px; }
+.paint-advanced-panel input[type=checkbox] { width: 22px; height: 22px; }
+.paint-advanced-panel .paint-shape-toggle { min-height: 40px; }
+.paint-advanced-panel .paint-v2-sidebar-title { flex-wrap: wrap; gap: 6px; }
+.paint-advanced-panel .paint-v2-sidebar-title small { margin: 0; }
+.paint-advanced-panel .paint-selection-banner { line-height: 1.6; }
+.paint-pen-workspace .paint-layer-tree > .paint-tree-layer,
+.paint-pen-workspace .paint-tree-layer { position: relative; display: flex; align-items: stretch; gap: 0; border: 0; margin: 0 0 6px; padding: 0; background: transparent; }
+.paint-pen-workspace .paint-tree-layer > .paint-layer-row { flex: 1; min-width: 0; margin-bottom: 0; grid-template-columns: 30px minmax(0, 1fr); padding: 3px; }
+.paint-pen-workspace .paint-layer-tree button.paint-layer-grip { display: grid; place-content: center; flex: 0 0 28px; width: 28px; min-height: 44px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--text-muted); cursor: grab; touch-action: none; }
+.paint-pen-workspace .paint-layer-tree button.paint-layer-grip:active { cursor: grabbing; }
+.paint-layer-folder { border: 1px solid var(--border); border-radius: 9px; margin: 0 0 8px; padding: 3px; }
+.paint-folder-heading { position: relative; display: flex; align-items: center; min-height: 54px; border-radius: 6px; background: var(--control); }
+.paint-folder-heading.is-selected { outline: 1px solid var(--accent); }
+.paint-pen-workspace .paint-layer-tree .paint-folder-toggle { min-width: 30px; min-height: 44px; padding: 0; color: var(--text-muted); border: 0; background: none; }
+.paint-pen-workspace .paint-layer-tree .paint-folder-select { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; min-height: 48px; padding: 4px; color: var(--text); border: 0; background: none; text-align: left; }
+.paint-folder-select span { display: grid; gap: 4px; font-size: 12px; }
+.paint-folder-select small { font-size: 10px; color: var(--text-muted); }
+.paint-folder-children { padding: 8px 0 0 8px; }
+.paint-pen-workspace .paint-folder-children .paint-layer-name { grid-template-columns: 32px minmax(0, 1fr); padding: 4px; gap: 4px; }
+.paint-folder-children .paint-layer-thumbnail { width: 32px; height: 38px; }
+.paint-layer-tree .is-drop-before::before, .paint-layer-tree .is-drop-after::after { content: ''; position: absolute; left: 0; right: 0; height: 3px; background: var(--accent); z-index: 3; border-radius: 3px; pointer-events: none; }
+.paint-layer-tree .is-drop-before::before { top: -3px; }
+.paint-layer-tree .is-drop-after::after { bottom: -3px; }
+.paint-layer-tree .is-drop-inside { outline: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 20%, var(--panel)); }
+.paint-layer-tree .is-dragging { opacity: .5; }
+.paint-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.paint-pen-workspace .paint-layer-tree { display: block; }
+.paint-pen-workspace .paint-layer-tree > .paint-tree-layer { min-height: 76px; height: auto; overflow: visible; }
+.paint-pen-workspace .paint-layer-folder { overflow: visible; }
+.paint-layer-folder { position: relative; }
+.paint-layer-folder:has(> .paint-folder-heading.is-drop-after)::after { content: ''; position: absolute; bottom: -3px; left: 0; right: 0; height: 3px; border-radius: 3px; background: var(--accent); pointer-events: none; }
+.paint-folder-heading.is-drop-after::after { display: none; }

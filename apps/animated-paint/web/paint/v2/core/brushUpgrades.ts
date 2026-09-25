@@ -1,3 +1,6 @@
+import { PLAYFUL_BRUSHES } from '../playfulPresets'
+import { ORGANIC_BRUSHES } from '../organicPresets'
+import { PREVIOUS_SCRIBBLE_SOURCE, PREVIOUS_DRY_BRISTLE_SOURCE, PREVIOUS_DRY_BRISTLE_V2_SOURCE } from './previousInkRecipes'
 import { EXPRESSIVE_BRUSHES } from '../expressivePresets'
 import { animationSourceHash } from './animationTiming'
 import type { BrushV2 } from './types'
@@ -149,6 +152,17 @@ const previousSpeedTaperHash = animationSourceHash(PREVIOUS_SPEED_TAPER_SOURCE)
 
 /** Upgrade only the original built-in recipe; retain every user configuration. */
 export function upgradeParsedBrush(brush: BrushV2): BrushV2 {
+  const previousInk = brush.id === 'scribble' ? PREVIOUS_SCRIBBLE_SOURCE
+    : brush.id === 'dryBristle' ? (brush.version === 2 ? PREVIOUS_DRY_BRISTLE_V2_SOURCE : PREVIOUS_DRY_BRISTLE_SOURCE) : undefined
+  if ((brush.version === 1 || (brush.id === 'dryBristle' && brush.version === 2)) && previousInk && brush.animationJs === previousInk) {
+    const current = [...PLAYFUL_BRUSHES, ...ORGANIC_BRUSHES].find(preset => preset.id === brush.id)!
+    const timing = brush.animationTiming
+    const animationTiming = timing?.sourceHash === animationSourceHash(previousInk)
+      ? { ...timing, sourceHash: animationSourceHash(current.animationJs) }
+      : timing ?? current.animationTiming
+    return { ...brush, version: current.version, animationJs: current.animationJs, animationTiming }
+  }
+
   if (brush.id === 'speedTaper' && brush.version === 1 &&
       brush.animationJs === PREVIOUS_SPEED_TAPER_SOURCE) {
     const current = EXPRESSIVE_BRUSHES.find((preset) => preset.id === 'speedTaper')!
@@ -158,7 +172,7 @@ export function upgradeParsedBrush(brush: BrushV2): BrushV2 {
     // remain only when it is also stale for the new source.
     const animationTiming = timing && timing.sourceHash !== previousSpeedTaperHash &&
       timing.sourceHash !== animationSourceHash(current.animationJs) ? timing : undefined
-    return { ...brush, version: 2, animationJs: current.animationJs, animationTiming }
+    return { ...brush, version: current.version, animationJs: current.animationJs, animationTiming }
   }
   if (brush.id !== 'scatteredPencil' || brush.version !== 1 ||
       brush.animationJs !== PREVIOUS_SCATTERED_PENCIL_SOURCE) return brush
@@ -171,5 +185,5 @@ export function upgradeParsedBrush(brush: BrushV2): BrushV2 {
       ? { ...timing, sourceHash: animationSourceHash(current.animationJs) }
       : timing
     : current.animationTiming ? { ...current.animationTiming } : undefined
-  return { ...brush, version: 2, animationJs: current.animationJs, animationTiming }
+  return { ...brush, version: current.version, animationJs: current.animationJs, animationTiming }
 }

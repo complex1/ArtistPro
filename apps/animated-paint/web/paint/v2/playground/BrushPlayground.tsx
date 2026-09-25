@@ -1,3 +1,5 @@
+import { useShortcuts } from '@artist-studio/ui-component'
+import '../../PaintScrollbars.css'
 import {
   useEffect,
   useRef,
@@ -266,6 +268,13 @@ function BrushEditor({ brushId }: { brushId: string }) {
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', stop)
   }
+
+  useShortcuts([
+    { keys: 'Space', label: 'Play / pause brush preview', run: () => setPlaying(value => !value) },
+    { keys: 'Mod+s', label: 'Save brush', run: () => { void saveBrush().catch(error => setMessage(error instanceof Error ? error.message : 'Could not save brush.')) } },
+    { keys: 'Mod+Shift+e', label: 'Export brush JSON', run: exportBrush },
+    { keys: 'Mod+o', label: 'Import brush JSON', run: () => importRef.current?.click() },
+  ])
 
   return (
     <div className="brush-editor-page">

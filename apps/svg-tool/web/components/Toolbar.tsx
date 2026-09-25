@@ -1,3 +1,4 @@
+import { useShortcuts } from '@artist-studio/ui-component'
 import { useRef } from 'react'
 import {
   Circle,
@@ -40,6 +41,16 @@ export function Toolbar() {
   const setTool = useEditorStore((state) => state.setTool)
   const addShape = useEditorStore((state) => state.addShape)
   const addNode = useEditorStore((state) => state.addNode)
+
+  useShortcuts(tools.map((item, index) => ({
+    keys: ['v', 'a', 'h', 'r', 'o', 'p', 'b', 'n', 't', 'i'][index], label: item.label,
+    enabled: mode !== 'animate' || motionTools.includes(item.id),
+    run: () => {
+      if (item.id === 'image') { imageInput.current?.click(); return }
+      setTool(item.id)
+      if (item.id === 'rect' || item.id === 'ellipse') addShape(item.id)
+    },
+  })).filter((_, index) => mode !== 'animate' || motionTools.includes(tools[index].id)), mode !== 'preview')
 
   if (mode === 'preview') {
     return (

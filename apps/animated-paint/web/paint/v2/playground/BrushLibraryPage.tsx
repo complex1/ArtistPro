@@ -1,3 +1,4 @@
+import '../../PaintScrollbars.css'
 import { useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft,

@@ -57,12 +57,19 @@ describe.each(ORGANIC_BRUSHES)('$name', (brush) => {
 })
 
 describe('organic motion', () => {
-  it('keeps dry gaps in place while the bristles flex', () => {
+  it('jiggles separate dry chunks between held poses and switches hairs off', () => {
     const early = frame('dryBristle', 0).items
     const late = frame('dryBristle', 1).items
     expect(late.length).toBe(early.length)
-    expect(late.map((item) => item.opacity)).toEqual(early.map((item) => item.opacity))
+    expect(late.map((item) => item.opacity)).not.toEqual(early.map((item) => item.opacity))
+    expect(frame('dryBristle', 0.05).items).toEqual(early)
+    expect(frame('dryBristle', 3).items).toEqual(early)
+    expect(early.some(item => item.opacity === 0)).toBe(true)
+    expect(late.map(item => item.x)).toEqual(early.map(item => item.x))
+    expect(early.every(item => item.size * (item.scaleX ?? 1) < 19.2)).toBe(true)
     expect(late).not.toEqual(early)
+    const movement = early.map((item, i) => Math.hypot(item.x - late[i].x, item.y - late[i].y))
+    expect(movement.reduce((a, b) => a + b, 0) / movement.length).toBeGreaterThan(2)
   })
 
   it('holds graphite grain between redraws', () => {

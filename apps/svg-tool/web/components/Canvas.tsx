@@ -1,3 +1,4 @@
+import { shortcutBlocked, useShortcuts } from '@artist-studio/ui-component'
 import {
   forwardRef,
   useCallback,
@@ -253,6 +254,12 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
     setViewport(nextZoom, { x: 0, y: 0 })
   }, [activeArtboard.height, activeArtboard.width, setViewport])
 
+  useShortcuts([
+    { keys: '0', label: 'Fit canvas', run: fitCanvas },
+    { keys: 'Mod+=', label: 'Zoom in', repeat: true, run: () => setZoom(zoom + 0.1) },
+    { keys: 'Mod+-', label: 'Zoom out', repeat: true, run: () => setZoom(zoom - 0.1) },
+  ])
+
   // Opening or leaving a symbol swaps the canvas underneath the viewport, so
   // frame the one that just became active instead of keeping the old scale.
   const framedSymbolId = useRef(editingSymbolId)
@@ -274,6 +281,7 @@ export const Canvas = forwardRef<CanvasHandle>(function Canvas(_, ref) {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (shortcutBlocked(event) || event.altKey) return
       if (event.key === 'Escape' && pointMenu) {
         setPointMenu(null)
         return

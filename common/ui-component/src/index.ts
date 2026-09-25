@@ -15,3 +15,4 @@ export {
   TextField,
   type PivotPreset,
 } from './fields'
+export { useShortcuts, shortcutBlocked, matchesShortcut, shortcutEntries, subscribeShortcuts, type Shortcut } from './shortcuts'

@@ -1,3 +1,4 @@
+import { useShortcuts } from '@artist-studio/ui-component';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { installGlobalClickFeedback } from "../shared/feedback";
 import tapPilotLogo from "../shared/images/logo.png";
@@ -137,6 +138,11 @@ export default function App({ onExit }: { onExit?: () => void }) {
     }
   }
 
+  useShortcuts([
+    { keys: 'Mod+s', label: 'Save profile', enabled: !!profile, run: () => { void save().catch(error => setError(String(error))) } },
+    { keys: 'Mod+Shift+l', label: 'Open activity log', run: () => setLogOpen(true) },
+    { keys: 'Mod+Shift+c', label: 'Open connection settings', run: () => setServerOpen(true) },
+  ], !serverOpen && !logOpen);
   const running = Boolean(serverInfo?.running);
 
   return (

@@ -1,3 +1,6 @@
+import { PLAYFUL_BRUSHES } from '../playfulPresets'
+import { ORGANIC_BRUSHES } from '../organicPresets'
+import { PREVIOUS_SCRIBBLE_SOURCE, PREVIOUS_DRY_BRISTLE_SOURCE, PREVIOUS_DRY_BRISTLE_V2_SOURCE } from './previousInkRecipes'
 import { describe, expect, it } from 'vitest'
 import { runAnimationSync } from '../animation/evaluate'
 import { exportBrushJson, importBrushJson } from '../brushTransfer'
@@ -231,5 +234,23 @@ describe('animated Speed Taper recipe upgrade', () => {
     expect(later.diagnostics.filter((item) => item.code === 'animate-error')).toEqual([])
     expect(first.items.map((item) => item.size)).not.toEqual(later.items.map((item) => item.size))
     expect(runAnimationSync({ ...request, time: 0 }).items).toEqual(first.items)
+  })
+})
+
+describe.each([
+  [PLAYFUL_BRUSHES[0], PREVIOUS_SCRIBBLE_SOURCE],
+  [ORGANIC_BRUSHES[0], PREVIOUS_DRY_BRISTLE_SOURCE],
+  [ORGANIC_BRUSHES[0], PREVIOUS_DRY_BRISTLE_V2_SOURCE],
+] as const)('ink motion upgrades', (current, previous) => {
+  it('updates exact old recipes and preserves settings and edited recipes', () => {
+    const old = { ...current, version: previous === PREVIOUS_DRY_BRISTLE_V2_SOURCE ? 2 : 1, animationJs: previous, size: 43, speed: 0.6,
+      animationTiming: current.animationTiming ? { ...current.animationTiming, sourceHash: animationSourceHash(previous) } : undefined }
+    const result = parseBrush(old)!
+    expect(result.animationJs).toBe(current.animationJs)
+    expect(result.version).toBe(current.version)
+    expect(result.size).toBe(43)
+    expect(result.speed).toBe(0.6)
+    const edited = { ...old, animationJs: previous + '\n// user edit' }
+    expect(upgradeParsedBrush(edited)).toBe(edited)
   })
 })

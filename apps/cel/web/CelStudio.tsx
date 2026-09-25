@@ -1,3 +1,4 @@
+import { useShortcuts } from '@artist-studio/ui-component'
 import {
   useCallback,
   useEffect,
@@ -481,6 +482,16 @@ function CelStudio({ project }: { project: ProjectRecord }) {
       setExporting(false)
     }
   }
+
+  useShortcuts([
+    { keys: 'Mod+o', label: 'Choose / replace image', run: () => inputRef.current?.click(), enabled: !busy },
+    { keys: '0', label: 'Reset view', run: () => setView(FIT_VIEW) },
+    { keys: 'Mod+=', label: 'Zoom in', repeat: true, run: () => zoomAround(view.zoom * 1.25, { x: 0, y: 0 }) },
+    { keys: 'Mod+-', label: 'Zoom out', repeat: true, run: () => zoomAround(view.zoom / 1.25, { x: 0, y: 0 }) },
+    { keys: 'Mod+Shift+e', label: 'Export SVG', enabled: !!svg && !busy, run: downloadSvg },
+    { keys: 'Mod+Alt+e', label: 'Export PNG', enabled: !!svg && !busy && !exporting, run: () => { void downloadPng() } },
+    ...(['original', 'restored', 'vector'] as const).map((key, index) => ({ keys: String(index + 1), label: 'Toggle ' + key + ' preview', run: () => setVisible(value => ({ ...value, [key]: !value[key] })) })),
+  ])
 
   return (
     <div className="studio-shell cel-shell">

@@ -1,3 +1,4 @@
+import { ShortcutHelp } from './ShortcutHelp'
 import { lazy, Suspense, useEffect } from 'react'
 import './App.css'
 import { useHashRoute } from './app/useHashRoute'
@@ -48,6 +49,10 @@ const LiveCharacterEditor = lazy(() =>
 )
 
 export default function App() {
+  return <><AppContent /><ShortcutHelp /></>
+}
+
+function AppContent() {
   const route = useHashRoute()
 
   useEffect(() => {

@@ -7,6 +7,8 @@ import { ORGANIC_BRUSHES } from './organicPresets'
 import { WEATHER_BRUSHES } from './weatherPresets'
 import { EXPRESSIVE_BRUSHES } from './expressivePresets'
 import { REVEAL_BRUSHES } from './revealPresets'
+import { CONCEPT_BRUSHES } from './conceptPresets'
+import { PLAYFUL_BRUSHES } from './playfulPresets'
 
 const WIGGLE = `function animate(points, config, time) {
   var items = [];
@@ -438,6 +440,8 @@ export const BUILTIN_BRUSHES: BrushV2[] = [
   ...WEATHER_BRUSHES,
   ...EXPRESSIVE_BRUSHES,
   ...REVEAL_BRUSHES,
+  ...CONCEPT_BRUSHES,
+  ...PLAYFUL_BRUSHES,
 ]
 
 export function getBuiltinBrush(id: string): BrushV2 {

@@ -34,26 +34,39 @@ const HELPERS = `
 `
 
 const DRY_BRISTLE = `function animate(points, config, time) {${HELPERS}
-  // Six long bristles. Missing ink is fixed; only the hairs flex gently.
-  var step = Math.max(1, Math.ceil(points.length * 6 / 12000));
-  for (var i = 0; i < points.length; i++) {
-    var p = points[i];
-    if (i > 0) along += Math.hypot(p.x - points[i - 1].x, p.y - points[i - 1].y);
-    if (i % step !== 0) continue;
-    var angle = heading(i);
-    var nx = -Math.sin(angle), ny = Math.cos(angle);
-    var body = config.size * (0.35 + p.pressure * 0.65);
+  if (!points.length) return items;
+  var pose = ((Math.floor(time * 9) % 27) + 27) % 27;
+  var distances = [0];
+  for (var n = 1; n < points.length; n++) {
+    distances.push(distances[n - 1] + Math.hypot(points[n].x - points[n - 1].x, points[n].y - points[n - 1].y));
+  }
+  var length = distances[distances.length - 1];
+  var gap = Math.max(6, config.size * 0.8, config.spacing * 2);
+  var count = Math.min(160, Math.max(1, Math.ceil(length / gap) + 1));
+  var cursor = 1;
+  for (var i = 0; i < count; i++) {
+    var d = count > 1 ? length * i / (count - 1) : 0;
+    while (cursor < points.length - 1 && distances[cursor] < d) cursor++;
+    var a = points[Math.max(0, cursor - 1)], b = points[Math.min(cursor, points.length - 1)];
+    var span = distances[Math.min(cursor, points.length - 1)] - distances[Math.max(0, cursor - 1)];
+    var mix = span > 0 ? (d - distances[cursor - 1]) / span : 0;
+    var x = a.x + (b.x - a.x) * mix, y = a.y + (b.y - a.y) * mix;
+    var pressure = a.pressure + (b.pressure - a.pressure) * mix;
+    var angle = Math.atan2(b.y - a.y, b.x - a.x);
+    var body = config.size * (0.35 + pressure * 0.65);
+    // Short, separate hairs swap lanes and lift off in independently held poses.
+    var swap = Math.floor(random(i, 101 + pose * 31) * 6);
     for (var g = 0; g < 6; g++) {
-      var coverage = noise(along / Math.max(8, config.size * 1.8), g + 10);
-      if (g !== 2 && coverage < 0.28) continue;
-      var flex = Math.sin(time * 1.6 + along * 0.035 + g * 1.7 + random(0, g) * 6.28);
-      var across = ((g - 2.5) * 0.17 + (random(1, g) - 0.5) * 0.06) * body;
-      across += flex * body * 0.025;
-      var width = Math.max(0.4, body * (0.09 + random(2, g) * 0.12));
-      var item = mark(p.x + nx * across, p.y + ny * across,
-        width, (0.65 + coverage * 0.35) * (0.6 + p.pressure * 0.4), angle);
-      item.scaleX = Math.max(1.6, config.spacing * step * 1.8 / width);
-      item.scaleY = 0.8;
+      var key = i * 6 + g;
+      var lane = (g + swap) % 6;
+      var across = ((lane - 2.5) * 0.17 + (random(key, 211 + pose * 31) - 0.5) * 0.12) * body;
+      var width = Math.max(0.35, body * (0.04 + random(key, 17) * 0.055));
+      var extent = Math.min(gap, count > 1 ? length / (count - 1) : gap) * (0.38 + random(key, 23) * 0.4);
+      var ink = g === 0 || random(key, 307 + pose * 31) > 0.3 ? 0.55 + random(key, 29) * 0.4 : 0;
+      var item = mark(x - Math.sin(angle) * across, y + Math.cos(angle) * across,
+        width, ink * (0.6 + pressure * 0.4), angle);
+      item.scaleX = Math.max(1, extent / width);
+      item.scaleY = 1;
       items.push(item);
     }
   }
@@ -173,9 +186,10 @@ const SKETCH_ECHO = `function animate(points, config, time) {${HELPERS}
 
 export const ORGANIC_BRUSHES: BrushV2[] = [
   createBrushV2({
-    id: 'dryBristle', name: 'Dry Bristle', category: 'Organic',
+    id: 'dryBristle', version: 3, name: 'Dry Bristle', category: 'Organic',
     renderer: 'stamp', animated: true, size: 24, spacing: 2,
     color: '#342c26', opacity: 0.9, stability: 45, animationJs: DRY_BRISTLE,
+    animationTiming: { mode: 'stepped', fps: 9, sourceHash: animationSourceHash(DRY_BRISTLE) },
   }),
   createBrushV2({
     id: 'graphiteCrawl', name: 'Graphite Crawl', category: 'Organic',

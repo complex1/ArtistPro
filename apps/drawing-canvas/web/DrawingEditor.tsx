@@ -1,3 +1,4 @@
+import { shortcutBlocked, useShortcuts } from '@artist-studio/ui-component'
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import {
   ArrowDown, ArrowLeft, ArrowUp, Brush, Check, ChevronDown, Circle,
@@ -385,6 +386,7 @@ function DrawingStudio({ project }: { project: ProjectRecord }) {
   useEffect(() => {
     const onBeforeUnload = (event: BeforeUnloadEvent) => { if (dirtyRef.current) { event.preventDefault(); event.returnValue = ''; void saveNowRef.current().catch(() => {}) } }
     const onKeyDown = (event: KeyboardEvent) => {
+      if (shortcutBlocked(event) || event.altKey) return
       const target = event.target as HTMLElement | null
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
       const key = event.key.toLowerCase()
@@ -600,6 +602,8 @@ function DrawingStudio({ project }: { project: ProjectRecord }) {
   const displayedHeight = resizing && draftExtent ? Math.round(draftExtent.height / resizing.bounds.height * 100) : heightScale
   const transformHelp = draft?.transform ? draft.transform.valid ? 'Release to apply · Esc to cancel' : 'Keep corners in order; crossing is not allowed' : transformMode === 'resize' ? 'Drag handles to resize · Shift locks corner proportions' : transformMode === 'skew' ? 'Drag an edge handle to skew · Drag inside to move' : 'Drag each corner to change perspective'
   const cursorClass = spaceDown || tool === 'hand' ? draft?.tool === 'hand' ? 'is-grabbing' : 'is-hand' : tool === 'transform' ? 'is-move' : 'is-drawing'
+
+  useShortcuts([{ keys: 'Mod+Shift+e', label: 'Export PNG', run: () => { void exportPng() } }], !!state)
 
   if (!state) return <div className="dc-loading"><Brush size={30} /><h2>{error || 'Preparing your canvas…'}</h2>{error && <a href="#/drawing-canvas">Back to gallery</a>}</div>
   return <div className="dc-studio">

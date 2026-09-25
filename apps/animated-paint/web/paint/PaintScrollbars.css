@@ -1,0 +1,10 @@
+/* Persistent, non-overlay tracks are deliberately wide enough for a pen tip. */
+:is(.paint-pen-workspace, .brush-editor-page, .brush-library-page, .paint-export-backdrop, .stamp-modal-backdrop) *, :is(.paint-pen-workspace, .brush-editor-page, .brush-library-page, .paint-export-backdrop, .stamp-modal-backdrop) {
+  scrollbar-width: auto;
+  scrollbar-color: auto;
+}
+:is(:is(.paint-pen-workspace, .brush-editor-page, .brush-library-page, .paint-export-backdrop, .stamp-modal-backdrop), :is(.paint-pen-workspace, .brush-editor-page, .brush-library-page, .paint-export-backdrop, .stamp-modal-backdrop) *)::-webkit-scrollbar { display: block; width: 16px; height: 16px; }
+:is(:is(.paint-pen-workspace, .brush-editor-page, .brush-library-page, .paint-export-backdrop, .stamp-modal-backdrop), :is(.paint-pen-workspace, .brush-editor-page, .brush-library-page, .paint-export-backdrop, .stamp-modal-backdrop) *)::-webkit-scrollbar-track { background: var(--control, #20242c); border-radius: 8px; }
+:is(:is(.paint-pen-workspace, .brush-editor-page, .brush-library-page, .paint-export-backdrop, .stamp-modal-backdrop), :is(.paint-pen-workspace, .brush-editor-page, .brush-library-page, .paint-export-backdrop, .stamp-modal-backdrop) *)::-webkit-scrollbar-thumb { background: #697484; border: 3px solid var(--control, #20242c); border-radius: 8px; min-height: 36px; }
+:is(:is(.paint-pen-workspace, .brush-editor-page, .brush-library-page, .paint-export-backdrop, .stamp-modal-backdrop), :is(.paint-pen-workspace, .brush-editor-page, .brush-library-page, .paint-export-backdrop, .stamp-modal-backdrop) *)::-webkit-scrollbar-thumb:hover { background: #99a6b9; }
+:is(:is(.paint-pen-workspace, .brush-editor-page, .brush-library-page, .paint-export-backdrop, .stamp-modal-backdrop), :is(.paint-pen-workspace, .brush-editor-page, .brush-library-page, .paint-export-backdrop, .stamp-modal-backdrop) *)::-webkit-scrollbar-corner { background: var(--control, #20242c); }

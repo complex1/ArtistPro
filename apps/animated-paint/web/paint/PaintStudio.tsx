@@ -1,3 +1,4 @@
+import { useShortcuts } from '@artist-studio/ui-component'
 import {
   useCallback,
   useEffect,
@@ -8,6 +9,13 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from 'react'
 import {
+  PanelLeft,
+  PanelRight,
+  Star,
+  Settings2,
+  Play,
+  Pause,
+  Maximize,
   ArrowDown,
   ArrowUp,
   Brush,
@@ -45,6 +53,7 @@ import { getBrushFillKind } from './v2/core/fill'
 import { importImageFile, loadImageRaster } from './v2/input/imageImport'
 import { fitImageToCanvas } from './v2/input/imageTransform'
 import './v2/ui/ImageLayerControls.css'
+import './PaintWorkspace.css'
 import {
   fromPointer,
   randomStrokeSeed,
@@ -52,7 +61,10 @@ import {
   stabilizePoint,
 } from './v2/input/sampler'
 import { BrushInspector } from './v2/ui/BrushInspector'
-import { BrushHoverPreview } from './v2/ui/BrushPreview'
+import { BrushPreview } from './v2/ui/BrushPreview'
+import { groupLayers, moveLayerEntry } from './v2/core/layerOrder'
+import { LayerTree } from './v2/ui/LayerTree'
+import { LayerThumbnail } from './v2/ui/LayerThumbnail'
 import { ImageLayerTransform } from './v2/ui/ImageLayerTransform'
 import { PaintExportModal } from './v2/ui/PaintExportModal'
 import {
@@ -66,6 +78,13 @@ import { PaintPreviewHost, touchSurface } from './v2/render/previewHost'
 import { createPaintScheduler } from './v2/render/scheduler'
 import { nextDocumentFrame } from './v2/render/timing'
 import { BUILTIN_BRUSHES } from './v2/presets'
+
+function readBrushShelf(key: string): string[] {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(key) ?? '[]')
+    return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string').slice(0, 100) : []
+  } catch { return [] }
+}
 
 type Tool = 'brush' | 'eraser' | 'hand' | 'select'
 
@@ -216,7 +235,30 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
   const selectedStrokeIdRef = useRef<string | null>(null)
   const lastEditAt = useRef(0)
   const [search, setSearch] = useState('')
+  const [category, setCategory] = useState('All')
+  const [brushesHidden, setBrushesHidden] = useState(false)
+  const [layersHidden, setLayersHidden] = useState(false)
+  const [favorites, setFavorites] = useState(() => readBrushShelf('paint.favorite-brushes'))
+  const [recentBrushes, setRecentBrushes] = useState(() => readBrushShelf('paint.recent-brushes'))
+  useEffect(() => { try { localStorage.setItem('paint.favorite-brushes', JSON.stringify(favorites)) } catch { /* Session-only when storage is unavailable. */ } }, [favorites])
+  useEffect(() => { try { localStorage.setItem('paint.recent-brushes', JSON.stringify(recentBrushes)) } catch { /* Session-only when storage is unavailable. */ } }, [recentBrushes])
+  const [hoveredBrush, setHoveredBrush] = useState<string | null>(null)
+  const [sidebarTab, setSidebarTab] = useState<'layers' | 'advanced'>('layers')
+  const openAdvanced = () => { setLayersHidden(false); setSidebarTab('advanced') }
+  const [previewPaused, setPreviewPaused] = useState(false)
+  const previewPausedRef = useRef(false)
+  const previewTimeRef = useRef(0)
+  const previewNowRef = useRef(0)
+  const [multiSelect, setMultiSelect] = useState(false)
+  useEffect(() => {
+    previewPausedRef.current = previewPaused
+    invalidatePreview()
+  }, [previewPaused, invalidatePreview])
   const [zoom, setZoom] = useState(0.85)
+  useEffect(() => {
+    const stage = stageRef.current
+    if (stage) setZoom(clampZoom(Math.min((stage.clientWidth - 112) / project.document.width, (stage.clientHeight - 64) / project.document.height, 1)))
+  }, [project.document.width, project.document.height])
   const [selectedLayerIds, setSelectedLayerIds] = useState<Set<string>>(
     () => new Set([project.document.activeLayerId]),
   )
@@ -346,10 +388,12 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
       },
     })
     const scheduler = createPaintScheduler((time) => {
+      if (!previewPausedRef.current) { previewTimeRef.current = time; previewNowRef.current = Date.now() }
+      const frameTime = previewTimeRef.current
       host.request({ document: documentRef.current,
         surfaces: { rasters: rasterLayers.current, masks: eraseMasks.current },
-        time, now: Date.now(), version: renderVersion.current, gpu: gpuPreview })
-      return nextDocumentFrame(documentRef.current, time, Date.now())
+        time: frameTime, now: previewNowRef.current, version: renderVersion.current, gpu: gpuPreview })
+      return previewPausedRef.current ? Infinity : nextDocumentFrame(documentRef.current, frameTime, previewNowRef.current)
     }, previewFps)
     schedulerRef.current = scheduler
     return () => { scheduler.dispose(); host.dispose(); schedulerRef.current = null }
@@ -748,12 +792,12 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
 
   const selectLayer = (
     layerId: string,
-    event: ReactPointerEvent<HTMLButtonElement>,
+    event: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean },
   ) => {
     const layer = documentRef.current.layers.find(item => item.id === layerId)
     if (layer?.kind === 'image') setTool('select')
     selectStroke(null)
-    const additive = event.metaKey || event.ctrlKey || event.shiftKey
+    const additive = multiSelect || event.metaKey || event.ctrlKey || event.shiftKey
     setSelectedLayerIds((current) => {
       if (!additive) return new Set([layerId])
       const next = new Set(current)
@@ -772,11 +816,7 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
   const groupSelected = () => {
     if (selectedLayerIds.size < 2) return
     const groupId = crypto.randomUUID()
-    updateLayers((layers) =>
-      layers.map((layer) =>
-        selectedLayerIds.has(layer.id) ? { ...layer, groupId } : layer,
-      ),
-    )
+    updateLayers(layers => groupLayers(layers, selectedLayerIds, groupId))
   }
 
   const ungroupSelected = () => {
@@ -794,6 +834,7 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
     if (selectedLayerIds.size === 0) return
     snapshot()
     const copies: PaintDocumentV2['layers'] = []
+    const copiedGroups = new Map<string, string>()
     for (const layer of documentRef.current.layers) {
       if (!selectedLayerIds.has(layer.id)) continue
       const id = crypto.randomUUID()
@@ -808,8 +849,10 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
         mask.getContext('2d')?.drawImage(sourceMask, 0, 0)
         eraseMasks.current.set(id, mask)
       }
+      if (layer.groupId && !copiedGroups.has(layer.groupId)) copiedGroups.set(layer.groupId, crypto.randomUUID())
       copies.push({
         ...structuredClone(layer),
+        groupId: layer.groupId ? copiedGroups.get(layer.groupId) : undefined,
         id,
         name: `${layer.name} copy`,
         strokes: layer.strokes.map((stroke) => ({
@@ -852,38 +895,6 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
     setSelectedLayerIds(new Set([active.id]))
   }
 
-  const moveSelected = (direction: -1 | 1) => {
-    updateLayers((source) => {
-      const layers = [...source]
-      if (direction === 1) {
-        for (let index = layers.length - 2; index >= 0; index -= 1) {
-          if (
-            selectedLayerIds.has(layers[index].id) &&
-            !selectedLayerIds.has(layers[index + 1].id)
-          ) {
-            ;[layers[index], layers[index + 1]] = [
-              layers[index + 1],
-              layers[index],
-            ]
-          }
-        }
-      } else {
-        for (let index = 1; index < layers.length; index += 1) {
-          if (
-            selectedLayerIds.has(layers[index].id) &&
-            !selectedLayerIds.has(layers[index - 1].id)
-          ) {
-            ;[layers[index], layers[index - 1]] = [
-              layers[index - 1],
-              layers[index],
-            ]
-          }
-        }
-      }
-      return layers
-    })
-  }
-
   const updateActiveLayer = (values: Partial<PaintDocumentV2['layers'][number]>) => {
     if (!activeLayer) return
     snapshot()
@@ -899,21 +910,45 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
     const term = search.trim().toLowerCase()
     const matching = brushes.filter(
       (brush) =>
-        !term ||
+        (category === 'All' || brush.category === category || (category === 'Favorites' && favorites.includes(brush.id)) || (category === 'Recent' && recentBrushes.includes(brush.id))) && (!term ||
         brush.name.toLowerCase().includes(term) ||
-        brush.category.toLowerCase().includes(term),
+        brush.category.toLowerCase().includes(term)),
     )
+    if (category === 'Recent') matching.sort((a, b) => recentBrushes.indexOf(a.id) - recentBrushes.indexOf(b.id))
+    if (category === 'Favorites' || category === 'Recent') return matching.length ? [{ group: category, presets: matching }] : []
     return [...new Set(matching.map((brush) => brush.category))].map(
       (group) => ({
         group,
         presets: matching.filter((brush) => brush.category === group),
       }),
     )
-  }, [brushes, search])
+  }, [brushes, search, category, favorites, recentBrushes])
+
+  useShortcuts([
+    { keys: 'Mod+z', label: 'Undo', run: undo, enabled: historyState.undo > 0 },
+    { keys: 'Mod+Shift+z', label: 'Redo', run: redo, enabled: historyState.redo > 0 },
+    { keys: 'Mod+y', label: 'Redo', run: redo, enabled: historyState.redo > 0 },
+    { keys: 'Mod+s', label: 'Save', run: () => { void savePaintProjectV2({ ...project, document: documentRef.current }).then(() => setSaveError('')).catch(() => setSaveError('Save failed — project was not saved.')) } },
+    ...(['brush', 'eraser', 'select', 'hand'] as const).map((value, index) => ({ keys: ['b', 'e', 'v', 'h'][index], label: value[0].toUpperCase() + value.slice(1) + ' tool', run: () => { setTool(value); if (value !== 'select') selectStroke(null) } })),
+    { keys: 'Space', label: 'Play / pause animation', run: () => setPreviewPaused(value => !value) },
+    { keys: '[', label: 'Decrease brush size', repeat: true, run: () => editBrush({ size: Math.max(1, inspectorBrush.size - 1) }) },
+    { keys: ']', label: 'Increase brush size', repeat: true, run: () => editBrush({ size: Math.min(200, inspectorBrush.size + 1) }) },
+    { keys: 'Mod+=', label: 'Zoom in', repeat: true, run: () => setZoom(value => clampZoom(value + 0.1)) },
+    { keys: 'Mod+-', label: 'Zoom out', repeat: true, run: () => setZoom(value => clampZoom(value - 0.1)) },
+    { keys: '0', label: 'Fit canvas', run: () => { const stage = stageRef.current; if (stage) { setZoom(clampZoom(Math.min((stage.clientWidth - 112) / document.width, (stage.clientHeight - 64) / document.height))); stage.scrollTo(0, 0) } } },
+    { keys: 'Mod+Shift+e', label: 'Export', run: () => setExportSurfaces({ rasters: rasterLayers.current, masks: eraseMasks.current }) },
+    { keys: 'Mod+Shift+n', label: 'Add layer', run: addLayer },
+    { keys: 'Mod+d', label: 'Duplicate selected layers', run: duplicateSelected },
+    { keys: 'Mod+g', label: 'Group selected layers', run: groupSelected },
+    { keys: 'Mod+Shift+g', label: 'Ungroup selected layers', run: ungroupSelected },
+    { keys: 'Delete', label: 'Delete selected stroke', run: deleteSelectedStroke },
+    { keys: 'Backspace', label: 'Delete selected stroke', run: deleteSelectedStroke },
+    { keys: 'Escape', label: 'Deselect stroke', run: () => selectStroke(null) },
+  ], !loadingSurfaces && !importingImage && !exportSurfaces)
 
   return (
     <>
-    <div className="paint-workspace" inert={loadingSurfaces || importingImage} aria-busy={loadingSurfaces || importingImage}>
+    <div className={`paint-workspace paint-pen-workspace${brushesHidden ? ' is-brushes-hidden' : ''}${layersHidden ? ' is-layers-hidden' : ''}`} inert={loadingSurfaces || importingImage} aria-busy={loadingSurfaces || importingImage}>
       <header className="app-header paint-v2-header">
         <div className="brand">
           <button
@@ -942,6 +977,8 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
         </div>
         {saveError ? <span className="paint-save-error">{saveError}</span> : null}
         <div className="header-actions paint-v2-header-actions">
+          <IconButton icon={PanelLeft} label={brushesHidden ? 'Show brushes' : 'Hide brushes'} onClick={() => setBrushesHidden(value => !value)} />
+          <IconButton icon={PanelRight} label={layersHidden ? 'Show layers' : 'Hide layers'} onClick={() => setLayersHidden(value => !value)} />
           <Button onClick={() => navigate({ page: 'paint-playground' })}>
             <FlaskConical size={14} /> Playground
           </Button>
@@ -961,6 +998,9 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
           >
             <Redo2 size={14} /> Redo
           </Button>
+          <Button onClick={() => setPreviewPaused(value => !value)} aria-label={previewPaused ? 'Play animation' : 'Pause animation'}>
+            {previewPaused ? <Play size={16} /> : <Pause size={16} />} {previewPaused ? 'Preview' : 'Pause'}
+          </Button>
           <Button
             onClick={() =>
               setExportSurfaces({
@@ -979,18 +1019,6 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
           <strong>Brush library</strong>
           <small>{brushes.length} presets</small>
         </div>
-        <Button
-          onClick={() => {
-            void duplicateBrush(inspectorBrush).then(async (copy) => {
-              setBrushes(await listAllBrushes())
-              setPresetId(copy.id)
-              setDraftBrush(copy)
-              selectStroke(null)
-            })
-          }}
-        >
-          <Copy size={13} /> Duplicate brush
-        </Button>
         <input
           className="scrub-input text-input paint-search"
           aria-label="Search brushes"
@@ -998,7 +1026,12 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search brushes…"
         />
-        <div className="paint-brush-groups">
+        <div className="paint-category-tabs" aria-label="Brush categories">
+          {['All', 'Favorites', 'Recent', ...new Set(brushes.map(brush => brush.category))].map(name =>
+            <button type="button" key={name} aria-pressed={category === name} onClick={() => setCategory(name)}>{name}</button>)}
+        </div>
+        <div className="paint-brush-groups" aria-label="Brush presets" tabIndex={0}>
+          {presetGroups.length === 0 && <p className="paint-empty">No brushes match your search.</p>}
           {presetGroups.map(({ group, presets }) => (
             <details key={group} open>
               <summary>
@@ -1007,28 +1040,45 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
               </summary>
               <div>
                 {presets.map((preset) => (
-                  <BrushHoverPreview key={preset.id} brush={preset}>
+                  <div className="paint-brush-card" key={preset.id}>
                   <button
+                    aria-pressed={preset.id === presetId}
+                    onPointerEnter={() => setHoveredBrush(preset.id)}
+                    onPointerLeave={() => setHoveredBrush(null)}
+                    onFocus={() => setHoveredBrush(preset.id)}
+                    onBlur={() => setHoveredBrush(null)}
                     type="button"
                     className={preset.id === presetId ? 'is-active' : ''}
                     onClick={() => {
                       setPresetId(preset.id)
+                      setRecentBrushes(current => [preset.id, ...current.filter(id => id !== preset.id)].slice(0, 12))
                       setTool('brush')
                       setDraftBrush(structuredClone(preset))
                       selectStroke(null)
                     }}
                   >
-                    <span />
-                    {preset.name}
+                    <BrushPreview brush={preset} active={hoveredBrush === preset.id} />
+                    <span>{preset.name}</span>
                   </button>
-                  </BrushHoverPreview>
+                  <button type="button" className="paint-favorite-toggle" aria-label={`${favorites.includes(preset.id) ? 'Unfavorite' : 'Favorite'} ${preset.name}`} aria-pressed={favorites.includes(preset.id)} onClick={() => setFavorites(current => current.includes(preset.id) ? current.filter(id => id !== preset.id) : [...current, preset.id])}><Star size={14} fill={favorites.includes(preset.id) ? 'currentColor' : 'none'} /></button>
+                  </div>
+
                 ))}
               </div>
             </details>
           ))}
         </div>
+        <Button onClick={() => openAdvanced()}><Settings2 size={18} /> Advanced brush settings</Button>
       </aside>
 
+      <div className="paint-stage-shell">
+      <nav className="paint-floating-tools" aria-label="Drawing tools">
+        {([{ id: 'brush', name: 'Brush', icon: Brush }, { id: 'eraser', name: 'Eraser', icon: Eraser },
+          { id: 'select', name: 'Select', icon: MousePointer2 }, { id: 'hand', name: 'Hand', icon: Hand }] as const).map(item =>
+          <button type="button" key={item.id} aria-pressed={tool === item.id} onClick={() => { setTool(item.id); if (item.id !== 'select') selectStroke(null) }}>
+            <item.icon size={22} /><span>{item.name}</span>
+          </button>)}
+      </nav>
       <main
         ref={stageRef}
         className={`paint-v2-stage${tool === 'hand' ? ' is-panning' : ''}`}
@@ -1066,6 +1116,13 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
           ) : null}
           </div>
         </div>
+      </main>
+      </div>
+      <div className="paint-quick-bar" aria-label="Quick brush controls">
+        <label className="paint-quick-color"><input type="color" aria-label="Brush color" value={inspectorBrush.color} onChange={event => editBrush({ color: event.target.value })} /><span>Color</span></label>
+        <label>Size <input aria-label="Brush size" type="range" min="1" max="200" value={inspectorBrush.size} onChange={event => editBrush({ size: Number(event.target.value) })} /><output>{Math.round(inspectorBrush.size)} px</output></label>
+        <label>Opacity <input aria-label="Brush opacity" type="range" min="0" max="100" value={Math.round(inspectorBrush.opacity * 100)} onChange={event => editBrush({ opacity: Number(event.target.value) / 100 })} /><output>{Math.round(inspectorBrush.opacity * 100)}%</output></label>
+        <IconButton icon={Settings2} label="Open brush settings" onClick={() => openAdvanced()} />
         <div className="zoom-controls paint-zoom-controls">
           <IconButton
             icon={ArrowDown}
@@ -1078,6 +1135,10 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
             label="Zoom in"
             onClick={() => setZoom((value) => clampZoom(value + 0.1))}
           />
+          <Button onClick={() => {
+            const stage = stageRef.current
+            if (stage) { setZoom(clampZoom(Math.min((stage.clientWidth - 112) / document.width, (stage.clientHeight - 64) / document.height))); stage.scrollTo(0, 0) }
+          }}><Maximize size={16} /> Fit</Button>
           <IconButton
             icon={Hand}
             label="Hand tool"
@@ -1085,13 +1146,36 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
             onClick={() => setTool(tool === 'hand' ? 'brush' : 'hand')}
           />
         </div>
-      </main>
-
-      <aside className="inspector paint-v2-inspector">
+      </div>
+      <aside className="bottom-panel paint-v2-bottom">
+        <div className="paint-sidebar-tabs" role="tablist" aria-label="Sidebar panels" onKeyDown={event => {
+          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+          event.preventDefault()
+          const next = event.key === 'Home' ? 'layers' : event.key === 'End' ? 'advanced' : sidebarTab === 'layers' ? 'advanced' : 'layers'
+          setSidebarTab(next)
+          event.currentTarget.querySelector<HTMLButtonElement>(`#paint-${next}-tab`)?.focus()
+        }}>
+          <button type="button" role="tab" id="paint-layers-tab" tabIndex={sidebarTab === 'layers' ? 0 : -1} aria-controls="paint-layers-panel" aria-selected={sidebarTab === 'layers'} onClick={() => setSidebarTab('layers')}>Layers</button>
+          <button type="button" role="tab" id="paint-advanced-tab" tabIndex={sidebarTab === 'advanced' ? 0 : -1} aria-controls="paint-advanced-panel" aria-selected={sidebarTab === 'advanced'} onClick={() => setSidebarTab('advanced')}>Advanced settings</button>
+        </div>
+        <div id="paint-advanced-panel" role="tabpanel" aria-labelledby="paint-advanced-tab" hidden={sidebarTab !== 'advanced'} className="paint-sidebar-panel paint-advanced-scroll">
+      <aside className="inspector paint-v2-inspector paint-advanced-panel">
         <div className="paint-v2-sidebar-title">
           <strong>Tool settings</strong>
           <small>{activeLayer?.kind === 'image' ? 'Image layer' : inspectorBrush.name}</small>
         </div>
+        <Button
+          onClick={() => {
+            void duplicateBrush(inspectorBrush).then(async (copy) => {
+              setBrushes(await listAllBrushes())
+              setPresetId(copy.id)
+              setDraftBrush(copy)
+              selectStroke(null)
+            })
+          }}
+        >
+          <Copy size={13} /> Duplicate brush
+        </Button>
         <div style={{ padding: '0 12px 12px', display: 'grid', gap: 8 }}>
         <label className="preview-field">
           <span>Preview speed</span>
@@ -1109,35 +1193,6 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
         <small aria-live="off">{renderStatus}</small>
         {renderError ? <p role="alert">{renderError}</p> : null}
         </div>
-        <nav className="mode-switcher paint-v2-tool-switcher" aria-label="Animated Paint tool">
-          <button
-            type="button"
-            className={tool === 'brush' ? 'is-active' : ''}
-            onClick={() => {
-              setTool('brush')
-              selectStroke(null)
-            }}
-          >
-            <Brush size={15} /> Brush
-          </button>
-          <button
-            type="button"
-            className={tool === 'eraser' ? 'is-active' : ''}
-            onClick={() => {
-              setTool('eraser')
-              selectStroke(null)
-            }}
-          >
-            <Eraser size={15} /> Eraser
-          </button>
-          <button
-            type="button"
-            className={tool === 'select' ? 'is-active' : ''}
-            onClick={() => setTool('select')}
-          >
-            <MousePointer2 size={15} /> Select
-          </button>
-        </nav>
         {activeLayer?.kind === 'image' && activeLayer.image ? (
           <div className="paint-image-controls">
             <strong>{activeLayer.name}</strong>
@@ -1193,11 +1248,12 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
         </CollapsibleSection>
         </>}
       </aside>
-
-      <footer className="bottom-panel paint-v2-bottom">
+        </div>
+        <div id="paint-layers-panel" role="tabpanel" aria-labelledby="paint-layers-tab" hidden={sidebarTab !== 'layers'} className="paint-sidebar-panel paint-layers-content">
         <section className="layers-panel paint-v2-layers">
           <div className="panel-tabs">
             <span className="is-active">Layers</span>
+            <button type="button" className="paint-multi-select" aria-pressed={multiSelect} onClick={() => setMultiSelect(value => !value)}>Select multiple</button>
           </div>
           <div className="panel-actions paint-layer-toolbar">
             <Button onClick={() => setShowAddLayerMenu(true)} disabled={importingImage} aria-haspopup="dialog">
@@ -1227,33 +1283,28 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
                 if (file) void addImageLayer(file)
               }}
             />
-            <Button disabled={selectedLayerIds.size < 2} onClick={groupSelected}>
-              <Group size={13} /> Group
+            <Button aria-label="Group selected layers" title="Group selected layers" disabled={selectedLayerIds.size < 2} onClick={groupSelected}>
+              <Group size={18} />
             </Button>
-            <Button onClick={ungroupSelected}>
-              <Ungroup size={13} /> Ungroup
+            <Button aria-label="Ungroup selected layers" title="Ungroup selected layers" onClick={ungroupSelected}>
+              <Ungroup size={18} />
             </Button>
-            <Button onClick={duplicateSelected}>
-              <Copy size={13} /> Duplicate
+            <Button aria-label="Duplicate selected layers" title="Duplicate selected layers" onClick={duplicateSelected}>
+              <Copy size={18} />
             </Button>
-            <IconButton
-              icon={ArrowUp}
-              label="Move selected layers up"
-              onClick={() => moveSelected(1)}
-            />
-            <IconButton
-              icon={ArrowDown}
-              label="Move selected layers down"
-              onClick={() => moveSelected(-1)}
-            />
             <IconButton
               icon={Trash2}
               label="Delete selected layers"
               onClick={deleteSelected}
             />
           </div>
-          <div className="layer-list paint-layer-list">
-            {[...document.layers].reverse().map((layer) => (
+          <LayerTree layers={document.layers} selected={selectedLayerIds}
+            onSelectGroup={ids => { setSelectedLayerIds(new Set(ids)); selectStroke(null); setDocument(current => ({ ...current, activeLayerId: ids[0] })) }}
+            onMove={(source, drop) => {
+              const next = moveLayerEntry(documentRef.current.layers, source, drop)
+              if (next !== documentRef.current.layers) updateLayers(() => next)
+            }}
+            renderLayer={layer => (
               <div
                 key={layer.id}
                 className={[
@@ -1283,8 +1334,10 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
                 <button
                   type="button"
                   className="layer-name paint-layer-name"
-                  onPointerDown={(event) => selectLayer(layer.id, event)}
+                  aria-pressed={selectedLayerIds.has(layer.id)}
+                  onClick={(event) => selectLayer(layer.id, event)}
                 >
+                  <LayerThumbnail layer={layer} width={document.width} height={document.height} rasters={rasterLayers} masks={eraseMasks} ready={!loadingSurfaces} />
                   <span>{layer.name}</span>
                   <small>
                     {layer.kind === 'image' ? 'Image' : `${layer.strokes.length} strokes`}
@@ -1292,13 +1345,13 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
                   </small>
                 </button>
               </div>
-            ))}
-          </div>
+            )} />
         </section>
 
         <section className="paint-layer-inspector">
           <div className="panel-tabs paint-layer-inspector-title">
             <span className="is-active">Layer settings</span>
+            {activeLayer?.kind === 'image' && <Button onClick={() => openAdvanced()}>Transform image</Button>}
             <small>{activeLayer?.name ?? 'No layer selected'}</small>
           </div>
           <div className="paint-layer-inspector-fields">
@@ -1332,7 +1385,8 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
             </PropertyRow>
           </div>
         </section>
-      </footer>
+        </div>
+      </aside>
       {imageError ? <p role="alert" className="paint-image-error">{imageError}</p> : null}
       {exportSurfaces ? (
         <PaintExportModal

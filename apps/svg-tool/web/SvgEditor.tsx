@@ -1,3 +1,4 @@
+import { shortcutBlocked, useShortcuts } from '@artist-studio/ui-component'
 import {
   lazy,
   Suspense,
@@ -130,6 +131,8 @@ function LoadedEditor({ project }: { project: ProjectRecord }) {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (shortcutBlocked(event) || event.altKey) return
+      if (event.repeat && !['ArrowLeft', 'ArrowRight', '[', ']'].includes(event.key)) { event.preventDefault(); return }
       const target = event.target as HTMLElement | null
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
         return
@@ -229,6 +232,8 @@ function LoadedEditor({ project }: { project: ProjectRecord }) {
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [minPanel])
+
+  useShortcuts([{ keys: 'Mod+Shift+e', label: 'Export SVG', run: exportSvg }])
 
   const beginBottomResize = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault()

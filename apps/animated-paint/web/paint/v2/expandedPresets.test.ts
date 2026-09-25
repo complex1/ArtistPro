@@ -9,6 +9,9 @@ import { strokeFrame } from './render/engine'
 import { brushPreviewPoints } from './ui/brushPreviewPath'
 
 const expected = {
+  scribble: 'Motion', gooBlobs: 'Funky', particle: 'Particles', glitter: 'Particles', cascade: 'FX',
+  charcoal: 'Texture', faded: 'Texture', dashed: 'Motion', pencil: 'Texture',
+  zipperInk: 'Funky', livingStitch: 'Texture', fireflyTrail: 'Particles', pixelMelt: 'FX',
   rainStreaks: 'Particles', softSmoke: 'Particles',
   chromaticEcho: 'FX', iridescentRibbon: 'FX',
   centerBloom: 'Reveal', dustReveal: 'Reveal',
@@ -32,8 +35,8 @@ describe('expanded brush integration', () => {
       .map((brush, index) => snapshotStroke(brush, brushPreviewPoints(brush, 640, 400), document.layers[0].id, index + 7))
     const saved = parseDocument(JSON.parse(JSON.stringify(document)))!
     const restored = applyScenePatch(new SceneDiffer().diff(saved), new Map())
-    expect(restored.layers[0].strokes).toHaveLength(8)
-    for (let i = 0; i < 8; i++) {
+    expect(restored.layers[0].strokes).toHaveLength(Object.keys(expected).length)
+    for (let i = 0; i < Object.keys(expected).length; i++) {
       const original = document.layers[0].strokes[i]
       const loaded = restored.layers[0].strokes[i]
       for (const time of [750, 4000, 250]) {

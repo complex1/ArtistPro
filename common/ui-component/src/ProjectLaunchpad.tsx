@@ -1,3 +1,4 @@
+import { useShortcuts } from './shortcuts'
 import { useId, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft, ArrowRight, Brush, Check, ChevronDown, Clock3, FileImage,
@@ -113,6 +114,8 @@ export function ProjectLaunchpad(props: ProjectLaunchpadProps) {
     nameRef.current?.focus({ preventScroll: true })
     nameRef.current?.select()
   }
+
+  useShortcuts([{ keys: 'Mod+Alt+n', label: 'Focus new project form', run: focusCreation, enabled: !creating }])
 
   return (
     <div className={`lp-shell lp-${tool}`}>

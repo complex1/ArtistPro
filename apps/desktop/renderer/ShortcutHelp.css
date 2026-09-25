@@ -1,0 +1,15 @@
+.shortcut-help-trigger { position:fixed; right:12px; bottom:12px; z-index:800; width:32px; height:32px; border:1px solid #687080; border-radius:8px; background:#202630; color:#fff; cursor:pointer; font-size:20px; box-shadow:0 2px 8px #0004; }
+.shortcut-help-dialog { padding:22px; width:min(540px,calc(100vw - 48px)); max-height:80vh; border:1px solid #697181; border-radius:14px; background:#202630; color:#f5f5f5; box-shadow:0 20px 70px #0006; }
+.shortcut-help-dialog::backdrop { background:#0008; }
+.shortcut-help-dialog header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.shortcut-help-dialog h2 { margin:0; font-size:20px; }
+.shortcut-help-dialog button { min-width:36px; min-height:36px; color:inherit; background:#363e4b; border:1px solid #697181; border-radius:6px; cursor:pointer; }
+.shortcut-help-dialog p { font-size:13px; line-height:1.6; color:#c7cfda; }
+.shortcut-help-list { max-height:55vh; overflow-y:scroll; scrollbar-gutter:stable; scrollbar-width:auto; }
+.shortcut-help-list::-webkit-scrollbar { width:14px; }
+.shortcut-help-list::-webkit-scrollbar-track { background:#131923; }
+.shortcut-help-list::-webkit-scrollbar-thumb { background:#778294; border:3px solid #131923; border-radius:8px; }
+.shortcut-help-list dl { margin:0; }
+.shortcut-help-list dl>div { display:flex; justify-content:space-between; gap:16px; padding:10px 4px; border-bottom:1px solid #ffffff16; font-size:13px; }
+.shortcut-help-list dd { margin:0; text-align:right; }
+.shortcut-help-list kbd { font-size:12px; white-space:nowrap; background:#10151e; padding:3px 6px; border-radius:4px; }
