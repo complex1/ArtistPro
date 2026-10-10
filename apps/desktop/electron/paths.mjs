@@ -32,6 +32,7 @@ export function resolveStudioPaths({
       'site-packages',
       RUNTIME_MANIFEST_NAME,
     ),
+    backendExecutable: path.join(resourcesPath, 'backend-runtime', 'artist-backend', platform === 'win32' ? 'artist-backend.exe' : 'artist-backend'),
     distIndex: path.join(appRoot, 'dist/index.html'),
     phoneDistPath: path.join(appRoot, 'dist-tappilot-phone'),
     venvPython,

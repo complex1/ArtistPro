@@ -2014,7 +2014,7 @@ body.is-scrubbing { cursor: ew-resize; user-select: none; }
   color: var(--text-muted);
 }
 
-/* Artist Pro home ------------------------------------------------------- */
+/* Artist Studio home ------------------------------------------------------- */
 
 .home-shell {
   display: grid;

@@ -1,5 +1,8 @@
 # FrameByFrame Animation
 
+![frame-by-frame editing workspace](../../docs/screenshots/frame-by-frame/editor.png)
+
+
 A raster animation workspace at `#/frame-by-frame` for drawing poses, controlling their timing, and generating guided line-art in-betweens locally.
 
 ## Workflow
@@ -30,7 +33,7 @@ The browser worker extracts ink, skeletonizes a bounded analysis image, matches 
 
 **ML assist** adds a per-request radial-basis motion model. It fits a bounded residual field from mutually-consistent line-feature matches after the coarse TPS pose is found. Your guides are retained as high-weight locks, so the model can correct a moving eye, hand, or other local stroke without shifting a guide you placed. The renderer pins every guide into its deformation grid, including guides between grid samples. ML assist is used only when automatic guide confidence and bidirectional field consistency are strong; otherwise generation safely uses Guided TPS. It runs entirely in the existing browser worker: no checkpoint download, server, image upload, or external inference service is required. It is a local motion-refinement model, not a generative model; it does not invent missing anatomy or hidden lines. Choose **Guided TPS** to bypass the refinement stage.
 
-The implementation remains separate from the pretrained matching/refinement/synthesis pipeline described in [Thin-Plate Spline-based Interpolation for Animation Line Inbetweening](https://arxiv.org/abs/2408.09131). That upstream research checkpoint has third-party and unclear checkpoint licensing, so it is not bundled into Artist Pro.
+The implementation remains separate from the pretrained matching/refinement/synthesis pipeline described in [Thin-Plate Spline-based Interpolation for Animation Line Inbetweening](https://arxiv.org/abs/2408.09131). That upstream research checkpoint has third-party and unclear checkpoint licensing, so it is not bundled into Artist Studio.
 
 Generation is capped at 48 MiPixels per batch (12 drawings at 2048²), with up to 48 guides. Work runs in a dedicated worker that is terminated on cancellation or closing the studio. Preview output is validated against the shot's frame, cel, dimension, and image-data limits before insertion.
 
@@ -78,3 +81,7 @@ npm run build
 ```
 
 The Chromium harness uses an isolated profile and temporary Vite server. It verifies composite pixels, held poses, transparency, GIF frames, playable video duration, cancellation, real pointer drawing, timeline edits, save/reopen, rapid scrubbing, recovery from failed storage writes, and real worker analysis, generated pixel positions, preview invalidation, insertion, fit timing, one-step Undo, and persistence of generated drawings.
+
+## Suite guides
+
+[Installation](../../docs/installation.md) · [Development](../../docs/development.md) · [Saving and backups](../../docs/data-and-backups.md) · [Testing evidence](../../docs/testing.md) · [Gallery screenshot](../../docs/screenshots/frame-by-frame/home.png)

@@ -1,0 +1,37 @@
+name: Deploy landing website
+on:
+  push:
+    branches: [main, master]
+    paths: ['website/**', 'docs/screenshots/**', 'public/artist-studio.svg', 'scripts/build-site.mjs', 'package*.json', '.github/workflows/pages.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  website:
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - uses: actions/configure-pages@v5
+        id: pages
+      - run: npm run build:site
+        env:
+          SITE_URL: ${{ steps.pages.outputs.base_url }}/
+      - run: npm run check:docs
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-site
+      - uses: actions/deploy-pages@v4
+        id: deploy

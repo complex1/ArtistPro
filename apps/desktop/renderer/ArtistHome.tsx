@@ -4,7 +4,9 @@ import {
   Clapperboard,
   CircleQuestionMark,
   Bone,
+  Box,
   Moon,
+  Orbit,
   Paintbrush,
   Palette,
   PenTool,
@@ -37,6 +39,8 @@ const icons: Record<string, LucideIcon> = {
   cel: Sparkles,
   tappilot: Smartphone,
   'live-character': Bone,
+  'reference-3d': Box,
+  'anime-3d': Orbit,
 }
 
 const modules = import.meta.glob('../../*/tool.json', {
@@ -134,7 +138,7 @@ export function ArtistHome() {
             <Sparkles size={19} strokeWidth={2} />
           </span>
           <span className="home-brand-copy">
-            <strong>Artist Pro</strong>
+            <strong>Artist Studio</strong>
             <small>Creative Studio</small>
           </span>
         </div>

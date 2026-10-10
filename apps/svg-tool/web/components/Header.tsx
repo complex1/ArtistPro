@@ -46,7 +46,7 @@ export function Header({
           className="studio-crumb"
           onClick={() => navigate({ page: 'home' })}
         >
-          Artist Pro
+          Artist Studio
         </button>
         <b>/</b>
         <button

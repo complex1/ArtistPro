@@ -1,6 +1,9 @@
 # Live Character
 
-A browser-based 2D character editor integrated into Artist Pro. Open the **Live Character** tool card, or navigate to `#/live-character`. Start with an empty character or the included starter rig.
+![live-character editing workspace](../../docs/screenshots/live-character/editor.png)
+
+
+A browser-based 2D character editor integrated into Artist Studio. Open the **Live Character** tool card, or navigate to `#/live-character`. Start with an empty character or the included starter rig.
 
 ## Workflow
 
@@ -20,7 +23,7 @@ Generate a mesh for a layer in **Mesh** mode, then switch to **Animate**. Select
 
 ## Project storage
 
-Projects are stored in the `artist-studio-live-character` IndexedDB database, under the current browser/Electron origin. The feature works without the Python project service. Shared Artist Pro Recent Projects merges this store with the other tools' API project lists.
+Projects are stored in the `artist-studio-live-character` IndexedDB database, under the current browser/Electron origin. The feature works without the Python project service. Shared Artist Studio Recent Projects merges this store with the other tools' API project lists.
 
 Save acknowledgment waits for the IndexedDB transaction to commit. Storage or validation failures are reported instead of silently falling back to temporary memory. Export project JSON for backups and moving characters between browsers or machines. Clearing site data removes browser projects. Importing a document or a full project record always creates an independent project ID.
 
@@ -43,3 +46,7 @@ Save acknowledgment waits for the IndexedDB transaction to commit. Storage or va
 - `web/render.ts`, `web/assets.ts`, `web/export.ts`: rendering, artwork import, and export.
 
 Run feature checks with `npx vitest run apps/live-character apps/desktop/renderer/app/routes.test.ts apps/desktop/renderer/home/recentProjects.test.ts`.
+
+## Suite guides
+
+[Installation](../../docs/installation.md) · [Development](../../docs/development.md) · [Saving and backups](../../docs/data-and-backups.md) · [Testing evidence](../../docs/testing.md) · [Gallery screenshot](../../docs/screenshots/live-character/home.png)

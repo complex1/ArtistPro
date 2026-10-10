@@ -1,0 +1,162 @@
+[
+  {
+    "name": "fastapi",
+    "version": "0.141.1",
+    "license": "MIT",
+    "notices": [
+      "docs/licenses/python/fastapi@0.141.1/licenses/LICENSE"
+    ]
+  },
+  {
+    "name": "uvicorn",
+    "version": "0.52.4",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "docs/licenses/python/uvicorn@0.52.4/licenses/LICENSE.md"
+    ]
+  },
+  {
+    "name": "annotated-doc",
+    "version": "0.0.5",
+    "license": "MIT",
+    "notices": [
+      "docs/licenses/python/annotated-doc@0.0.5/licenses/LICENSE"
+    ]
+  },
+  {
+    "name": "annotated-types",
+    "version": "0.8.0",
+    "license": "MIT",
+    "notices": [
+      "docs/licenses/python/annotated-types@0.8.0/licenses/LICENSE"
+    ]
+  },
+  {
+    "name": "anyio",
+    "version": "4.15.0",
+    "license": "MIT",
+    "notices": [
+      "docs/licenses/python/anyio@4.15.0/licenses/LICENSE"
+    ]
+  },
+  {
+    "name": "click",
+    "version": "8.5.0",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "docs/licenses/python/click@8.5.0/licenses/LICENSE.txt"
+    ]
+  },
+  {
+    "name": "h11",
+    "version": "0.16.0",
+    "license": "MIT",
+    "notices": [
+      "docs/licenses/python/h11@0.16.0/licenses/LICENSE.txt"
+    ]
+  },
+  {
+    "name": "httptools",
+    "version": "0.8.0",
+    "license": "MIT",
+    "notices": [
+      "docs/licenses/python/httptools@0.8.0/licenses/LICENSE",
+      "docs/licenses/python/httptools@0.8.0/licenses/vendor/http-parser/LICENSE-MIT",
+      "docs/licenses/python/httptools@0.8.0/licenses/vendor/llhttp/LICENSE"
+    ]
+  },
+  {
+    "name": "idna",
+    "version": "3.19",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "docs/licenses/python/idna@3.19/licenses/LICENSE.md"
+    ]
+  },
+  {
+    "name": "pydantic",
+    "version": "2.13.5",
+    "license": "MIT",
+    "notices": [
+      "docs/licenses/python/pydantic@2.13.5/licenses/LICENSE"
+    ]
+  },
+  {
+    "name": "pydantic_core",
+    "version": "2.46.5",
+    "license": "MIT",
+    "notices": [
+      "docs/licenses/python/pydantic_core@2.46.5/licenses/LICENSE"
+    ]
+  },
+  {
+    "name": "python-dotenv",
+    "version": "1.2.3",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "docs/licenses/python/python-dotenv@1.2.3/licenses/LICENSE"
+    ]
+  },
+  {
+    "name": "PyYAML",
+    "version": "6.0.3",
+    "license": "MIT",
+    "notices": [
+      "docs/licenses/python/PyYAML@6.0.3/licenses/LICENSE"
+    ]
+  },
+  {
+    "name": "starlette",
+    "version": "1.6.0",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "docs/licenses/python/starlette@1.6.0/licenses/LICENSE.md"
+    ]
+  },
+  {
+    "name": "typing-inspection",
+    "version": "0.4.4",
+    "license": "MIT",
+    "notices": [
+      "docs/licenses/python/typing-inspection@0.4.4/licenses/LICENSE"
+    ]
+  },
+  {
+    "name": "typing_extensions",
+    "version": "4.16.0",
+    "license": "PSF-2.0",
+    "notices": [
+      "docs/licenses/python/typing_extensions@4.16.0/licenses/LICENSE"
+    ]
+  },
+  {
+    "name": "uvloop",
+    "version": "0.22.1",
+    "license": "MIT License",
+    "notices": [
+      "docs/licenses/python/uvloop@0.22.1/licenses/LICENSE-APACHE",
+      "docs/licenses/python/uvloop@0.22.1/licenses/LICENSE-MIT"
+    ]
+  },
+  {
+    "name": "watchfiles",
+    "version": "1.2.0",
+    "license": "MIT",
+    "notices": [
+      "docs/licenses/python/watchfiles@1.2.0/licenses/LICENSE"
+    ]
+  },
+  {
+    "name": "websockets",
+    "version": "17.1",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "docs/licenses/python/websockets@17.1/licenses/LICENSE"
+    ]
+  },
+  {
+    "name": "Python",
+    "version": "3.14.6",
+    "noticeCopied": true
+  }
+]

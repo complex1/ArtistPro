@@ -1,0 +1,292 @@
+{
+  "version": 2,
+  "name": "Untitled",
+  "width": 800,
+  "height": 600,
+  "background": "#ffffff",
+  "layers": [
+    {
+      "id": "3e45e1f7-279e-4eca-aac5-eac63ca5e23e",
+      "name": "Layer 1",
+      "kind": "drawing",
+      "visible": true,
+      "opacity": 1,
+      "blendMode": "source-over",
+      "rasterDataUrl": null,
+      "eraseMaskDataUrl": null,
+      "strokes": [
+        {
+          "id": "2793ff8c-7a64-4ceb-962e-568ff3517265",
+          "layerId": "3e45e1f7-279e-4eca-aac5-eac63ca5e23e",
+          "brushSnapshot": {
+            "id": "wiggle",
+            "version": 1,
+            "name": "Wiggle",
+            "category": "Motion",
+            "renderer": "line",
+            "animated": true,
+            "closedPath": false,
+            "fill": {
+              "enabled": false,
+              "outline": true
+            },
+            "size": 12,
+            "color": "#111111",
+            "opacity": 1,
+            "stamps": [
+              "dot"
+            ],
+            "spacing": 4,
+            "scatter": {
+              "along": 0,
+              "across": 0,
+              "seed": 1
+            },
+            "stability": 35,
+            "blurRadius": 0,
+            "glow": 0,
+            "shadow": {
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 0,
+              "color": "#000000",
+              "opacity": 0
+            },
+            "rotation": "followPath",
+            "rotationDegrees": 0,
+            "stampsPerPoint": 1,
+            "drift": 0,
+            "distortion": 0,
+            "blendMode": "source-over",
+            "hardness": 1,
+            "particle": {
+              "count": 1,
+              "lifetime": 1,
+              "velocity": 0,
+              "gravity": 0,
+              "spawn": 1
+            },
+            "speed": 1,
+            "seed": 1,
+            "animationJs": "function animate(points, config, time) {\n  var items = [];\n  for (var i = 0; i < points.length; i++) {\n    var p = points[i];\n    var n = i / Math.max(1, points.length - 1);\n    var wobble = Math.sin(time * 8 + n * 14) * config.size * 0.5;\n    var angle = i + 1 < points.length ? Math.atan2(points[i + 1].y - p.y, points[i + 1].x - p.x) : 0;\n    items.push({\n      x: p.x - Math.sin(angle) * wobble,\n      y: p.y + Math.cos(angle) * wobble,\n      size: config.size * (0.4 + p.pressure * 0.6),\n      rotation: angle,\n      opacity: config.opacity,\n      color: config.color,\n      kind: \"segment\",\n      blur: config.blurRadius,\n      glow: config.glow,\n      shadow: config.shadow\n    });\n  }\n  return items;\n}\n"
+          },
+          "points": [
+            {
+              "x": 240,
+              "y": 270.4109589041096,
+              "t": 1.3660999999046326,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 0
+            },
+            {
+              "x": 248.54794520547944,
+              "y": 279.67123287671234,
+              "t": 1.3663999999761582,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 19388.280562141506
+            },
+            {
+              "x": 260.0876712328767,
+              "y": 291.46027397260275,
+              "t": 1.3827999999523164,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1547.548916230079
+            },
+            {
+              "x": 272.6745205479452,
+              "y": 301.997397260274,
+              "t": 1.4010999999046325,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1380.0108478161887
+            },
+            {
+              "x": 285.62786301369863,
+              "y": 309.2470342465753,
+              "t": 1.4193999999761582,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1247.924899949648
+            },
+            {
+              "x": 298.70947808219177,
+              "y": 312.4967359589041,
+              "t": 1.4370999999046326,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1171.5961930829685
+            },
+            {
+              "x": 311.83598856164383,
+              "y": 310.78481648972604,
+              "t": 1.4553999999761582,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1112.8769572503938
+            },
+            {
+              "x": 324.9782124349315,
+              "y": 305.1993433056507,
+              "t": 1.4736999999284743,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1200.4960540538107
+            },
+            {
+              "x": 338.1259359960616,
+              "y": 295.40881125286813,
+              "t": 1.490899999976158,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1466.2427908712239
+            },
+            {
+              "x": 351.27558444793664,
+              "y": 283.4341798289148,
+              "t": 1.5092999999523162,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1487.0373787567828
+            },
+            {
+              "x": 364.4259066115723,
+              "y": 269.2704560908051,
+              "t": 1.5276999999284744,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1615.9896163280005
+            },
+            {
+              "x": 377.5764645743243,
+              "y": 255.76520757698725,
+              "t": 1.5448999999761581,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1686.0617200870342
+            },
+            {
+              "x": 390.7271050667669,
+              "y": 243.91508292591814,
+              "t": 1.5632999999523163,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1480.109772582743
+            },
+            {
+              "x": 403.8777744446013,
+              "y": 234.78123792818093,
+              "t": 1.5815999999046326,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1346.067410835508
+            },
+            {
+              "x": 417.0284539323228,
+              "y": 229.44740587760305,
+              "t": 1.5997999999523163,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1199.5941829167623
+            },
+            {
+              "x": 430.1791369585047,
+              "y": 229.00522219414736,
+              "t": 1.618,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1112.2666922886003
+            },
+            {
+              "x": 443.32982122314786,
+              "y": 232.4121017405543,
+              "t": 1.635899999976158,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1167.5822661124623
+            },
+            {
+              "x": 456.4805059212524,
+              "y": 240.72779725302962,
+              "t": 1.6541999999284744,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1308.0524118851679
+            },
+            {
+              "x": 469.6311907710685,
+              "y": 252.18623588787543,
+              "t": 1.6715,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1551.1224148238987
+            },
+            {
+              "x": 482.7818756739835,
+              "y": 265.4569633826742,
+              "t": 1.6887999999523162,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1661.4453315496698
+            },
+            {
+              "x": 495.93256059548327,
+              "y": 279.3619919784565,
+              "t": 1.7070999999046326,
+              "pressure": 0.5,
+              "tiltX": 0,
+              "tiltY": 0,
+              "altitude": 0,
+              "velocity": 1608.9712501073398
+            }
+          ],
+          "seed": 1445868412,
+          "createdAt": 1791616593636
+        }
+      ]
+    }
+  ],
+  "activeLayerId": "3e45e1f7-279e-4eca-aac5-eac63ca5e23e"
+}

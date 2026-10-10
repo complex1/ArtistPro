@@ -162,7 +162,7 @@ async function getPlatformCapabilityStatus() {
 }
 
 async function openCapabilitySettings(settingsUrl) {
-  if (!settingsUrl) return false;
+  if (settingsUrl !== "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") return false;
   await shell.openExternal(settingsUrl);
   return true;
 }

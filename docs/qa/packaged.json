@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-10T07:23:30.096Z",
+  "platform": "darwin",
+  "arch": "arm64",
+  "passed": [
+    "Actual packaged Electron host is running",
+    "Packaged host uses an isolated profile",
+    "Built file renderer lists nine tools",
+    "Packaged frozen backend serves nine manifests without system Python",
+    "Packaged API plugin responds: svg-tool",
+    "Packaged API plugin responds: animated-paint",
+    "Packaged API plugin responds: cel",
+    "Packaged TapPilot preload and validated IPC work",
+    "Packaged LAN control stays off",
+    "Packaged tool home opens: svg",
+    "Packaged tool home opens: paint",
+    "Packaged tool home opens: cel",
+    "Packaged tool home opens: drawing-canvas",
+    "Packaged tool home opens: frame-by-frame",
+    "Packaged tool home opens: live-character",
+    "Packaged tool home opens: reference-3d",
+    "Packaged tool home opens: anime-3d",
+    "Packaged tool home opens: tappilot",
+    "No packaged renderer console errors",
+    "Validated IPC opens a separate native tool window",
+    "Closing every macOS window keeps the backend alive",
+    "macOS activation reopens the built home",
+    "Packaged app quits cleanly",
+    "Quit stops the owned backend"
+  ],
+  "ok": true
+}

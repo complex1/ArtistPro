@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "name": "Untitled scene",
+  "width": 1600,
+  "height": 1200,
+  "objects": [
+    {
+      "id": "VlV0RQbXcNjg0BlSVrh4e",
+      "name": "Drawing figure",
+      "kind": "figure",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "color": "#d5bca7",
+      "visible": true,
+      "locked": false,
+      "pose": {}
+    }
+  ],
+  "assets": [],
+  "camera": {
+    "position": [
+      3.2,
+      2.4,
+      5
+    ],
+    "target": [
+      0,
+      0.9,
+      0
+    ],
+    "projection": "perspective",
+    "fov": 40,
+    "orthoSize": 3,
+    "roll": 0
+  },
+  "light": {
+    "azimuth": 45,
+    "elevation": 50,
+    "intensity": 2.5,
+    "ambient": 0.8,
+    "color": "#fff4e7",
+    "shadows": true
+  },
+  "floor": {
+    "visible": true,
+    "grid": true,
+    "color": "#e2e5e7"
+  },
+  "background": "#eef0f2",
+  "displayStyle": "clay",
+  "transparent": false,
+  "savedViews": [],
+  "savedPoses": []
+}

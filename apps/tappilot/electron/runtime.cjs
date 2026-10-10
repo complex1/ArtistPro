@@ -5,6 +5,7 @@ const store = require("./store.cjs");
 const logger = require("./logger.cjs");
 const executor = require("./executor.cjs");
 const { createLanServer } = require("./server.cjs");
+const { isSafeExternalUrl } = require("../../desktop/electron/security.cjs");
 
 let isDev = false;
 let getWindows = () => [];
@@ -19,6 +20,14 @@ let serverInfo = {
 let starting = false;
 let stopping = false;
 let initialized = false;
+let validateSender = () => { throw new Error("IPC sender validation is required"); };
+
+function handle(channel, listener) {
+  ipcMain.handle(channel, (event, ...args) => {
+    validateSender(event);
+    return listener(event, ...args);
+  });
+}
 
 // TapPilot can be open in any window, so every window hears the update and the
 // ones without a TapPilot view simply ignore it.
@@ -131,9 +140,9 @@ async function stopRemoteServer() {
 }
 
 function registerIpc() {
-  ipcMain.handle("profiles:list", () => store.listProfiles());
-  ipcMain.handle("profiles:get", (_e, id) => store.getProfile(id));
-  ipcMain.handle("profiles:create", (_e, payload) => {
+  handle("profiles:list", () => store.listProfiles());
+  handle("profiles:get", (_e, id) => store.getProfile(id));
+  handle("profiles:create", (_e, payload) => {
     const profile = store.createProfile(payload || {});
     logger.append({
       level: "info",
@@ -143,7 +152,7 @@ function registerIpc() {
     });
     return profile;
   });
-  ipcMain.handle("profiles:import", (_e, data, options) => {
+  handle("profiles:import", (_e, data, options) => {
     try {
       const profile = store.importProfile(data, options || {});
       logger.append({
@@ -163,10 +172,10 @@ function registerIpc() {
       throw new Error(err.message || "Import failed");
     }
   });
-  ipcMain.handle("profiles:validateImport", (_e, data) =>
+  handle("profiles:validateImport", (_e, data) =>
     store.validateImport(data)
   );
-  ipcMain.handle("profiles:importConflicts", (_e, data) => {
+  handle("profiles:importConflicts", (_e, data) => {
     const conflicts = store.findImportConflicts(data);
     return {
       nameConflict: conflicts.nameConflict
@@ -177,7 +186,7 @@ function registerIpc() {
         : null,
     };
   });
-  ipcMain.handle("profiles:save", (_e, profile) => {
+  handle("profiles:save", (_e, profile) => {
     try {
       const saved = store.saveProfile(profile);
       logger.append({
@@ -197,7 +206,7 @@ function registerIpc() {
       throw err;
     }
   });
-  ipcMain.handle("profiles:delete", (_e, id) => {
+  handle("profiles:delete", (_e, id) => {
     const existing = store.getProfile(id);
     const ok = store.deleteProfile(id);
     logger.append({
@@ -207,11 +216,11 @@ function registerIpc() {
     });
     return ok;
   });
-  ipcMain.handle("profiles:export", (_e, id) => store.exportProfile(id));
+  handle("profiles:export", (_e, id) => store.exportProfile(id));
 
-  ipcMain.handle("styles:list", () => store.listStyles());
-  ipcMain.handle("styles:get", (_e, id) => store.getStyle(id));
-  ipcMain.handle("styles:create", (_e, payload) => {
+  handle("styles:list", () => store.listStyles());
+  handle("styles:get", (_e, id) => store.getStyle(id));
+  handle("styles:create", (_e, payload) => {
     const style = store.createStyle(payload || {});
     logger.append({
       level: "info",
@@ -220,7 +229,7 @@ function registerIpc() {
     });
     return style;
   });
-  ipcMain.handle("styles:save", (_e, style) => {
+  handle("styles:save", (_e, style) => {
     const saved = store.saveStyle(style);
     logger.append({
       level: "info",
@@ -229,7 +238,7 @@ function registerIpc() {
     });
     return saved;
   });
-  ipcMain.handle("styles:delete", (_e, id) => {
+  handle("styles:delete", (_e, id) => {
     const existing = store.getStyle(id);
     const ok = store.deleteStyle(id);
     logger.append({
@@ -239,7 +248,7 @@ function registerIpc() {
     });
     return ok;
   });
-  ipcMain.handle("styles:import", (_e, data) => {
+  handle("styles:import", (_e, data) => {
     try {
       const style = store.importStyle(data);
       logger.append({
@@ -259,7 +268,7 @@ function registerIpc() {
     }
   });
 
-  ipcMain.handle("profiles:setPublished", (_e, id, published) => {
+  handle("profiles:setPublished", (_e, id, published) => {
     const profile = store.setPublished(id, published);
     logger.append({
       level: "info",
@@ -271,31 +280,34 @@ function registerIpc() {
     return profile;
   });
 
-  ipcMain.handle("server:info", () => {
+  handle("server:info", () => {
     if (lanServer) serverInfo = lanServer.getInfo();
     return withPhoneUrl(serverInfo);
   });
-  ipcMain.handle("server:start", async () => startRemoteServer());
-  ipcMain.handle("server:stop", async () => stopRemoteServer());
-  ipcMain.handle("server:qr", async () => {
+  handle("server:start", async () => startRemoteServer());
+  handle("server:stop", async () => stopRemoteServer());
+  handle("server:qr", async () => {
     if (lanServer) serverInfo = lanServer.getInfo();
     const info = withPhoneUrl(serverInfo);
     if (!info.running || !info.primaryUrl) return null;
     return QRCode.toDataURL(info.primaryUrl, { margin: 1, width: 240 });
   });
 
-  ipcMain.handle("shell:openExternal", (_e, url) => shell.openExternal(url));
+  handle("shell:openExternal", (_e, url) => {
+    if (!isSafeExternalUrl(url)) throw new Error("Only HTTP(S) links can be opened");
+    return shell.openExternal(url);
+  });
 
   const capabilities = require("./platformCapabilities.cjs");
-  ipcMain.handle("platform:capabilities", () =>
+  handle("platform:capabilities", () =>
     capabilities.getPlatformCapabilityStatus()
   );
-  ipcMain.handle("platform:openSettings", (_e, settingsUrl) =>
+  handle("platform:openSettings", (_e, settingsUrl) =>
     capabilities.openCapabilitySettings(settingsUrl)
   );
 
-  ipcMain.handle("logs:list", () => logger.list());
-  ipcMain.handle("logs:clear", () => {
+  handle("logs:list", () => logger.list());
+  handle("logs:clear", () => {
     logger.clear();
     broadcastLog({ type: "clear" });
     return true;
@@ -309,6 +321,7 @@ async function initialize(options = {}) {
   getWindows =
     typeof options.getWindows === "function" ? options.getWindows : getWindows;
   phoneOutputPath = options.phoneDistPath || null;
+  validateSender = options.validateSender || validateSender;
   logger.setOnAppend((payload) => broadcastLog(payload));
   logger.startPruneLoop();
   registerIpc();

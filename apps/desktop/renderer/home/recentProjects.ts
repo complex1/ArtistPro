@@ -18,21 +18,25 @@ export type RecentProject = ProjectSummary & {
 }
 
 /**
- * Merge tool-owned project stores. Drawing Canvas, FrameByFrame, and Live Character use IndexedDB;
+ * Merge tool-owned project stores. Drawing Canvas, FrameByFrame, Live Character, 3D Reference, and Anime 3D use IndexedDB;
  * existing tools continue using their manifest API endpoints.
  */
 export async function loadRecentProjects(
   tools: ToolManifest[],
 ): Promise<RecentProject[]> {
   const sources = tools.filter(
-    (tool) => tool.status === 'ready' && (Boolean(tool.apiPrefix) || tool.id === 'live-character' || tool.id === 'drawing-canvas' || tool.id === 'frame-by-frame'),
+    (tool) => tool.status === 'ready' && (Boolean(tool.apiPrefix) || tool.id === 'live-character' || tool.id === 'drawing-canvas' || tool.id === 'frame-by-frame' || tool.id === 'reference-3d' || tool.id === 'anime-3d'),
   )
 
   const batches = await Promise.all(
     sources.map(async (tool) => {
       const apiPrefix = tool.apiPrefix
       try {
-        const summaries = tool.id === 'frame-by-frame'
+        const summaries = tool.id === 'anime-3d'
+          ? await (await import('@artist-studio/anime-3d/library')).listProjects()
+          : tool.id === 'reference-3d'
+          ? await (await import('@artist-studio/reference-3d/library')).listProjects()
+          : tool.id === 'frame-by-frame'
           ? await (await import('@artist-studio/frame-by-frame/library')).listProjects()
           : tool.id === 'drawing-canvas'
           ? await (await import('@artist-studio/drawing-canvas/library')).listProjects()
@@ -63,6 +67,14 @@ export async function loadRecentProjects(
 export async function deleteRecentProject(
   project: RecentProject,
 ): Promise<void> {
+  if (project.toolId === 'anime-3d') {
+    await (await import('@artist-studio/anime-3d/library')).deleteProject(project.id)
+    return
+  }
+  if (project.toolId === 'reference-3d') {
+    await (await import('@artist-studio/reference-3d/library')).deleteProject(project.id)
+    return
+  }
   if (project.toolId === 'frame-by-frame') {
     await (await import('@artist-studio/frame-by-frame/library')).deleteProject(project.id)
     return

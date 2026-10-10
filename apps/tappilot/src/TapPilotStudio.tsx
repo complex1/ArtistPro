@@ -26,7 +26,7 @@ export function TapPilotStudio() {
   if (typeof window !== "undefined" && !("tapPilot" in window)) {
     return (
       <div className="studio-loading">
-        TapPilot needs the desktop app. Open Artist Pro in Electron to control
+        TapPilot needs the desktop app. Open Artist Studio in Electron to control
         shortcuts and pair your phone.
       </div>
     );

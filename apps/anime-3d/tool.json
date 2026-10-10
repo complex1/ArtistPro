@@ -1,0 +1,7 @@
+{
+  "id": "anime-3d",
+  "title": "Anime 3D",
+  "blurb": "Draw, pose, animate, and render anime in 3D",
+  "route": "/anime-3d",
+  "status": "ready"
+}

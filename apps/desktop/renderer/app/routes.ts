@@ -1,5 +1,7 @@
 export type AppRoute =
   | { page: 'home' }
+  | { page: 'anime-home' }
+  | { page: 'anime-editor'; projectId: string }
   | { page: 'frame-home' }
   | { page: 'frame-editor'; projectId: string }
   | { page: 'svg-home' }
@@ -14,12 +16,30 @@ export type AppRoute =
   | { page: 'tappilot' }
   | { page: 'live-character-home' }
   | { page: 'live-character-editor'; projectId: string }
+  | { page: 'reference-home' }
+  | { page: 'reference-editor'; projectId: string }
 
 export function parseHash(hash: string): AppRoute {
   const path = hash.replace(/^#/, '').replace(/^\/+|\/+$/g, '')
   if (!path) return { page: 'home' }
 
   const parts = path.split('/').filter(Boolean)
+  if (parts[0] === 'anime-3d') {
+    if (!parts[1]) return { page: 'anime-home' }
+    try {
+      return { page: 'anime-editor', projectId: decodeURIComponent(parts[1]) }
+    } catch {
+      return { page: 'anime-home' }
+    }
+  }
+  if (parts[0] === 'reference-3d') {
+    if (!parts[1]) return { page: 'reference-home' }
+    try {
+      return { page: 'reference-editor', projectId: decodeURIComponent(parts[1]) }
+    } catch {
+      return { page: 'reference-home' }
+    }
+  }
   if (parts[0] === 'frame-by-frame') {
     if (!parts[1]) return { page: 'frame-home' }
     try { return { page: 'frame-editor', projectId: decodeURIComponent(parts[1]) } }
@@ -72,6 +92,10 @@ export function parseHash(hash: string): AppRoute {
 
 export function toHash(route: AppRoute): string {
   if (route.page === 'home') return '#/'
+  if (route.page === 'anime-home') return '#/anime-3d'
+  if (route.page === 'anime-editor') return `#/anime-3d/${encodeURIComponent(route.projectId)}`
+  if (route.page === 'reference-home') return '#/reference-3d'
+  if (route.page === 'reference-editor') return `#/reference-3d/${encodeURIComponent(route.projectId)}`
   if (route.page === 'frame-home') return '#/frame-by-frame'
   if (route.page === 'frame-editor') return `#/frame-by-frame/${encodeURIComponent(route.projectId)}`
   if (route.page === 'drawing-home') return '#/drawing-canvas'
@@ -99,6 +123,8 @@ export function toHash(route: AppRoute): string {
 }
 
 export function toolHomeRoute(toolRoute: string): AppRoute | undefined {
+  if (toolRoute === '/anime-3d') return { page: 'anime-home' }
+  if (toolRoute === '/reference-3d') return { page: 'reference-home' }
   if (toolRoute === '/frame-by-frame') return { page: 'frame-home' }
   if (toolRoute === '/drawing-canvas') return { page: 'drawing-home' }
   if (toolRoute === '/svg') return { page: 'svg-home' }
@@ -113,6 +139,8 @@ export function projectRoute(
   toolRoute: string,
   projectId: string,
 ): AppRoute | undefined {
+  if (toolRoute === '/anime-3d') return { page: 'anime-editor', projectId }
+  if (toolRoute === '/reference-3d') return { page: 'reference-editor', projectId }
   if (toolRoute === '/frame-by-frame') return { page: 'frame-editor', projectId }
   if (toolRoute === '/drawing-canvas') return { page: 'drawing-editor', projectId }
   if (toolRoute === '/svg') return { page: 'svg-editor', projectId }

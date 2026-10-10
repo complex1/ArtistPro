@@ -1,0 +1,170 @@
+{
+  "version": 2,
+  "name": "Untitled",
+  "artboard": {
+    "width": 800,
+    "height": 600,
+    "background": "#ffffff",
+    "grid": {
+      "type": "grid",
+      "enabled": false,
+      "locked": false,
+      "spacing": 40,
+      "origin": {
+        "x": 400,
+        "y": 300
+      },
+      "color": "#4f8cff",
+      "opacity": 0.35,
+      "snap": false,
+      "snapThreshold": 8
+    }
+  },
+  "children": [
+    {
+      "id": "mJzIhDEqWRunVnC_LErXU",
+      "name": "Rectangle",
+      "visible": true,
+      "locked": false,
+      "pivotPreset": "center",
+      "effects": [],
+      "transform": {
+        "pivot": {
+          "x": 260,
+          "y": 195
+        },
+        "position": {
+          "x": 100,
+          "y": 90
+        },
+        "rotation": 0,
+        "scale": {
+          "x": 1,
+          "y": 1
+        },
+        "skew": {
+          "x": 0,
+          "y": 0
+        },
+        "opacity": 1
+      },
+      "fill": "#b8ed84",
+      "stroke": "none",
+      "strokeWidth": 1,
+      "type": "rect",
+      "width": 520,
+      "height": 390,
+      "rx": 70,
+      "ry": 70
+    },
+    {
+      "id": "mCSCVHR61UQ5QieL7aHGU",
+      "name": "Circle",
+      "visible": true,
+      "locked": false,
+      "pivotPreset": "center",
+      "effects": [],
+      "transform": {
+        "pivot": {
+          "x": 85,
+          "y": 85
+        },
+        "position": {
+          "x": 355,
+          "y": 150
+        },
+        "rotation": 0,
+        "scale": {
+          "x": 1,
+          "y": 1
+        },
+        "skew": {
+          "x": 0,
+          "y": 0
+        },
+        "opacity": 1
+      },
+      "fill": "#f0ad73",
+      "stroke": "none",
+      "strokeWidth": 1,
+      "type": "ellipse",
+      "rx": 85,
+      "ry": 85
+    },
+    {
+      "id": "Pi1A9JvzySPmLfQe-TE40",
+      "name": "Path",
+      "visible": true,
+      "locked": false,
+      "pivotPreset": "center",
+      "effects": [],
+      "transform": {
+        "pivot": {
+          "x": 360,
+          "y": 407.5
+        },
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "rotation": 0,
+        "scale": {
+          "x": 1,
+          "y": 1
+        },
+        "skew": {
+          "x": 0,
+          "y": 0
+        },
+        "opacity": 1
+      },
+      "fill": "none",
+      "stroke": "#243d31",
+      "strokeWidth": 30,
+      "type": "path",
+      "closed": false,
+      "points": [
+        {
+          "id": "qJQmO3QsDG6oX9fR58DU5",
+          "anchor": {
+            "x": 150,
+            "y": 410
+          },
+          "handleIn": {
+            "x": 0,
+            "y": 0
+          },
+          "handleOut": {
+            "x": 100,
+            "y": -180
+          },
+          "handleMode": "disconnected"
+        },
+        {
+          "id": "XgY-TOWfVdWHy1kjXHdMj",
+          "anchor": {
+            "x": 570,
+            "y": 405
+          },
+          "handleIn": {
+            "x": -180,
+            "y": -176.66666666666666
+          },
+          "handleOut": {
+            "x": 0,
+            "y": 0
+          },
+          "handleMode": "disconnected"
+        }
+      ],
+      "trimStart": 0,
+      "trimEnd": 1,
+      "trimOffset": 0
+    }
+  ],
+  "animation": {
+    "duration": 3,
+    "tracks": []
+  },
+  "symbols": []
+}

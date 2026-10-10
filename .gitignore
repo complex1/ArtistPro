@@ -29,3 +29,11 @@ __pycache__/
 *.njsproj
 *.sln
 *.sw?
+
+# Generated site and test recordings
+dist-site/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example

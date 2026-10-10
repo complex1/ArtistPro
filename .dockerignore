@@ -1,0 +1,14 @@
+node_modules
+.venv
+.git
+dist
+dist-site
+dist-tappilot-phone
+build
+release
+.pytest_cache
+**/__pycache__
+**/*.pyc
+.env*
+docs/screenshots
+apps/tappilot/docs/images

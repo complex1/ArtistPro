@@ -6,16 +6,22 @@ asar: true
 npmRebuild: false
 directories:
   output: release
+artifactName: '${productName}-${version}-${os}-${arch}.${ext}'
 files:
   - package.json
+  - LICENSE
+  - docs/third-party-notices.md
+  - docs/third-party-licenses.json
+  - docs/python-licenses.json
+  - docs/licenses/**/*
   - dist/**/*
   - dist-tappilot-phone/**/*
   - apps/desktop/electron/**/*
   - apps/tappilot/electron/**/*
   - '!apps/**/electron/**/*.test.*'
 extraResources:
-  - from: build/python-deps
-    to: python/site-packages
+  - from: build/backend-runtime
+    to: backend-runtime
     filter:
       - '**/*'
   - from: backend
@@ -33,16 +39,21 @@ extraResources:
       - '!**/__pycache__/**'
 mac:
   category: public.app-category.graphics-design
-  identity: null
-  icon: apps/tappilot/phone/public/icons/icon-512.png
+  icon: public/artist-studio.png
   target:
     - dmg
     - zip
 win:
-  icon: apps/tappilot/phone/public/icons/icon-512.png
+  icon: public/artist-studio.png
   target:
     - nsis
 linux:
-  icon: apps/tappilot/phone/public/icons/icon-512.png
+  icon: public/artist-studio.png
   target:
     - AppImage
+    - deb
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true

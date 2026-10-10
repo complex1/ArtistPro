@@ -5,6 +5,10 @@ import { deleteRecentProject, loadRecentProjects } from './recentProjects'
 const localProjects = vi.hoisted(() => ({ list: vi.fn(), remove: vi.fn() }))
 const drawingProjects = vi.hoisted(() => ({ list: vi.fn(), remove: vi.fn() }))
 const animationProjects = vi.hoisted(() => ({ list: vi.fn(), remove: vi.fn() }))
+const referenceProjects = vi.hoisted(() => ({ list: vi.fn(), remove: vi.fn() }))
+const animeProjects = vi.hoisted(() => ({ list: vi.fn(), remove: vi.fn() }))
+vi.mock('@artist-studio/anime-3d/library', () => ({ listProjects: animeProjects.list, deleteProject: animeProjects.remove }))
+vi.mock('@artist-studio/reference-3d/library', () => ({ listProjects: referenceProjects.list, deleteProject: referenceProjects.remove }))
 vi.mock('@artist-studio/frame-by-frame/library', () => ({ listProjects: animationProjects.list, deleteProject: animationProjects.remove }))
 vi.mock('@artist-studio/drawing-canvas/library', () => ({
   listProjects: drawingProjects.list,
@@ -136,6 +140,45 @@ describe('loadRecentProjects', () => {
 
 
 describe('browser project integration', () => {
+  it('merges Anime 3D shots with the other tools and deletes through its local store', async () => {
+    const fetch = stubFetch({ 'apps/svg-tool': [summary('vector', 100)] })
+    const tool: ToolManifest = { id: 'anime-3d', title: 'Anime 3D', blurb: 'Anime shots', route: '/anime-3d', status: 'ready' }
+    animeProjects.list.mockResolvedValue([summary('wave', 900)])
+    animeProjects.remove.mockResolvedValue(undefined)
+    const projects = await loadRecentProjects([...tools, tool])
+    expect(projects.map(project => project.id)).toEqual(['wave', 'vector'])
+    expect(projects[0]).toMatchObject({ id: 'wave', toolId: 'anime-3d', toolTitle: 'Anime 3D', toolRoute: '/anime-3d' })
+    fetch.mockClear()
+    await deleteRecentProject(projects[0])
+    expect(animeProjects.remove).toHaveBeenCalledWith('wave')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('keeps available projects when Anime 3D storage is unavailable', async () => {
+    stubFetch({ 'apps/svg-tool': [summary('vector', 100)] })
+    animeProjects.list.mockRejectedValue(new Error('IndexedDB unavailable'))
+    const tool: ToolManifest = { id: 'anime-3d', title: 'Anime 3D', blurb: 'Anime shots', route: '/anime-3d', status: 'ready' }
+    expect((await loadRecentProjects([...tools, tool])).map(project => project.id)).toEqual(['vector'])
+  })
+
+  it('loads and deletes 3D Reference scenes through local storage without the API', async () => {
+    const fetch = stubFetch({})
+    const tool: ToolManifest = { id: 'reference-3d', title: '3D Reference', blurb: '3D scenes', route: '/reference-3d', status: 'ready' }
+    referenceProjects.list.mockResolvedValue([summary('scene', 800)])
+    referenceProjects.remove.mockResolvedValue(undefined)
+    const projects = await loadRecentProjects([tool])
+    expect(projects).toMatchObject([{ id: 'scene', toolId: 'reference-3d', toolTitle: '3D Reference', toolRoute: '/reference-3d' }])
+    await deleteRecentProject(projects[0])
+    expect(referenceProjects.remove).toHaveBeenCalledWith('scene')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('keeps available projects when 3D Reference storage is unavailable', async () => {
+    stubFetch({ 'apps/svg-tool': [summary('vector', 100)] })
+    referenceProjects.list.mockRejectedValue(new Error('IndexedDB unavailable'))
+    const tool: ToolManifest = { id: 'reference-3d', title: '3D Reference', blurb: '3D scenes', route: '/reference-3d', status: 'ready' }
+    expect((await loadRecentProjects([...tools, tool])).map(project => project.id)).toEqual(['vector'])
+  })
   it('loads and deletes FrameByFrame shots without the API', async () => {
     const fetch = stubFetch({})
     const tool: ToolManifest = { id: 'frame-by-frame', title: 'FrameByFrame Animation', blurb: 'Animation', route: '/frame-by-frame', status: 'ready' }

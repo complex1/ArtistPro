@@ -1,6 +1,6 @@
 # Pen-friendly Animated Paint editor
 
-Implemented from the supplied interface reference while retaining Artist Pro's existing theme colors and controls.
+Implemented from the supplied interface reference while retaining Artist Studio's existing theme colors and controls.
 
 - Left: searchable brush preview cards, category filters, Favorites, and Recent. Favorites and the last 12 selected brushes persist locally. Card animation runs only on hover/focus and while visible.
 - Center: fitted drawing canvas, floating Brush/Eraser/Select/Hand controls, bottom color/size/opacity controls, zoom and Fit. Header buttons collapse either side panel.

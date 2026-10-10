@@ -109,7 +109,7 @@ export function DrawingHome() {
   return (
     <div className="dc-home-shell">
       <header className="dc-home-topbar">
-        <button type="button" className="dc-home-back" onClick={() => { window.location.hash = '#/' }}><ArrowLeft size={15} /> Artist Pro</button>
+        <button type="button" className="dc-home-back" onClick={() => { window.location.hash = '#/' }}><ArrowLeft size={15} /> Artist Studio</button>
         <span className="dc-home-divider" />
         <span className="dc-home-brand"><Brush size={19} /><strong>Drawing Canvas</strong></span>
         <span className="dc-home-local">Your browser. Your sketchbook.</span>

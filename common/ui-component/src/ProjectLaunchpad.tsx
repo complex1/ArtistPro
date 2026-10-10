@@ -120,7 +120,7 @@ export function ProjectLaunchpad(props: ProjectLaunchpadProps) {
   return (
     <div className={`lp-shell lp-${tool}`}>
       <header className="lp-topbar">
-        <button className="lp-back" type="button" aria-label="Back to Artist Pro" onClick={onBack}><ArrowLeft size={15} /> <span>Artist Pro</span></button>
+        <button className="lp-back" type="button" aria-label="Back to Artist Studio" onClick={onBack}><ArrowLeft size={15} /> <span>Artist Studio</span></button>
         <span className="lp-header-divider" />
         <div className="lp-brand"><span className="lp-brand-icon"><Icon size={18} /></span><div><strong>{content.title}</strong><span>{content.subtitle}</span></div></div>
         <div className="lp-topbar-end"><span className="lp-local"><Monitor size={13} /> Your workspace</span><button className="lp-topbar-new" type="button" onClick={focusCreation}><Plus size={14} /> New project</button></div>

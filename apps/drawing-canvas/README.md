@@ -1,6 +1,9 @@
 # Drawing Canvas
 
-A raster drawing workspace in Artist Pro, available at `#/drawing-canvas`.
+![drawing-canvas editing workspace](../../docs/screenshots/drawing-canvas/editor.png)
+
+
+A raster drawing workspace in Artist Studio, available at `#/drawing-canvas`.
 
 ## Included in this version
 
@@ -62,7 +65,7 @@ Dragging previews the pixels without changing the saved drawing. Releasing appli
 - `web/document.ts` validates and copies the portable format without allocating DOM/canvas objects.
 - `web/library.ts` stores validated records in the isolated `artist-studio-drawing-canvas` IndexedDB database. Writes resolve after transaction commit. Imports always receive a new project ID.
 - `web/transformControls.ts` defines handle geometry and resize, skew, and perspective gesture calculations.
-- `web/DrawingHome.tsx` and `web/DrawingEditor.tsx` provide the gallery and editor. Desktop routing and the shared recent-project list integrate the tool with Artist Pro.
+- `web/DrawingHome.tsx` and `web/DrawingEditor.tsx` provide the gallery and editor. Desktop routing and the shared recent-project list integrate the tool with Artist Studio.
 
 Version 1 documents store dimensions, name, background, active layer ID, and layers ordered **bottom to top**. Every layer contains metadata and either a lossless embedded PNG with matching canvas dimensions or `null` for blank pixels. Library records wrap the document with ID and timestamps. The editor exports a raw document; the gallery accepts both forms. Validation rejects unsupported versions, malformed values, duplicate IDs, invalid active layers, unsupported blends, external images, and oversized data. The drawing engine additionally decodes PNGs before use.
 
@@ -81,3 +84,7 @@ npm run build
 ```
 
 Unit tests cover document boundaries, independent imports, committed persistence, storage failures, selection/transform math, flood fill, and history. The Electron/Chromium smoke test exercises the actual Canvas 2D engine and checks rendered pixel output.
+
+## Suite guides
+
+[Installation](../../docs/installation.md) · [Development](../../docs/development.md) · [Saving and backups](../../docs/data-and-backups.md) · [Testing evidence](../../docs/testing.md) · [Gallery screenshot](../../docs/screenshots/drawing-canvas/home.png)

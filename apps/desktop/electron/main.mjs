@@ -1,7 +1,7 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { spawn, spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -12,18 +12,39 @@ import {
 } from './paths.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+// An explicit profile makes portable sessions and release smoke tests independent
+// of the user's normal projects and standalone TapPilot data.
+if (process.env.ARTIST_PROFILE_DIR) {
+  const profile = path.resolve(process.env.ARTIST_PROFILE_DIR)
+  mkdirSync(path.join(profile, 'appData'), { recursive: true })
+  app.setPath('userData', profile)
+  app.setPath('appData', path.join(profile, 'appData'))
+}
 const require = createRequire(import.meta.url)
 const tapPilot = require('../../tappilot/electron/runtime.cjs')
+const { isTrustedRenderer, isSafeExternalUrl, isToolHash } = require('./security.cjs')
 const studioPaths = resolveStudioPaths({
   isPackaged: app.isPackaged,
   appPath: app.getAppPath(),
   resourcesPath: process.resourcesPath,
   electronDir: __dirname,
 })
+const rendererDevUrl = app.isPackaged ? undefined : process.env.VITE_DEV_SERVER_URL
 
 let sidecar = null
 let apiBase = 'http://127.0.0.1:8765'
 let mainWindow = null
+let quitting = false
+
+function trusted(url) {
+  return isTrustedRenderer(url, { indexPath: studioPaths.distIndex, devUrl: rendererDevUrl })
+}
+
+function validateSender(event) {
+  if (!BrowserWindow.fromWebContents(event.sender) || event.senderFrame !== event.sender.mainFrame || !trusted(event.senderFrame.url)) {
+    throw new Error('Untrusted IPC sender')
+  }
+}
 /** Tool windows keyed by route hash, so a second click focuses the open one. */
 const toolWindows = new Map()
 
@@ -39,7 +60,7 @@ function freePort() {
   })
 }
 
-async function waitForHealth(url, attempts = 50) {
+async function waitForHealth(url, attempts = 150) {
   for (let i = 0; i < attempts; i += 1) {
     try {
       const response = await fetch(`${url}/health`)
@@ -102,10 +123,11 @@ async function startSidecar() {
   const port = await freePort()
   apiBase = `http://127.0.0.1:${port}`
   const dataRoot = path.join(app.getPath('userData'), 'artist-studio')
-  const python = findPython()
+  const bundled = app.isPackaged && existsSync(studioPaths.backendExecutable)
+  const python = bundled ? { command: studioPaths.backendExecutable, args: [], version: 'bundled' } : findPython()
   sidecar = spawn(
     python.command,
-    [
+    bundled ? ['--port', String(port)] : [
       ...python.args,
       '-m',
       'uvicorn',
@@ -131,6 +153,7 @@ async function startSidecar() {
     console.log('[fastapi]', String(chunk).trim())
   })
   let stderr = ''
+  sidecar.on('error', (error) => { stderr = error.message })
   sidecar.stderr?.on('data', (chunk) => {
     stderr = `${stderr}${chunk}`.slice(-4000)
     console.error('[fastapi]', String(chunk).trim())
@@ -159,9 +182,16 @@ function createWindow(hash = '#/') {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   })
-  const devUrl = process.env.VITE_DEV_SERVER_URL
+  win.webContents.on('will-navigate', (event, url) => { if (!trusted(url)) event.preventDefault() })
+  win.webContents.on('will-redirect', (event, url) => { if (!trusted(url)) event.preventDefault() })
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (isSafeExternalUrl(url)) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  const devUrl = rendererDevUrl
   if (devUrl) {
     const url = new URL(devUrl)
     url.searchParams.set('apiBase', apiBase)
@@ -184,7 +214,7 @@ function createHomeWindow() {
 
 function openToolWindow(hash) {
   // Only in-app routes may be opened; anything else falls back to home.
-  const target = typeof hash === 'string' && hash.startsWith('#/') ? hash : '#/'
+  const target = isToolHash(hash) ? hash : '#/'
   const open = toolWindows.get(target)
   if (open && !open.isDestroyed()) {
     if (open.isMinimized()) open.restore()
@@ -204,8 +234,8 @@ function openToolWindow(hash) {
   return true
 }
 
-ipcMain.handle('artist:get-api-base', () => apiBase)
-ipcMain.handle('artist:open-window', (_event, hash) => openToolWindow(hash))
+ipcMain.handle('artist:get-api-base', (event) => { validateSender(event); return apiBase })
+ipcMain.handle('artist:open-window', (event, hash) => { validateSender(event); return openToolWindow(hash) })
 
 app.whenReady().then(async () => {
   try {
@@ -222,20 +252,29 @@ app.whenReady().then(async () => {
     return
   }
   await tapPilot.initialize({
-    isDev: Boolean(process.env.VITE_DEV_SERVER_URL),
+    isDev: Boolean(rendererDevUrl),
     getWindows: () => BrowserWindow.getAllWindows(),
     phoneDistPath: studioPaths.phoneDistPath,
+    validateSender,
   })
+  // Artistic workflows need file import and download, not camera/microphone access.
   createHomeWindow()
+  const activeSession = mainWindow.webContents.session
+  activeSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
+  activeSession.setPermissionCheckHandler(() => false)
 })
 
-app.on('window-all-closed', async () => {
-  await tapPilot.shutdown()
-  stopSidecar()
+app.on('activate', () => {
+  if (!quitting && !mainWindow && sidecar) createHomeWindow()
+})
+
+app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', async () => {
-  await tapPilot.shutdown()
-  stopSidecar()
+app.on('before-quit', (event) => {
+  if (quitting) return
+  event.preventDefault()
+  quitting = true
+  void tapPilot.shutdown().finally(() => { stopSidecar(); app.quit() })
 })

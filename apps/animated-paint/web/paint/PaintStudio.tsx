@@ -956,7 +956,7 @@ function PaintWorkspace({ project }: { project: PaintProjectRecordV2 }) {
             className="studio-crumb"
             onClick={() => navigate({ page: 'home' })}
           >
-            Artist Pro
+            Artist Studio
           </button>
           <b>/</b>
           <button

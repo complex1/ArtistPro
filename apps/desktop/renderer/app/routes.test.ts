@@ -8,6 +8,24 @@ import {
 } from './routes'
 
 describe('app routes', () => {
+  it('opens Anime 3D shots and safely round-trips encoded IDs', () => {
+    expect(parseHash('#/anime-3d')).toEqual({ page: 'anime-home' })
+    expect(parseHash('#/anime-3d/')).toEqual({ page: 'anime-home' })
+    const route: AppRoute = { page: 'anime-editor', projectId: 'Wave shot/1 #日本語' }
+    expect(parseHash(toHash(route))).toEqual(route)
+    expect(parseHash('#/anime-3d/%E0%A4%A')).toEqual({ page: 'anime-home' })
+    expect(toolHomeRoute('/anime-3d')).toEqual({ page: 'anime-home' })
+    expect(projectRoute('/anime-3d', 'shot')).toEqual({ page: 'anime-editor', projectId: 'shot' })
+  })
+  it('opens 3D Reference scenes and safely round-trips encoded IDs', () => {
+    expect(parseHash('#/reference-3d')).toEqual({ page: 'reference-home' })
+    expect(parseHash('#/reference-3d/')).toEqual({ page: 'reference-home' })
+    const route: AppRoute = { page: 'reference-editor', projectId: 'scene study/1' }
+    expect(parseHash(toHash(route))).toEqual(route)
+    expect(parseHash('#/reference-3d/%E0%A4%A')).toEqual({ page: 'reference-home' })
+    expect(toolHomeRoute('/reference-3d')).toEqual({ page: 'reference-home' })
+    expect(projectRoute('/reference-3d', 'scene')).toEqual({ page: 'reference-editor', projectId: 'scene' })
+  })
   it('opens FrameByFrame shots and safely round-trips encoded IDs', () => {
     expect(parseHash('#/frame-by-frame')).toEqual({ page: 'frame-home' })
     const route: AppRoute = { page: 'frame-editor', projectId: 'my shot/1' }
@@ -16,7 +34,7 @@ describe('app routes', () => {
     expect(toolHomeRoute('/frame-by-frame')).toEqual({ page: 'frame-home' })
     expect(projectRoute('/frame-by-frame', 'shot')).toEqual({ page: 'frame-editor', projectId: 'shot' })
   })
-  it('lands on Artist Pro home for empty and unknown hashes', () => {
+  it('lands on Artist Studio home for empty and unknown hashes', () => {
     expect(parseHash('')).toEqual({ page: 'home' })
     expect(parseHash('#/')).toEqual({ page: 'home' })
     expect(parseHash('#/unknown')).toEqual({ page: 'home' })
@@ -79,6 +97,10 @@ describe('app routes', () => {
   it('round-trips hashes', () => {
     const routes: AppRoute[] = [
       { page: 'home' },
+      { page: 'anime-home' },
+      { page: 'anime-editor', projectId: 'wave shot/1' },
+      { page: 'reference-home' },
+      { page: 'reference-editor', projectId: 'scene study/1' },
       { page: 'drawing-home' },
       { page: 'drawing-editor', projectId: 'my canvas/1' },
       { page: 'svg-home' },

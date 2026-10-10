@@ -15,6 +15,86 @@ function Art({ children }: { children: ReactNode }) {
   )
 }
 
+function AnimeArt() {
+  return (
+    <Art>
+      <defs>
+        <linearGradient id="anime-stage" x1="0" y1="0" x2="1" y2="1">
+          <stop stopColor="#303144" /><stop offset="1" stopColor="#181f30" />
+        </linearGradient>
+      </defs>
+      <rect width="240" height="132" fill="url(#anime-stage)" />
+      <circle cx="181" cy="30" r="35" fill="#e2b577" opacity=".08" />
+      <path d="M0 89 120 71 240 89M0 101H240M42 105 120 72 198 105M85 105 120 72 151 105" fill="none" stroke="#9198b6" strokeWidth=".6" opacity=".25" />
+      <ellipse cx="124" cy="100" rx="31" ry="5" fill="#101520" />
+      <g stroke="#161b2b" strokeWidth="1.8" strokeLinejoin="round">
+        <path d="m116 70-9 25-7 5h15l9-24 7 20 12 3 1-5-8-23z" fill="#596581" />
+        <path d="m108 40-17 15-18-4-2 7 21 7 23-15m17-10 14 9 12-21 7 4-12 29-25-12" fill="#f0c3a5" />
+        <path d="m112 37-6 12 5 23q13 5 25-2l-2-26-7-9z" fill="#aaa0e0" />
+        <path d="m127 36 7 8 2 26q-6 4-11 4l1-24z" fill="#7779b4" stroke="none" />
+        <path d="M112 15q7-11 19-5 10 7 2 22-7 10-16 0z" fill="#f0c3a5" />
+        <path d="m109 23-2-13 6 2 5-9 5 5 10-3 5 11-1 12-5-10-8 3-3-7-5 9-3-5z" fill="#343449" />
+        <path d="m112 36-8 9 9-2m13-7 11 7-9-1" fill="#d3c0ed" />
+      </g>
+      <path d="m120 26 3 1m7-2 3-1" stroke="#352c40" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M79 30Q112-1 151 19M60 73q22 17 36 3" fill="none" stroke="#e1b373" strokeWidth="1.4" strokeLinecap="round" opacity=".8" />
+      <g fill="#242b40" stroke="#e1bf87" strokeWidth="1.2">
+        <circle cx="92" cy="60" r="3" /><circle cx="149" cy="55" r="3" />
+        <circle cx="122" cy="70" r="3" /><circle cx="161" cy="30" r="5" />
+      </g>
+      <path d="M20 19h13m-13 0v13m200-13h-13m13 0v13M20 89h13m-13 0V76m200 13h-13m13 0V76" fill="none" stroke="#b5bbd1" strokeWidth="1" opacity=".65" />
+      <rect y="108" width="240" height="24" fill="#141a27" />
+      <path d="M40 112v15m20-15v15m20-15v15m20-15v15m20-15v15m20-15v15m20-15v15m20-15v15m20-15v15" stroke="#2a344b" strokeWidth="1" />
+      <path d="m17 115 7 5-7 5z" fill="#c3bfd8" />
+      <path d="M43 120h154" stroke="#837fa9" opacity=".4" />
+      {[44, 119, 195].map(x => <rect key={x} x={x - 3} y="117" width="6" height="6" transform={`rotate(45 ${x} 120)`} fill="#d9b67c" />)}
+      <path d="M119 108v24" stroke="#cec4ec" strokeWidth="1.5" />
+    </Art>
+  )
+}
+
+function ReferenceArt() {
+  return (
+    <Art>
+      <defs>
+        <linearGradient id="reference-figure" x1="0" y1="0" x2="1" y2="1">
+          <stop stopColor="#f2d4b1" /><stop offset="1" stopColor="#a78061" />
+        </linearGradient>
+        <linearGradient id="reference-floor" x1="0" y1="0" x2="0" y2="1">
+          <stop stopColor="#3d4749" /><stop offset="1" stopColor="#202b31" />
+        </linearGradient>
+      </defs>
+      <rect width="240" height="132" fill="#26333a" />
+      <path d="M0 79 120 62 240 79V132H0Z" fill="url(#reference-floor)" />
+      <g stroke="#748384" strokeWidth=".6" opacity=".35">
+        <path d="M0 94H240M0 113H240M120 64 10 132M120 64 71 132M120 64 150 132M120 64 222 132" />
+      </g>
+      <ellipse cx="137" cy="116" rx="46" ry="8" fill="#101b22" opacity=".5" />
+      <g stroke="#1b272c" strokeWidth="1.3" strokeLinejoin="round" fill="url(#reference-figure)">
+        <path d="m112 82-9 31 8 3 12-30m0-1 13 28 8-3-10-33" />
+        <path d="m109 69-3 18 23 1 3-18z" />
+        <path d="m105 41-2 26 11 11 13-5 9-30-15-5z" />
+        <path d="m104 43-17 14-16-7-4 7 21 11 22-16m23-9 17-7 8-17 7 3-8 22-24 13" />
+        <ellipse cx="121" cy="25" rx="10" ry="13" transform="rotate(8 121 25)" />
+        <path d="m103 112-9 7q1 5 16 1l1-5m25-3 1 7 15 1q3-4-10-7" />
+      </g>
+      <g fill="#eabb76" stroke="#fff1d3" strokeWidth=".8">
+        <circle cx="109" cy="47" r="2.5" /><circle cx="130" cy="47" r="2.5" />
+        <circle cx="87" cy="61" r="2.5" /><circle cx="152" cy="40" r="2.5" />
+        <circle cx="116" cy="80" r="3" />
+      </g>
+      <g fill="none" stroke="#eabb76" strokeWidth="1.1">
+        <circle cx="162" cy="20" r="6" /><circle cx="67" cy="53" r="6" />
+      </g>
+      <path d="M22 22H39M22 22V37M218 22H201M218 22V37M22 110H39M22 110V95M218 110H201M218 110V95" fill="none" stroke="#d5e2dd" opacity=".7" />
+      <g transform="translate(184 73)" stroke="#a4b6b1" strokeWidth="1" strokeLinejoin="round">
+        <path d="m0 9 16-8 16 8-16 8z" fill="#647b79" />
+        <path d="M0 9v20l16 9V17z" fill="#455d60" /><path d="M16 17v21l16-9V9z" fill="#364d55" />
+      </g>
+    </Art>
+  )
+}
+
 function PaintArt() {
   return (
     <Art>
@@ -289,6 +369,8 @@ function TapPilotArt() {
 }
 
 const ART: Record<string, () => ReactNode> = {
+  'anime-3d': AnimeArt,
+  'reference-3d': ReferenceArt,
   'frame-by-frame': () => <Art><rect width="240" height="132" fill="#2d2b24" /><path d="M24 95Q116-33 215 96" fill="none" stroke="#bda579" strokeDasharray="3 5" opacity=".5" />{[0, 1, 2].map(index => <g key={index} transform={`translate(${17 + index * 70} ${index === 1 ? 17 : 30}) rotate(${index === 0 ? -7 : index === 2 ? 7 : 0} 32 41)`}><rect width="65" height="85" rx="4" fill="#f0e6d3" /><path d="M8 67H57" stroke="#b6a78c" /><ellipse cx="32" cy={index === 1 ? 32 : 49} rx="15" ry={index === 1 ? 19 : 14} fill={index === 1 ? '#d6a064' : '#8eab9c'} stroke="#596152" strokeWidth="1.4" /><circle cx="27" cy={index === 1 ? 29 : 47} r="1.5" fill="#424c3e" /><circle cx="38" cy={index === 1 ? 29 : 47} r="1.5" fill="#424c3e" /><path d={`M28 ${index === 1 ? 37 : 54}q5 4 10-1`} stroke="#424c3e" fill="none" /><rect x="8" y="75" width="21" height="2" fill="#b6a78c" /></g>)}</Art>,
   'drawing-canvas': DrawingArt,
   'animated-paint': PaintArt,

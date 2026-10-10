@@ -48,6 +48,20 @@ const LiveCharacterEditor = lazy(() =>
   })),
 )
 
+const ReferenceHome = lazy(() =>
+  import('@artist-studio/reference-3d').then((module) => ({ default: module.ReferenceHome })),
+)
+const ReferenceEditor = lazy(() =>
+  import('@artist-studio/reference-3d').then((module) => ({ default: module.ReferenceEditor })),
+)
+
+const AnimeHome = lazy(() =>
+  import('@artist-studio/anime-3d').then((module) => ({ default: module.AnimeHome })),
+)
+const AnimeEditor = lazy(() =>
+  import('@artist-studio/anime-3d').then((module) => ({ default: module.AnimeEditor })),
+)
+
 export default function App() {
   return <><AppContent /><ShortcutHelp /></>
 }
@@ -56,27 +70,47 @@ function AppContent() {
   const route = useHashRoute()
 
   useEffect(() => {
-    if (route.page === 'home') document.title = 'Artist Pro'
-    else if (route.page === 'frame-home' || route.page === 'frame-editor') { document.title = 'FrameByFrame Animation — Artist Pro' }
+    if (route.page === 'home') document.title = 'Artist Studio'
+    else if (route.page === 'anime-home' || route.page === 'anime-editor') {
+      document.title = 'Anime 3D — Artist Studio'
+    }
+    else if (route.page === 'reference-home' || route.page === 'reference-editor') {
+      document.title = '3D Reference — Artist Studio'
+    }
+    else if (route.page === 'frame-home' || route.page === 'frame-editor') { document.title = 'FrameByFrame Animation — Artist Studio' }
     else if (route.page === 'drawing-home' || route.page === 'drawing-editor') {
-      document.title = 'Drawing Canvas — Artist Pro'
+      document.title = 'Drawing Canvas — Artist Studio'
     } else if (route.page === 'svg-home' || route.page === 'svg-editor') {
-      document.title = 'SVG — Artist Pro'
+      document.title = 'SVG — Artist Studio'
     } else if (
       route.page === 'paint-home' ||
       route.page === 'paint-editor' ||
       route.page === 'paint-playground'
     ) {
-      document.title = 'Animated Paint — Artist Pro'
+      document.title = 'Animated Paint — Artist Studio'
     } else if (route.page === 'cel-home' || route.page === 'cel-editor') {
-      document.title = 'Cel — Artist Pro'
+      document.title = 'Cel — Artist Studio'
     } else if (route.page === 'live-character-home' || route.page === 'live-character-editor') {
-      document.title = 'Live Character — Artist Pro'
+      document.title = 'Live Character — Artist Studio'
     } else if (route.page === 'tappilot') {
-      document.title = 'TapPilot — Artist Pro'
-    } else document.title = 'Artist Pro'
+      document.title = 'TapPilot — Artist Studio'
+    } else document.title = 'Artist Studio'
   }, [route])
 
+  if (route.page === 'anime-home' || route.page === 'anime-editor') {
+    return (
+      <Suspense fallback={<div className="studio-loading">Opening Anime 3D…</div>}>
+        {route.page === 'anime-home' ? <AnimeHome /> : <AnimeEditor key={route.projectId} projectId={route.projectId} />}
+      </Suspense>
+    )
+  }
+  if (route.page === 'reference-home' || route.page === 'reference-editor') {
+    return (
+      <Suspense fallback={<div className="studio-loading">Opening 3D Reference…</div>}>
+        {route.page === 'reference-home' ? <ReferenceHome /> : <ReferenceEditor key={route.projectId} projectId={route.projectId} />}
+      </Suspense>
+    )
+  }
   if (route.page === 'frame-home' || route.page === 'frame-editor') {
     return <Suspense fallback={<div className="studio-loading">Opening FrameByFrame Animation…</div>}>{route.page === 'frame-home' ? <FrameHome /> : <FrameEditor key={route.projectId} projectId={route.projectId} />}</Suspense>
   }

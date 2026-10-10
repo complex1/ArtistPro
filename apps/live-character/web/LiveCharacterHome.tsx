@@ -228,7 +228,7 @@ export function LiveCharacterHome() {
             window.location.hash = '#/'
           }}
         >
-          <ArrowLeft size={15} /> Artist Pro
+          <ArrowLeft size={15} /> Artist Studio
         </button>
         <span className="lch-divider" />
         <span className="lch-brand">

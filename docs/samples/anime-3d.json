@@ -1,0 +1,285 @@
+{
+  "version": 1,
+  "name": "First wave",
+  "fps": 24,
+  "duration": 24,
+  "character": {
+    "position": [
+      0,
+      0,
+      0
+    ],
+    "rotation": 0,
+    "visible": true,
+    "locked": false
+  },
+  "keys": [
+    {
+      "frame": 1,
+      "pose": {
+        "hips": [
+          0,
+          0,
+          0
+        ],
+        "spine": [
+          0,
+          0,
+          0
+        ],
+        "head": [
+          0,
+          0,
+          0
+        ],
+        "leftUpperArm": [
+          0,
+          0,
+          0
+        ],
+        "leftForearm": [
+          0,
+          0,
+          0
+        ],
+        "leftHand": [
+          0,
+          0,
+          0
+        ],
+        "rightUpperArm": [
+          0,
+          0,
+          0
+        ],
+        "rightForearm": [
+          0,
+          0,
+          0
+        ],
+        "rightHand": [
+          0,
+          0,
+          0
+        ],
+        "leftThigh": [
+          0,
+          0,
+          0
+        ],
+        "leftShin": [
+          0,
+          0,
+          0
+        ],
+        "leftFoot": [
+          0,
+          0,
+          0
+        ],
+        "rightThigh": [
+          0,
+          0,
+          0
+        ],
+        "rightShin": [
+          0,
+          0,
+          0
+        ],
+        "rightFoot": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "frame": 9,
+      "pose": {
+        "hips": [
+          0,
+          0,
+          0
+        ],
+        "spine": [
+          0,
+          0,
+          0
+        ],
+        "head": [
+          0,
+          0,
+          0
+        ],
+        "leftUpperArm": [
+          0,
+          0,
+          145
+        ],
+        "leftForearm": [
+          0,
+          0,
+          25
+        ],
+        "leftHand": [
+          0,
+          0,
+          0
+        ],
+        "rightUpperArm": [
+          0,
+          0,
+          0
+        ],
+        "rightForearm": [
+          0,
+          0,
+          0
+        ],
+        "rightHand": [
+          0,
+          0,
+          0
+        ],
+        "leftThigh": [
+          0,
+          0,
+          0
+        ],
+        "leftShin": [
+          0,
+          0,
+          0
+        ],
+        "leftFoot": [
+          0,
+          0,
+          0
+        ],
+        "rightThigh": [
+          0,
+          0,
+          0
+        ],
+        "rightShin": [
+          0,
+          0,
+          0
+        ],
+        "rightFoot": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "frame": 17,
+      "pose": {
+        "hips": [
+          0,
+          0,
+          0
+        ],
+        "spine": [
+          0,
+          0,
+          0
+        ],
+        "head": [
+          0,
+          -10,
+          0
+        ],
+        "leftUpperArm": [
+          0,
+          0,
+          145
+        ],
+        "leftForearm": [
+          0,
+          0,
+          25
+        ],
+        "leftHand": [
+          0,
+          -40,
+          20
+        ],
+        "rightUpperArm": [
+          0,
+          0,
+          0
+        ],
+        "rightForearm": [
+          0,
+          0,
+          0
+        ],
+        "rightHand": [
+          0,
+          0,
+          0
+        ],
+        "leftThigh": [
+          0,
+          0,
+          0
+        ],
+        "leftShin": [
+          0,
+          0,
+          0
+        ],
+        "leftFoot": [
+          0,
+          0,
+          0
+        ],
+        "rightThigh": [
+          0,
+          0,
+          0
+        ],
+        "rightShin": [
+          0,
+          0,
+          0
+        ],
+        "rightFoot": [
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  ],
+  "strokes": [],
+  "camera": {
+    "position": [
+      4,
+      2.8,
+      6
+    ],
+    "target": [
+      0,
+      1.1,
+      0
+    ],
+    "fov": 38
+  },
+  "appearance": {
+    "background": "#eee8df",
+    "characterColor": "#826df2",
+    "celShading": true,
+    "outlines": true,
+    "ground": true,
+    "lightAzimuth": 35
+  },
+  "output": {
+    "width": 1280,
+    "height": 720,
+    "transparent": false
+  }
+}

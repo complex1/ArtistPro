@@ -8,7 +8,7 @@ from backend.host.plugins import load_manifests, register_plugins
 
 # CORS for the Vite renderer in Electron. Source:
 # https://fastapi.tiangolo.com/tutorial/cors/
-app = FastAPI(title="Artist Studio", version="0.0.0")
+app = FastAPI(title="Artist Studio", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

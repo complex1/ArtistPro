@@ -1,5 +1,8 @@
 # TapPilot
 
+![tappilot editing workspace](../../docs/screenshots/tappilot/editor.png)
+
+
 TapPilot is an Artist Studio tool for building phone-controlled shortcut decks.
 
 ## Starter profiles
@@ -31,3 +34,7 @@ Use the repository-level commands:
 - `npm run dev` — run Artist Studio, TapPilot's phone UI, and Electron
 - `npm run build` — build Artist Studio and the phone PWA
 - `npm test` — run all frontend, backend, and TapPilot schema tests
+
+## Suite guides
+
+[Installation](../../docs/installation.md) · [Development](../../docs/development.md) · [Saving and backups](../../docs/data-and-backups.md) · [Testing evidence](../../docs/testing.md) · [Gallery screenshot](../../docs/screenshots/tappilot/home.png)

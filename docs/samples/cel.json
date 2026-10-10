@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "name": "original-demo",
+  "width": 320,
+  "height": 240,
+  "sourceAsset": "source.png",
+  "sourceName": "original-demo",
+  "settings": {
+    "colorCount": 16,
+    "maxEdge": 1024,
+    "denoise": true,
+    "inkThreshold": 32,
+    "ignoreNearWhite": true,
+    "chromaRules": [],
+    "chromaTolerance": 24,
+    "speckle": 4,
+    "cornerThreshold": 60,
+    "exportScale": 4,
+    "inkEnabled": false
+  },
+  "chromaRemove": [],
+  "chromaRetain": [],
+  "chromaTolerance": 24
+}

@@ -1,0 +1,96 @@
+Wireframes and implementation checkpoint
+
+Companion to Product requirements and UX specification. These compact text wireframes describe the shared desktop workspace and the sample flows from the interactive planning prototype. The checkpoint at the end records the current Anime 3D implementation; earlier tabs retain the broader proposed design.
+
+S01 — Studio and new shot
+
++-----------------------------------------------------+
+| Artist Studio / Anime 3D                               |
+| Shot name [Untitled shot________________]           |
+| [New shot]  [Try First wave]  [Open project file]     |
+| 1 character / 24 frames / 24 fps / 1280 x 720         |
+| Recent shots                  [Find a shot_______]  |
+| [Preview | Name | Local save time | Open | Delete]  |
++-----------------------------------------------------+
+
+New shot creates a neutral starter scene; Try First wave creates Neutral, Wave, and Turn keys at frames 1, 9, and 17. A recent card reopens its local project. Import validates a portable project before creating a new local record. Empty, loading, invalid-file, and storage-error states remain on this screen with useful actions.
+
+Shared workspace — six stages, one shot
+
++-----------------------------------------------------+
+| Studio | Shot name | Save state | Undo/Redo | Export |
+| Build | Pose | Draw | Animate | Camera | Render      |
++------------+-------------------------+--------------+
+| SCENE      | Explore / Shot preview  | INSPECTOR    |
+| Character  |                         | Stage tools  |
+| Drawing    |       3D CANVAS         | Selection    |
+| Shot camera|                         | Properties   |
+|            | Selected joint / Frame  | Help         |
++------------+-------------------------+--------------+
+| Play / Pause | Loop | Frame 01 / 24 | Previous/Next |
+| Character 01 | 01* ... 09* ... 17* ... 24            |
+| Drawing: static | Camera: static | Hold from frame  |
++-----------------------------------------------------+
+| Action feedback                  Local project      |
++-----------------------------------------------------+
+
+The center remains the same scene while stages change the inspector. The project bar owns saving, undo/redo, project download, and export. The timeline exposes keys at all times. Distinct Explore and Shot preview labels explain which camera is visible. Key diamonds, selected controls, lock icons, and error text communicate state beyond color.
+
+S02 / S05 / S06 / S07 — Create and time the scene
+
+Build: Character 01 is selected in the scene list. Its inspector shows X/Y/Z placement, turn, jacket color, background, and ground visibility. Visibility and locking belong to the character row. Frame character restores a useful working view.
+
+Pose: show joint handles on the character and Selected joint plus X/Y/Z rotations in the inspector. Neutral, Wave, and Turn are available presets. Dragging a hand or foot uses IK; other handles rotate joints. Release commits one whole-character key at the playhead. Escape cancels the gesture; Undo restores the prior pose.
+
+POSE AT FRAME 09              DRAW ON FRONT PLANE
+[Selected joint: Left hand]   [Front / Side / Top / View]
+[X] [Y] [Z]                  [Depth: 0 m] [Ink] [Width]
+[Neutral] [Wave] [Turn]       Canvas: faint plane + cursor
+[Add current pose key]       Drag -> preview -> release
+Auto-key: whole character    Stroke list -> select/delete
+
+Draw: choose a plane and depth before dragging. Freeze the plane for that gesture, then retain the resulting points in world space. Existing strokes do not follow the character or move when the next stroke’s depth changes. Alt-drag navigates without painting; an edge-on plane reports an actionable error.
+
+Animate: clicking a frame scrubs without editing. Keys hold until the next key. The sample’s exposures are Neutral 1–8, Wave 9–16, and Turn 17–24. Move or copy a pose through the destination-frame control; later key diamonds can also be dragged. An occupied destination asks to Replace. Frame 1 is retained as the base. Play/Pause and Loop control the one-second preview.
+
+S08 / S09 — Find the shot and export
+
+CAMERA                       EXPORT PNG STILL
+[Front] [Side] [Top]          Shot: First wave / Frame 09
+[Perspective]                Camera: saved shot camera
+[Use this view for shot]     Size: 1280 x 720
+[Field of view]              Background: opaque / alpha
+Explore -> capture -> Shot  [Back] [Render & download]
+
+Explore angle presets and orbit affect the working viewpoint. Use this view for shot explicitly copies that viewpoint into the saved camera, is undoable, and switches to Shot preview. Render shows the saved composition and controls for cel shading, outlines, light direction, ground, and transparency.
+
+Export states are ready, rendering, success, canceled, and failed. Show frame, camera, resolution, and background before rendering. Success says the PNG was rendered and its download started. Cancel or failure keeps the shot editable. Grids, bones, handles, and drawing-plane guides are excluded; ground remains optional scene content.
+
+S03 / S04 — Future designer concepts
+
+Character Designer concept: component library at left, rotating character preview in the center, body/face/hair/outfit properties at right, and explicit Apply/Cancel below. Validate rig compatibility before replacing a character with existing poses. Environment concept: reusable assets at left, placement in the shared canvas, transform/material controls at right, and shot preview for composition. These are later designs; the current Build stage supplies the fixed character and simple background/ground controls.
+
+Sample UX — create, correct, and recover
+
+First wave: Studio → Try First wave → inspect keys 1/9/17 → Pose at frame 9 → Draw two world-space effect strokes → Camera → Use this view for shot → Shot preview → Render PNG → Project file → reopen. The durable project retains scene content and timing; the editor currently reopens at frame 1.
+
+Correct a mistake: Undo a stroke with the wrong depth → change plane depth → redraw. Move the frame-17 key toward occupied frame 9 → cancel Replace → choose frame 18 → preview the extended middle hold → Undo to restore timing.
+
+SAVE FAILURE
+[Save failed: your current shot is still open]
+[Retry save] [Download project]
+Leave -> wait for save -> success: Studio
+                      -> failure: stay / explicit leave
+
+Recover work: a failed save preserves the active editor and offers Retry save and Download project. Navigation waits for pending saves; failed hash navigation retains the editor. The Studio button asks before leaving unsaved work. A portable file can preserve newer edits when the last browser save is older. Imported files receive a new project ID.
+
+Implementation checkpoint — current early studio
+
+Implemented and exercised: Artist Studio launcher entry; local gallery and portable import/export; original procedural rig with arm/leg IK and numeric posing; whole-character auto-keys and Hold timing; plane-based world drawing; undo/redo; independent Explore camera and saved shot capture; cel appearance; fixed 720p PNG still output; ordered browser autosaves and failed-save protection.
+
+Browser evidence: 24 Chromium checks passed for creation, current-frame keys, held poses, undo/redo, pointer stroke vertices, queued-save ordering, injected save failure and retry, navigation protection, camera independence, transparent PNG dimensions/pixels, and exact saved-content reopen. This verifies those flows; representative artist usability and device coverage still need evaluation.
+
+Planning differences still open: the editor enters Pose and reopens at frame 1; frame/view/selection are session state. Recovery currently means reopening the last completed browser save or importing a portable file; the proposed Restore/Discard recovery chooser is not implemented. Object renaming, multi-object scenes, general scene grouping, stroke transforms, pressure input, resizable panels, and persistent layout preferences remain future work.
+
+Further scope limits: the shot camera is captured from Explore and has numeric field of view; there is no separate Edit shot camera mode. View-facing drawing uses the view at gesture start, with committed points fixed in world space. Output is one PNG still at 1280 × 720; there is no animation/video export, smaller-resolution retry, character/environment designer, deforming stroke attachment, cloud sync, or multi-shot project yet.
+

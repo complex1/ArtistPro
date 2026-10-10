@@ -1,6 +1,6 @@
 # Keyboard shortcuts
 
-Every Artist Pro workspace exposes the keyboard button and `?` or `Mod+/` for a context-specific guide. `Mod` is Command on macOS and Control on Windows/Linux. The guide uses a native modal dialog with focus restoration, Escape dismissal, and an always-visible scrollbar.
+Every Artist Studio workspace exposes the keyboard button and `?` or `Mod+/` for a context-specific guide. `Mod` is Command on macOS and Control on Windows/Linux. The guide uses a native modal dialog with focus restoration, Escape dismissal, and an always-visible scrollbar.
 
 Animated Paint now supports B/E/V/H tools, brackets for brush size, Space for playback, Mod+Z / Mod+Shift+Z / Mod+Y history, Mod+S save, Mod+= / Mod+- zoom, 0 fit, Mod+Shift+E export, Mod+Shift+N add layer, Mod+D duplicate layers, Mod+G / Mod+Shift+G group/ungroup, Delete/Backspace delete the selected stroke, and Escape deselect. Layer deletion remains an explicit UI action. Brush editing supports save, import, export, and playback.
 

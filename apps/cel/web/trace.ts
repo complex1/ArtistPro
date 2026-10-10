@@ -55,7 +55,9 @@ async function traceWithVTrace(
     mode: 'spline',
     filterSpeckle: options.speckle,
     cornerThreshold: options.cornerThreshold,
-    colorPrecision: 8,
+    // visioncortex requires the clustering shift to be below 8. The wrapper
+    // passes this value directly; 8 panics before returning vector output.
+    colorPrecision: 6,
     layerDifference: 8,
     background: VTrace.COLOR_TRANSPARENT,
   })

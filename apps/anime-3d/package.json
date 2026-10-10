@@ -1,0 +1,9 @@
+{
+  "name": "@artist-studio/anime-3d",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./web/index.ts",
+    "./library": "./web/library.ts"
+  }
+}
