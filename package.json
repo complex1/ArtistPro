@@ -67,7 +67,7 @@
     "fflate": "^0.8.3",
     "gifenc": "^1.0.3",
     "imagetracerjs": "^1.2.6",
-    "immer": "^11.1.18",
+    "immer": "^11.1.21",
     "jsep": "^1.4.0",
     "lucide-react": "^1.33.0",
     "mediabunny": "^1.55.2",
