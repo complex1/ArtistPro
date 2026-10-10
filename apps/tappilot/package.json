@@ -10,7 +10,7 @@
     "test": "node --test test/**/*.node.cjs"
   },
   "dependencies": {
-    "@iconify-json/lucide": "^1.2.120",
+    "@iconify-json/lucide": "^1.2.140",
     "@iconify-json/mdi": "^1.2.3",
     "@iconify/react": "^6.0.2",
     "cors": "^2.8.5",
