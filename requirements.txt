@@ -17,4 +17,4 @@ typing-inspection==0.4.4
 typing_extensions==4.16.0
 uvloop==0.22.1; sys_platform != "win32" and implementation_name == "cpython"
 watchfiles==1.2.0
-websockets==17.1
+websockets==17.2
